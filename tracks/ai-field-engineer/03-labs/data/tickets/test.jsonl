@@ -1,0 +1,100 @@
+{"ticket": "Good morning. How do I rotate my API key? This is urgent. Cheers, Carlos.", "category": "how-to", "severity": 3}
+{"ticket": "Abuse report: bot signups from us-east. It affects all users. Ref #8731.", "category": "abuse", "severity": 5}
+{"ticket": "Hello, I think my API key was stolen \u2014 unknown usage overnight. This is urgent. Thanks.", "category": "abuse", "severity": 5}
+{"ticket": "Hey, We received a phishing email using your logo. This is urgent. Cheers, Ken.", "category": "abuse", "severity": 5}
+{"ticket": "Quick one: Abuse report: bot signups from us-east. It affects all users.", "category": "abuse", "severity": 5}
+{"ticket": "Hi team, The invoice shows the wrong company name. It affects all users. Cheers, Wei.", "category": "billing", "severity": 4}
+{"ticket": "I think my API key was stolen \u2014 unknown usage overnight. We are in production.", "category": "abuse", "severity": 5}
+{"ticket": "Hey, The invoice shows the wrong company name. Launch is tomorrow.", "category": "billing", "severity": 4}
+{"ticket": "Quick one: Where can I find docs for SSO login rate limits?", "category": "how-to", "severity": 2}
+{"ticket": "Good morning. How do I rotate my API key? It affects all users.", "category": "how-to", "severity": 3}
+{"ticket": "Hello, The invoice shows the wrong company name. Launch is tomorrow. Thanks.", "category": "billing", "severity": 4}
+{"ticket": "Quick one: Abuse report: bot signups from eu-west. Ref #9659.", "category": "abuse", "severity": 4}
+{"ticket": "Quick one: Error rate on the dashboard jumped to 40%. Launch is tomorrow. Account 83801.", "category": "outage", "severity": 5}
+{"ticket": "Hey, How to export usage data to CSV? This is urgent. Cheers, Carlos.", "category": "how-to", "severity": 3}
+{"ticket": "Hi team, Report fraud: fake invoices sent in your name. Please help.", "category": "abuse", "severity": 4}
+{"ticket": "Hi team, How do I set up SSO with Okta? This is urgent. Account 74158.", "category": "how-to", "severity": 3}
+{"ticket": "The invoice shows the wrong company name. It affects all users. Please help.", "category": "billing", "severity": 4}
+{"ticket": "Abuse report: bot signups from us-east. We are in production. Please help.", "category": "abuse", "severity": 5}
+{"ticket": "Hey, We were charged twice on the last invoice. This is urgent. Thanks.", "category": "billing", "severity": 4}
+{"ticket": "Hello, Where can I change the default model? Cheers, Carlos.", "category": "how-to", "severity": 2}
+{"ticket": "Hello, the EU cluster is down in eu-west. We are in production. Please help.", "category": "outage", "severity": 5}
+{"ticket": "Getting 500 errors from the CLI since 09:00. Account 53114.", "category": "outage", "severity": 4}
+{"ticket": "I think my API key was stolen \u2014 unknown usage overnight. We are in production. Ref #7149.", "category": "abuse", "severity": 5}
+{"ticket": "Hey, Error rate on the API jumped to 40%. We are in production.", "category": "outage", "severity": 5}
+{"ticket": "Quick one: Why did the payment for $49 fail? Cheers, Lena.", "category": "billing", "severity": 3}
+{"ticket": "Quick one: Abuse report: bot signups from eu-west. Thanks.", "category": "abuse", "severity": 4}
+{"ticket": "Hey, We received a phishing email using your logo. Please help.", "category": "abuse", "severity": 4}
+{"ticket": "Hey, Abuse report: bot signups from us-east. This is urgent. Thanks.", "category": "abuse", "severity": 5}
+{"ticket": "Quick one: How do I rotate my API key? Launch is tomorrow.", "category": "how-to", "severity": 3}
+{"ticket": "An account is scraping our public pages via SSO login. Launch is tomorrow. Please help.", "category": "abuse", "severity": 5}
+{"ticket": "Hello, Error rate on the EU cluster jumped to 40%. Launch is tomorrow. Please help.", "category": "outage", "severity": 5}
+{"ticket": "How do I rotate my API key? Thanks.", "category": "how-to", "severity": 2}
+{"ticket": "Billing page shows a charge I don't recognise. It affects all users.", "category": "billing", "severity": 4}
+{"ticket": "Hi team, Abuse report: bot signups from eu-west. This is urgent.", "category": "abuse", "severity": 5}
+{"ticket": "Hello, Error rate on the EU cluster jumped to 40%. Launch is tomorrow. Thanks.", "category": "outage", "severity": 5}
+{"ticket": "Hey, Why did the payment for $900 fail? It affects all users.", "category": "billing", "severity": 4}
+{"ticket": "Hey, My card was declined when renewing the plan. This is urgent. Thanks.", "category": "billing", "severity": 4}
+{"ticket": "Quick one: Error rate on the dashboard jumped to 40%. This is urgent.", "category": "outage", "severity": 5}
+{"ticket": "How to configure batch jobs for a second region? We are in production. Please help.", "category": "how-to", "severity": 3}
+{"ticket": "Hey, Billing page shows a charge I don't recognise. Launch is tomorrow. Account 51613.", "category": "billing", "severity": 4}
+{"ticket": "Hi team, Someone is sending spam from an account on your platform. It affects all users.", "category": "abuse", "severity": 5}
+{"ticket": "Quick one: My card was declined when renewing the plan. It affects all users. Cheers, Ken.", "category": "billing", "severity": 4}
+{"ticket": "Good morning. Error rate on batch jobs jumped to 40%. We are in production. Please help.", "category": "outage", "severity": 5}
+{"ticket": "Hello, How to export usage data to CSV? Thanks.", "category": "how-to", "severity": 2}
+{"ticket": "Error rate on SSO login jumped to 40%. We are in production. Ref #1902.", "category": "outage", "severity": 5}
+{"ticket": "Hi team, How to configure webhooks for a second region? This is urgent. Cheers, Priya.", "category": "how-to", "severity": 3}
+{"ticket": "Hello, Abuse report: bot signups from us-west. We are in production.", "category": "abuse", "severity": 5}
+{"ticket": "Requests to the CLI time out after 30s.", "category": "outage", "severity": 4}
+{"ticket": "Hello, Getting 500 errors from the dashboard since 09:00. Ref #3970.", "category": "outage", "severity": 4}
+{"ticket": "Hi team, An account is scraping our public pages via the API. Ref #9751.", "category": "abuse", "severity": 4}
+{"ticket": "Abuse report: bot signups from us-west. Account 37577.", "category": "abuse", "severity": 4}
+{"ticket": "Quick one: Abuse report: bot signups from ap-south.", "category": "abuse", "severity": 4}
+{"ticket": "We were charged twice on the last invoice. We are in production.", "category": "billing", "severity": 4}
+{"ticket": "Quick one: How do I rotate my API key? Launch is tomorrow. Cheers, Mei.", "category": "how-to", "severity": 3}
+{"ticket": "Good morning. webhooks is down in ap-south. We are in production. Cheers, Carlos.", "category": "outage", "severity": 5}
+{"ticket": "Where can I find docs for the CLI rate limits? Ref #9992.", "category": "how-to", "severity": 2}
+{"ticket": "Good morning. Where can I find docs for webhooks rate limits? Thanks.", "category": "how-to", "severity": 2}
+{"ticket": "Good morning. the CLI unreachable for our whole team. Thanks.", "category": "outage", "severity": 4}
+{"ticket": "Billing page shows a charge I don't recognise. Launch is tomorrow.", "category": "billing", "severity": 4}
+{"ticket": "Hi team, Where can I find docs for batch jobs rate limits? It affects all users. Ref #9294.", "category": "how-to", "severity": 3}
+{"ticket": "Quick one: We received a phishing email using your logo. We are in production. Ref #7853.", "category": "abuse", "severity": 5}
+{"ticket": "Hi team, Where can I change the default model? Ref #7756.", "category": "how-to", "severity": 2}
+{"ticket": "Hey, Where can I change the default model? This is urgent. Thanks.", "category": "how-to", "severity": 3}
+{"ticket": "Good morning. Report fraud: fake invoices sent in your name. This is urgent. Cheers, Aisha.", "category": "abuse", "severity": 5}
+{"ticket": "Hi team, We were charged twice on the last invoice. We are in production. Cheers, Carlos.", "category": "billing", "severity": 4}
+{"ticket": "Good morning. Can I get a refund for the unused seats ($49)? Launch is tomorrow.", "category": "billing", "severity": 4}
+{"ticket": "Quick one: We were charged twice on the last invoice. Cheers, Aisha.", "category": "billing", "severity": 3}
+{"ticket": "Requests to the CLI time out after 30s. We are in production.", "category": "outage", "severity": 5}
+{"ticket": "Good morning. the EU cluster unreachable for our whole team. Launch is tomorrow. Thanks.", "category": "outage", "severity": 5}
+{"ticket": "Hi team, Why did the payment for $2400 fail? Please help.", "category": "billing", "severity": 3}
+{"ticket": "Hey, An account is scraping our public pages via SSO login. Please help.", "category": "abuse", "severity": 4}
+{"ticket": "Hi team, How do I set up SSO with Okta?", "category": "how-to", "severity": 2}
+{"ticket": "Good morning. the EU cluster is down in ap-south.", "category": "outage", "severity": 4}
+{"ticket": "Quick one: Why did the payment for $49 fail? Launch is tomorrow.", "category": "billing", "severity": 4}
+{"ticket": "Hello, Billing page shows a charge I don't recognise. We are in production. Cheers, Olu.", "category": "billing", "severity": 4}
+{"ticket": "Quick one: Report fraud: fake invoices sent in your name. This is urgent. Cheers, Aisha.", "category": "abuse", "severity": 5}
+{"ticket": "Good morning. How to export usage data to CSV? Launch is tomorrow.", "category": "how-to", "severity": 3}
+{"ticket": "How to export usage data to CSV? It affects all users.", "category": "how-to", "severity": 3}
+{"ticket": "Hey, We were charged twice on the last invoice.", "category": "billing", "severity": 3}
+{"ticket": "Good morning. Getting 500 errors from the CLI since 09:00. Please help.", "category": "outage", "severity": 4}
+{"ticket": "Hello, Error rate on the EU cluster jumped to 40%. It affects all users. Ref #9808.", "category": "outage", "severity": 5}
+{"ticket": "Hi team, Where can I change the default model? It affects all users.", "category": "how-to", "severity": 3}
+{"ticket": "Hi team, webhooks is down in eu-west. It affects all users. Cheers, Tom.", "category": "outage", "severity": 5}
+{"ticket": "I think my API key was stolen \u2014 unknown usage overnight. Account 61963.", "category": "abuse", "severity": 4}
+{"ticket": "Quick one: We received a phishing email using your logo. Thanks.", "category": "abuse", "severity": 4}
+{"ticket": "Hello, Abuse report: bot signups from us-east. We are in production. Account 72622.", "category": "abuse", "severity": 5}
+{"ticket": "Hey, How to configure SSO login for a second region? Launch is tomorrow. Please help.", "category": "how-to", "severity": 3}
+{"ticket": "Hello, the EU cluster is down in ap-south.", "category": "outage", "severity": 4}
+{"ticket": "Hi team, An account is scraping our public pages via the dashboard. This is urgent. Account 57654.", "category": "abuse", "severity": 5}
+{"ticket": "Good morning. Getting 500 errors from the EU cluster since 09:00. Thanks.", "category": "outage", "severity": 4}
+{"ticket": "Hi team, We received a phishing email using your logo. Ref #5372.", "category": "abuse", "severity": 4}
+{"ticket": "Hey, We were charged twice on the last invoice. Ref #3398.", "category": "billing", "severity": 3}
+{"ticket": "Hey, the dashboard is down in eu-west. Launch is tomorrow. Please help.", "category": "outage", "severity": 5}
+{"ticket": "Hi team, Report fraud: fake invoices sent in your name. Launch is tomorrow. Please help.", "category": "abuse", "severity": 5}
+{"ticket": "Hello, Abuse report: bot signups from us-west. Please help.", "category": "abuse", "severity": 4}
+{"ticket": "Billing page shows a charge I don't recognise. Cheers, Olu.", "category": "billing", "severity": 3}
+{"ticket": "Hi team, batch jobs is down in us-west. Please help.", "category": "outage", "severity": 4}
+{"ticket": "the EU cluster is down in eu-west. Thanks.", "category": "outage", "severity": 4}
+{"ticket": "Quick one: Huge latency spike on the API in us-west. It affects all users. Cheers, Ken.", "category": "outage", "severity": 5}
+{"ticket": "Billing page shows a charge I don't recognise. Please help.", "category": "billing", "severity": 3}

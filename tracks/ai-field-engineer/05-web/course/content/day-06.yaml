@@ -1,0 +1,1109 @@
+# Day 6 · Structured output and batch. Plain-language content for the guided course (spec section 3).
+# Sources (kit root = fireworks-field-engineer-kit/):
+#   L07     03-labs/lessons/07-structured-output/README.md (table lines 13-17, sample lines 41-44, checks 49-51)
+#   so      03-labs/lessons/07-structured-output/structured_output.py (schema in the prompt in every mode, lines
+#           40-42; max_tokens 120; n 50 per mode; rejected mode is "a finding too", line 52; ~$0.02, line 17;
+#           lines 46-54 catch EVERY exception, so a server that is down prints "server rejected request
+#           (APIConnectionError: Connection error.)" for each mode, then felab/results.py line 43 "(no rows)")
+#   L08     03-labs/lessons/08-batch-api/README.md (300 ms line 8, half price line 10, sample line 43)
+#   mb/sb   make_batch.py (100 requests, t-000..t-099), score_batch.py (join by custom_id; answered / of)
+#   sub     submit_batch.sh (poll every 30 s, Ctrl-C safe, "well under a cent even at full price", line 9)
+#   tickets 03-labs/felab/tickets.py (strict parse, schema_valid, grade); data/triage_schema.json (341 bytes:
+#           4-value enum, integer 1-5, next_action maxLength 120, no extra fields); data/make_tickets.py
+#           (800/100/100 rows; severity BASE_SEV line 61 how-to 2 .. outage 4, +1 for urgency cues, line 74)
+#   mock    03-labs/felab/mock_server.py lines 161-168 (12% of prompt-only JSON broken on purpose: prefix
+#           "Sure! Here is the JSON:" and the last 3 characters cut; json_object gets all fields, lines 96-98;
+#           reply time = pieces x 18 ms, line 176)
+#   narr    04-video-source/src/narration.json lines 943-1078 (The Platform Map; Modes 973-976, Worked
+#           1002-1034, BeforeAfter 1035-1065); lines 734-769 (Training Techniques: prompt first; 81% -> 89%)
+#   LB      02-lab-book/field-engineer-lab-book.html lines 655 (on-demand: per GPU-second, scale-to-zero after
+#           1 h idle by default, needed for LoRA serving), 656 (Batch: 50%, 12-72h windows), 657 (reserved),
+#           664 (structured output: schema in the prompt too; reasoning models omit response_format),
+#           671-701 (gpt-oss 120B $0.15 / $0.015 / $0.60; H100 $8.00 an hour), 1217-1256 (F3, F4)
+#   L09     03-labs/lessons/09-eval-harness/README.md lines 53-57 (mock-8b 75.0, -lora 92.5)
+#   memo    03-labs/lessons/15-capstone/build_memo.py lines 51, 77-78, 112-113
+# Arithmetic: 50 x 0.86 = 43; 50 - 43 = 7; 50 x 0.78 = 39; 50 x 0.64 = 32; 39 - 32 = 7; 50 - 39 = 11 (22%);
+#   16 x 0.15 = 2.40; 4 x 0.60 = 2.40; 2.40 + 2.40 = 4.80; 365 x 24 / 12 = 730 h; 730 / 24 = 30.4 days;
+#   4.80 x 30.4 = 146; 8 x 730 = 5,840; 5,840 / 146 = 40; 20M x 40 = 800M tokens a day;
+#   800,000,000 / 86,400 = 9,259 tokens/s; 4.80 / 2 = 2.40; 6.00 / 0.20 = 30; 0.1 x 6.00 = 0.60;
+#   0.9 x 0.20 = 0.18; 0.60 + 0.18 = 0.78; 6.00 / 0.78 = 7.7; 0.60 / 0.78 = 77%; 1.9 / 0.6 = 3.2;
+#   2,000 x 600 x 2 = 2.4M; 2.4 x 0.50 = 1.20; t-043..t-099 = 57; 100 x 0.45 s = 45 s; 150 = 50 x 3;
+#   12% = about 1 in 8 (12.5%).
+# Live sources, checked 2026-09-27: https://fireworks.ai/models/fireworks/gpt-oss-20b "Serverless: Not supported"
+#   (on-demand only); https://docs.fireworks.ai/guides/batch-inference: batch takes "Any model that supports
+#   On-Demand Deployments in the Model Library" at "50% off Serverless per-token prices"; a job on an unsupported
+#   model can stay pending with no error. So submit_batch.sh's default gpt-oss-20b should still run in batch, with
+#   no serverless price to halve; the Stuck row falls back to gpt-oss-120b.
+# Kit problem (not confirmed by a run): the Fireworks default gpt-oss-120b and the batch model gpt-oss-20b
+#   write out reasoning (outside-kit fact), yet the lesson enforces json_schema on them with max_tokens 120,
+#   against check 3 and LB line 664; the run notes and a Stuck row tell the learner what to do if it shows.
+# Glossary: shared terms copy the FIRST day's definition exactly (the validator compares case-sensitively;
+#   Days 1-4 now all start definitions lower-case). Terms Day 6 defines first that later days repeat
+#   (Constrained decoding: Day 10; Managed platform, Autoscaling: Day 8; gpt-oss: Day 7; Scale to zero:
+#   Day 10's text) must match exactly; Day 6 caveats go in the example.
+
+day: 6
+tile: "Check replies are well-formed, then run bulk jobs at half price"
+
+overview:
+  today: >-
+    Make a model's replies come back in a fixed shape that code can read, every time. Then measure how often
+    they are also right. Finally, send the same test to Fireworks as one file through its Batch API (its bulk
+    service), which answers later at about half the usual price.
+  example: >-
+    Imagine software that sends support tickets to the right team. It needs every model reply in a shape it can
+    read; otherwise the ticket gets stuck. In the practice test, making the server enforce that shape fixes all
+    the unreadable replies, but some tickets still go to the wrong team. Today you will measure those two
+    errors separately: a readable answer is not necessarily a correct one.
+  deliverable: >-
+    The share of well-formed replies you would quote to a customer, measured on 50 test tickets the model
+    never trained on, and a 100-ticket test scored through the Batch API.
+  expected: >-
+    About 100% well-formed with the format enforced, but fewer right answers (78% on the practice server).
+    From the Batch API: an answer for each of the 100 test tickets, matched to its ticket.
+  before:
+    - title: "The practice server is running."
+      body: >-
+        Both steps rehearse on the kit's practice server first: free, offline, with made-up numbers. Start it
+        from the `03-labs` folder with the Python environment on (`source .venv/bin/activate`).
+      command: "make mock &"
+      after: "It prints `mock LLM on http://localhost:9000/v1`."
+    - title: "llama.cpp from Day 2, for step 1."
+      body: >-
+        Step 1 also asks a real model, run on your Mac by llama.cpp (the program that runs models locally).
+        Nothing new downloads: it reuses Day 2's Llama 3.1 8B, stored at 4 bits per number. In a second
+        terminal, from the `03-labs` folder:
+      command: "bash lessons/02-three-local-servers/serve_llamacpp.sh"
+      after: >-
+        Wait for the line saying it is listening (ready for requests). Leave it running for step 1, then stop
+        it with Ctrl+C.
+    - title: "Your Fireworks key and firectl from Day 1."
+      body: >-
+        Both steps end on Fireworks, about $0.03 in all. The scripts read your key from the `.env` file in
+        `03-labs`. Step 2 also uses firectl, Fireworks' command-line tool. Check it is still signed in:
+      command: "firectl whoami"
+      after: "It shows your account. If it asks you to sign in, run `firectl signin`."
+  feeds: >-
+    On Day 7, a test rig (the eval harness) grades the same tickets more ways: a second model acting as
+    judge, speed, and cost per 1,000 tickets. On Day 10, your sizing memo (a written hardware and cost
+    recommendation) quotes your latest two well-formed shares, asked in the prompt and enforced, from
+    `results/07-structured.csv`. It names batch as the way to halve the cost of tests and bulk re-processing.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 1 · Structured output (lesson 07-structured-output). No video: "In plain words" is the explanation.
+  # ---------------------------------------------------------------------------------------------------------
+  d6-s1:
+    why: >-
+      Business software reads a model's replies with code, and one badly formed reply can crash it. You try
+      three ways of asking for the format, measure how often replies come back well-formed, and see that
+      well-formed is not the same as right.
+    why_example: >-
+      Sorting 50 support tickets on the practice server: asking nicely gave 43 readable replies. Making the
+      server enforce the format gave 50 of 50, yet only 39 had the right category.
+    plain:
+      lead: >-
+        The server can guarantee a reply's format, but not that the answer is right. Business software reads
+        a model's reply with code, not with eyes; if the reply is not exactly in the expected format, the code
+        stops with an error. A schema is the rulebook for that format. The server can enforce it (constrained
+        decoding): the model writes one token (a word piece) at a time, and at every step the server blocks
+        any token that would break the rules.
+      picture: >-
+        A paper form lets people write anything in any box, so some come back in a shape the office's
+        computer cannot file, such as "sometime next week" in a date box. An online form with dropdowns offers
+        only allowed choices, so every form can be filed. It still cannot stop someone choosing the wrong
+        option.
+      numbers_source: >-
+        the kit's triage schema (`data/triage_schema.json`) and lesson 07's practice-server table (made-up
+        numbers for teaching), 50 tickets for each way of asking
+      numbers:
+        - >-
+          The task: read one customer support ticket and reply with 3 fields. The schema (the kit calls it the
+          contract) sets them: `category` is one of 4 words (billing, outage, how-to, abuse); `severity` a
+          whole number from 1 (least urgent) to 5 (most urgent); `next_action` text of up to 120 characters.
+          Nothing else is allowed.
+        - >-
+          With enforcement on, the reply must start with `{`, so a chatty `Sure! Here is the JSON:` is blocked
+          at the very first token. After `{"category": "` the server allows only tokens that start one of the
+          4 words.
+        - >-
+          Asking in the prompt only: 43 of 50 replies could be read as data (86%); 7 came back broken.
+        - >-
+          Enforced, in either of the server's two settings (`json_object` or `json_schema`): 50 of 50 readable
+          and following the schema (100%). Only `json_schema` guarantees the schema's fields; `json_object`
+          guarantees readable JSON, and the practice server happens to give it the right fields too.
+        - >-
+          Right category: 39 of 50 enforced (78%), 32 of 50 prompt-only (64%). The 7-ticket gap is the 7 broken
+          replies: a reply the code cannot read counts as wrong.
+        - >-
+          Even enforced, 11 of 50 are wrong (22%): well-formed is not the same as right.
+      words:
+        - term: "JSON"
+          def: >-
+            A plain-text format for data that programs can read: named fields inside curly brackets. Example:
+            `{"category": "billing", "severity": 3}`.
+        - term: "Schema (JSON schema)"
+          def: >-
+            The rulebook a JSON reply must follow: which fields, what type each holds, which values are
+            allowed. Example: `data/triage_schema.json`.
+        - term: "Constrained decoding"
+          def: >-
+            At every step the server blocks any token that would break the schema, so the reply cannot come out
+            malformed, unless the reply length limit cuts it off. Example: `json_schema` mode, 50 of 50 valid.
+        - term: "Parse"
+          def: >-
+            Read text as data. Parsing fails when the text is not valid JSON. Example: the `parses_%` column.
+    run:
+      - cmd: "python data/make_tickets.py"
+        note: >-
+          Run it from the `03-labs` folder. It builds the kit's practice support tickets, the same for everyone:
+          800 for training, 100 for checking during training, 100 kept back for tests. Day 1's smoke test
+          already built them; running it again writes identical files. **Look for** three `wrote` lines: 800,
+          100 and 100 rows.
+      - cmd: "python structured_output.py --target mock"
+        note: >-
+          Sends the first 50 test tickets to the practice server three times: asking for JSON in the prompt
+          only, then with `json_object`, then with `json_schema`. The schema is in the prompt every time.
+          **Look for** schema_valid_% at 86 in the prompt row and 100 in both enforced rows, and
+          category_acc_% at 64 in the prompt row and 78 in both enforced rows.
+      - cmd: "python structured_output.py --target llamacpp"
+        note: >-
+          The same 150 requests (50 tickets x 3 ways), now to a real model on your Mac: Day 2's Llama 3.1 8B,
+          stored at 4 bits per number. Start its llama.cpp server first, as in Before you start. llama.cpp
+          turns the schema into a grammar, a rulebook of allowed text it enforces token by token. **Look for**
+          the json_schema row at 100% valid, and note its category_acc_%. If one mode prints `server rejected
+          request` (for example with `BadRequestError`), that server does not support it: write that down, it
+          is a finding too. If every mode prints it with `APIConnectionError`, the server is not running: see
+          Stuck.
+      - cmd: "python structured_output.py --target fireworks"
+        note: >-
+          The same 150 requests on Fireworks (paid, about $0.02), to the model named in your `.env` file
+          (gpt-oss-120b unless you changed it). **Look for** the json_schema row: its schema_valid_% is the
+          figure you would quote to a customer, with its category_acc_% beside it. gpt-oss-120b writes out its
+          thinking before it answers (a reasoning model, check 3 below). If its rows show low validity or empty
+          replies, that thinking may have used up the script's 120-token reply limit (`max_tokens`): write it
+          down as a finding, and compare with the prompt row, which follows check 3's pattern.
+    see: >-
+      Each row is one way of asking, 50 tickets each. `parses_%` is the share that read as JSON;
+      `schema_valid_%` the share that also follow the schema; `category_acc_%` the share with the right
+      category; `p95_ms` the wait 95 of 100 replies stay under, in milliseconds (thousandths of a second). The
+      practice server breaks about 1 in 8 prompt-only replies on purpose (7 of 50 here): it puts
+      `Sure! Here is the JSON:` in front and cuts off the end. Those replies are longer, and longer replies
+      take longer to write, so that row is slower (536 against 447 ms).
+    checks:
+      - q: >-
+          Every reply now comes back well-formed (100% valid), but only 78 of every 100 put the ticket in the
+          right category (78% accuracy). What do you do next?
+        plain: >-
+          Work on the answers, not the format. Improve the instructions or add a few worked examples to the
+          prompt first; if that is not enough, fine-tune the model. The format problem is already solved.
+        picture: >-
+          The online form can now always be filed, but some people pick the wrong option. Clearer
+          instructions on the form help first; if people keep getting it wrong, you train them.
+        numbers_source: "lesson 07's practice table and the Training Techniques video (Day 7)"
+        numbers:
+          - >-
+            In the practice run, 39 of 50 replies are right (78%) and 11 are wrong, all perfectly formatted.
+          - >-
+            Enforcement has nothing left to fix: `json_object` and `json_schema` both score 78%.
+          - >-
+            Cheapest fix first: a better prompt, which the Training Techniques video (Day 7) calls free.
+          - >-
+            Then train. The Training Techniques video (Day 7) works an example with a different ticket-sorting
+            model: 2,000 solved tickets of about 600 tokens each, read twice in training, so 2,000 x 600 x 2 =
+            2.4 million tokens.
+          - >-
+            At $0.50 per million training tokens: 2.4 x $0.50 = about $1.20. That model goes from 81% to 89%
+            right.
+        words:
+          - term: "Accuracy"
+            def: >-
+              The share of replies with the right answer, checked against each ticket's known label. Example:
+              78% in the practice run.
+          - term: "Few-shot examples"
+            def: >-
+              A few solved examples placed in the prompt to show the model what a good answer looks like.
+              Example: tickets shown with their correct JSON before the real one.
+          - term: "Fine-tune"
+            def: >-
+              Further training of an existing model on your own examples. Example: Days 7 and 8 train one on
+              these tickets.
+          - term: "Label"
+            def: >-
+              The known right answer stored with each test example. Example: each test ticket's category and
+              severity.
+        more: >-
+          Constrained decoding decides which tokens are allowed, not which allowed token is right: `billing` is a
+          valid category even when the label is `outage`. Accuracy is a model problem. Fix the prompt first
+          (clearer instructions, a few labelled examples), then fine-tune on labelled data (the LoRA fine-tunes of
+          Days 7 and 8), and measure each change on the same held-out tickets.
+      - q: >-
+          The server already forces every reply to follow the schema (`json_schema` mode). Why also write the
+          schema into the prompt?
+        plain: >-
+          So the model plans its answer in the right shape from the start. Forcing alone only blocks wrong
+          tokens as they come, which can push the model into awkward or worse answers.
+        picture: >-
+          Tell a writer the word limit before they start and they plan to fit it. Cut them off mid-sentence at
+          the limit instead, and the ending comes out garbled.
+        numbers_source: "the kit's triage schema and lesson 07's script"
+        numbers:
+          - >-
+            The schema allows `severity` 1 to 5 only. A model that never saw the schema may start to write
+            "high". The server allows only a digit, so the model must pick a number it never planned.
+          - >-
+            `next_action` may hold at most 120 characters. A model unaware of the limit can run long, and a
+            strict server can cut the text off at the limit.
+          - >-
+            Lesson 07's script puts the schema in the prompt in all 3 modes, and Day 6's batch file (step 2) does
+            the same.
+          - >-
+            The cost is small: the schema is 341 characters, a few lines of text, sent with each request.
+        words:
+          - term: "Schema (JSON schema)"
+            def: >-
+              The rulebook a JSON reply must follow: which fields, what type each holds, which values are
+              allowed. Example: 4 categories, severity 1 to 5.
+          - term: "Enforce"
+            def: >-
+              Make the server block anything that breaks the rules. Example: `json_schema` mode.
+          - term: "Completion"
+            def: >-
+              The text the model writes back. Example: the JSON reply to one ticket.
+        more: >-
+          Constrained decoding only removes tokens; it does not tell the model what shape it is heading for. A
+          model that has read the schema already puts its choices on valid continuations, so the mask rarely has
+          to override it. Without the schema in the prompt, the mask may force a digit where the model meant a
+          word, or close a string at its length limit. The lab book passes this on as a Fireworks docs rule: put
+          the schema in the prompt too. The lesson's script does it in every mode, with the comment "the model
+          should know the shape it is being held to, not just be forced into it".
+      - q: >-
+          Some models write out their reasoning before giving a final answer (reasoning models). How do you get
+          well-formed replies from one?
+        plain: >-
+          Write the schema into the prompt, but do not make the server enforce it. Let the model think freely,
+          then check its final answer with code afterwards.
+        picture: >-
+          An exam that allows scrap paper: students work things out in their own words, then fill in the answer
+          grid. Forcing their working into the grid's boxes would wreck it, so you mark the grid afterwards.
+        numbers_source: "lesson 07's code and the lab book's structured-output card"
+        numbers:
+          - >-
+            First: the schema goes in the prompt, as the lesson's script does in all 3 of its modes.
+          - >-
+            Then: leave out `response_format`, the enforcement setting, so nothing blocks tokens while the model
+            reasons. The lab book passes this on as Fireworks' own advice.
+          - >-
+            Next: check the final answer with the lesson's code: does it read as JSON, and does it follow the
+            schema (one of 4 categories, severity 1 to 5)?
+          - >-
+            Finally: report the share that passes on 50 tickets, like the other modes, so the numbers compare.
+        words:
+          - term: "Reasoning model"
+            def: >-
+              A model that writes out its thinking before its final answer. Some servers return that thinking
+              separately.
+          - term: "response_format"
+            def: >-
+              The request setting that turns on enforcement: `json_object` or `json_schema`. Leaving it out means
+              asking in the prompt only.
+          - term: "Validate"
+            def: >-
+              Check a reply with code after it arrives. Example: the lesson's "does it parse" and "does it fit
+              the schema" checks.
+        more: >-
+          Constrained decoding restricts every token the server generates. The lesson's script notes that some
+          reasoning models return their thinking separately and that constrained decoding can interfere with it,
+          so the documented pattern is schema in the prompt, and validate after. Validating afterwards keeps the
+          result measurable: the same parse and schema checks give a rate you can quote. The kit's timing code
+          also reads a reasoning model's separate `reasoning_content` stream (`felab/measure.py`), because the
+          user waits for it.
+    say:
+      ask: "Our software keeps breaking on the model's replies. How do you make them reliable?"
+      means:
+        - phrase: "Schema-constrained decoding for the format"
+          meaning: >-
+            I have the server enforce the customer's schema (the rulebook for the reply's shape) one token at a
+            time, so every reply is readable data with the right fields. On the practice server: 50 of 50
+            well-formed, against 43 of 50 when only asked in the prompt.
+        - phrase: "then a validity and accuracy rate"
+          meaning: >-
+            Then I measure two separate numbers: the share of replies that are well-formed (validity) and the
+            share that are right (accuracy).
+        - phrase: "on 50 of their real tickets"
+          meaning: >-
+            Measured on 50 of the customer's own examples, not on a public test. The lesson rehearses this on 50
+            made-up practice tickets the model never trained on.
+        - phrase: "The first is solved by the platform"
+          meaning: >-
+            Format is fixed by a server setting, not by the model: 100% well-formed with `json_schema` on the
+            practice server.
+        - phrase: "the second by the model"
+          meaning: >-
+            Being right depends on the model: a better prompt first, then a fine-tune (further training on their
+            examples, Days 7 and 8). On the practice server, 78% right even with perfect format.
+    fields:
+      - id: d6-valid-mac
+        label: "Well-formed replies on your Mac: prompt only / schema enforced (%)"
+        hint: >-
+          From `python structured_output.py --target llamacpp`: the schema_valid_% column of the prompt row and
+          the json_schema row. Write both, for example "86 / 100".
+        unit: "%"
+        meaning: >-
+          How often the real model on your Mac follows the schema when only asked, and when the server
+          enforces it. Only the second is guaranteed.
+        example: "86 / 100 on the practice server"
+      - id: d6-acc-mac
+        label: "Right category on your Mac, schema enforced (%)"
+        hint: "The category_acc_% of the json_schema row in the same run."
+        unit: "%"
+        meaning: >-
+          How often a well-formed reply is also right. Format and correctness are two separate numbers.
+        example: "78 on the practice server"
+      - id: d6-valid-fireworks
+        label: "Fireworks, schema enforced: well-formed / right category (%)"
+        hint: >-
+          From `python structured_output.py --target fireworks`: schema_valid_% and category_acc_% of the
+          json_schema row. Write both.
+        unit: "%"
+        meaning: >-
+          The figure you would quote to a customer: the share of replies their code can rely on, measured on 50
+          test tickets the model never trained on, with how often they are right beside it. Day 10's memo reads
+          your latest run from `results/07-structured.csv`.
+        example: "100 / 78 on the practice server"
+    done: >-
+      Your Mac and Fireworks runs each printed a table, and for each you wrote down the json_schema row's
+      well-formed share and right-category share. Expect about 100% well-formed on your Mac. If Fireworks shows
+      less, or a server rejected a mode, you wrote that down instead.
+    stuck:
+      - problem: "Every mode prints `server rejected request (APIConnectionError: Connection error.)` and the table says `(no rows)`."
+        fix: >-
+          That server is not running. `make check` (from the `03-labs` folder) shows what is up. Start the
+          practice server with `make mock &`, or llama.cpp with
+          `bash lessons/02-three-local-servers/serve_llamacpp.sh` in a second terminal, and wait until it says
+          it is listening.
+      - problem: "`data/tickets/test.jsonl missing`."
+        fix: >-
+          The ticket data is not built yet. From the `03-labs` folder run `python data/make_tickets.py`, then run
+          the script again.
+      - problem: "`No module named 'felab'` (or `'openai'`)."
+        fix: >-
+          The Python environment from Day 1 is off in this terminal. From the `03-labs` folder run
+          `source .venv/bin/activate`, then try again.
+      - problem: "One mode prints `server rejected request` with an error such as `BadRequestError`, while the other modes print rows."
+        fix: >-
+          That server does not accept that way of asking, so the script skips the mode and carries on. Write it
+          down: which modes a server supports is a real finding for a customer.
+      - problem: "`FIREWORKS_API_KEY is not set`, or every mode prints `AuthenticationError` on Fireworks."
+        fix: >-
+          Your key is missing or wrong. Put your key in the `.env` file in `03-labs`, as on Day 1, or export it
+          in this terminal.
+      - problem: "Every mode prints `server rejected request (NotFoundError: ...)` on Fireworks."
+        fix: >-
+          The model id is not found. Model ids change: copy a current one from the Fireworks model library and
+          pass it with `--model`.
+      - problem: "Fireworks shows a low schema_valid_% or empty replies, even with the format enforced."
+        fix: >-
+          gpt-oss-120b writes out its thinking before its answer (a reasoning model, check 3). That thinking may
+          use up the script's 120-token reply limit, so the answer comes back cut off or empty. Write it down as
+          a finding and compare with the prompt row, which follows check 3's pattern: schema in the prompt,
+          nothing enforced, checked afterwards.
+    replace:
+      - find: "that is the job of the eval harness in lesson 09 and the fine-tune in lessons 10 and 11."
+        with: "that is the job of the eval harness in lesson 09 (Day 7) and the fine-tunes in lessons 10 and 11 (Days 7 and 8)."
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 2 · Batch API (lesson 08-batch-api), video: The Platform Map
+  # ---------------------------------------------------------------------------------------------------------
+  d6-s2:
+    why: >-
+      Jobs where nobody waits for the answer can go to Fireworks' Batch API: one file in, answers later, at
+      about half the usual price. You rehearse the round trip offline, then run it for real on 100 test
+      tickets.
+    why_example: >-
+      The Platform Map video's example app spends $4.80 a day on 20 million tokens (word pieces). If none of it
+      needed an instant answer, batch would cut that to about $2.40.
+    start_first:
+      command: "cd lessons/08-batch-api && bash submit_batch.sh accounts/fireworks/models/gpt-oss-20b"
+      note: >-
+        Batch jobs take minutes to hours, so start the real one now. It may finish during the video or take
+        many hours (the lab book allows up to 72); both are normal. Run it in a second terminal: from
+        `03-labs`, `source .venv/bin/activate`, then the command. It builds the file of 100 requests, uploads
+        it, starts the job and checks on it every 30 seconds. The script estimates fractions of a cent, so it
+        is safe to start before the offline rehearsal below. Write down the job name from the `create job:` line: you
+        need it to check on the job later. Ctrl+C is then safe: it stops the checking, and the job keeps
+        running. The model, gpt-oss-20b, is no longer offered per token (serverless), but batch still takes it:
+        batch runs any model that Fireworks can put on a GPU reserved for one customer (an on-demand
+        deployment). If the job is still pending, with no error, when you finish today's other work, see
+        Stuck? below.
+    videos:
+      08-platform:
+        in_this_video: >-
+          What a managed AI platform runs for its customers, the four ways it sells computing, and the sums that
+          decide between paying per token and renting a whole GPU.
+        key_points:
+          - point: >-
+              A managed platform runs everything from the GPUs up to the model, so the customer builds only the
+              app. Its shared (serverless) models charge per token, not per hour of GPU time.
+            detail: >-
+              The 5 layers, bottom to top: GPUs and data centres; the serving engine (the program that runs the
+              model); scaling and routing (adding copies as traffic grows, and sending each request to one); the
+              model; then the app. A raw GPU cloud rents only the bottom layer and leaves the rest to you.
+          - point: >-
+              Four ways to buy computing: shared models billed per token, your own rented GPUs, batch for work
+              that can wait, and GPUs reserved on a long contract.
+            detail: >-
+              Shared per-token models (serverless) suit traffic that comes in sudden peaks. Your own GPUs
+              (dedicated) suit steady volume or strict speed. Batch, this step, costs about half of serverless
+              because answers come later. Reserved GPUs cost less per hour but bill for the whole contract.
+          - point: >-
+              Do the sums before renting a GPU: most products start far below the point where a dedicated one
+              pays.
+            detail: >-
+              The video's app uses 20 million tokens a day: about $146 a month on serverless. One dedicated H100
+              (a top data-centre GPU) running all month costs $5,840, 40 times more.
+    plain:
+      lead: >-
+        Some jobs have nobody waiting for the answer: testing a model on 100 tickets, or re-sorting last year's
+        documents. The Batch API takes all the requests as one file, runs them when Fireworks has spare GPUs,
+        and charges about half the usual per-token price. You collect the answers later and match each one to
+        its question by a label.
+      picture: >-
+        Same-day dry cleaning costs extra; leave it for next week and it is cheaper, because the shop fits it in
+        between rush jobs. Each item gets a numbered tag, because the clothes do not come back in the order
+        they went in.
+      numbers_source: "lesson 08's scripts, the lab book and the Platform Map video's example prices"
+      numbers:
+        - >-
+          The file: the 100 test tickets the model never trained on, one request per line, labelled `t-000` to
+          `t-099`.
+        - >-
+          Price: about half of serverless (the lab book says 50%).
+        - >-
+          The script's own estimate: 100 short tickets on a small model cost well under a cent even at full
+          price; in batch, about half that. It was written when gpt-oss-20b had a per-token price; it has none
+          now, so there is no listed price to halve for it (see the run note).
+        - >-
+          Scaled up, with the Platform Map video's example: 20 million tokens a day costs $4.80 on serverless.
+          If none of it needed an instant answer, batch would make it about $2.40 (4.80 ÷ 2).
+        - >-
+          The trade: results come back in minutes to hours. Work where someone waits needs an answer in about
+          300 ms (0.3 seconds), the lesson's example.
+      words:
+        - term: "Batch API"
+          def: >-
+            Fireworks' way to send many requests as one file and collect the answers later, at about half the
+            serverless price. Example: the lesson's 100 tickets.
+        - term: "JSONL"
+          def: >-
+            A file with one JSON record per line. Example: `batch_input.jsonl`, 100 lines.
+        - term: "custom_id"
+          def: >-
+            The label on each request in a batch file, used to match every answer back to its question.
+            Example: `t-000` to `t-099`.
+        - term: "Serverless"
+          def: >-
+            Fireworks' shared, always-on models, billed per token you send and receive. Example: step 1's
+            Fireworks run.
+    run:
+      - cmd: "python make_batch.py"
+        note: >-
+          Turns the 100 test tickets into one file, `batch_input.jsonl`: one line per request, each
+          with its own label (`custom_id`, `t-000` to `t-099`) and the usual chat request with the schema
+          enforced. If you started the Fireworks job first, it already made this file; running it again writes
+          the same file. **Look for** `wrote …batch_input.jsonl (100 requests)`.
+      - cmd: "python score_batch.py --simulate --target mock"
+        note: >-
+          Rehearses the whole round trip offline: sends the 100 requests to the practice server one by one,
+          saves the answers in the shape a batch job returns, then scores them. It takes under a minute: 100
+          requests, each under about half a second (in step 1, 95 of 100 enforced replies from the practice
+          server came back within 447 ms). **Look for** answered 100 of 100, schema_valid_% 100.0 and
+          category_acc_% 78.0.
+      - cmd: "bash submit_batch.sh accounts/fireworks/models/gpt-oss-20b"
+        note: >-
+          The real thing (paid, fractions of a cent by the script's estimate). It uploads the file to your
+          Fireworks account and starts the batch job on a small model (gpt-oss-20b). Then it checks every 30
+          seconds until the job says COMPLETED, FAILED or EXPIRED. If you started it before the video, do not
+          run it again: one job is enough. **Look for** the job name on the `create job:` line and, at the end,
+          the id of the output dataset (the results file the job saved in your account).
+
+          A plain note on the model: gpt-oss-20b is no longer offered per token. On 27 September 2026
+          [its model page](https://fireworks.ai/models/fireworks/gpt-oss-20b) said "Serverless: Not supported".
+          Batch still takes it: [Fireworks' batch guide](https://docs.fireworks.ai/guides/batch-inference)
+          (checked the same day) accepts "Any model that supports On-Demand Deployments": models Fireworks can
+          run on a GPU reserved for one customer, and gpt-oss-20b is one. The
+          same guide prices batch at "50% off Serverless per-token prices", and gpt-oss-20b no longer has one,
+          so its batch price is not listed. If the job never leaves pending, see Stuck? below.
+      - cmd: "firectl dataset download <OUTPUT_DATASET_ID>"
+        note: >-
+          Downloads the results. Replace `<OUTPUT_DATASET_ID>` with the output dataset id from the job details
+          the script printed. **Look for** the name of the `.jsonl` file it saves: the next command needs it.
+      - cmd: "python score_batch.py <downloaded>.jsonl"
+        note: >-
+          Scores the real answers exactly like the rehearsal, matching each one to its ticket by `custom_id`.
+          Replace `<downloaded>.jsonl` with that file's path. **Look for** answered at or near 100 of 100, and
+          your model's own schema_valid_% and category_acc_%: these are real numbers, not the practice
+          server's. gpt-oss-20b also writes out its thinking before it answers (step 1's check 3). If
+          schema_valid_% is low or replies are empty, that thinking may have used up the batch file's 120-token
+          reply limit: write that down as a finding.
+    see: >-
+      Each results file gives one row. `answered` counts results matched to a ticket by `custom_id`, out of the
+      100 sent (`of`). The next three are shares of the answered results: those that follow the schema, have
+      the right category, and have the right severity (urgency, 1 to 5). The practice run's 100 of 100, 100%,
+      78% and 79% are made-up; your Fireworks row is a real model's score on the same tickets.
+    checks:
+      - q: >-
+          Which of a customer's jobs (workloads) would you move to the Batch API, where requests go in as one
+          file and the answers come back later at about half price?
+        plain: >-
+          Any job where nobody is waiting for the answer: testing a model on a fixed set of examples,
+          reprocessing old records, sorting documents into categories, or generating practice data.
+        picture: >-
+          A restaurant cooks for the diners at its tables first. Tomorrow's catering order waits for the quiet
+          hours, when the kitchen is idle and the work costs less.
+        numbers_source: "lesson 08 and the Platform Map video's example prices"
+        numbers:
+          - >-
+            Work where someone waits, such as a chat window, pays for speed: the lesson's example is an answer
+            in 300 ms (0.3 seconds). It stays on serverless or dedicated.
+          - >-
+            A test of the model on 100 tickets can wait minutes to hours: batch, at about half price.
+          - >-
+            The Platform Map video's app, 20 million tokens a day: $4.80 on serverless, about $2.40 if it could
+            all go to batch.
+          - >-
+            Discounts for a repeated prompt opening (prompt caching, Day 5) apply on top of the batch price.
+        words:
+          - term: "Back-fill"
+            def: >-
+              Running a job over all your existing records at once, for example after adding a new field.
+          - term: "Embedding"
+            def: >-
+              A list of numbers that captures a text's meaning, used for search and matching. Recomputing them
+              for every document is a typical back-fill.
+          - term: "Synthetic data"
+            def: >-
+              Examples made by a program or a model instead of collected from real users. Example: the kit's
+              tickets.
+          - term: "Eval"
+            def: >-
+              A repeatable test of a model on a fixed set of prompts. Example: the 100 test tickets.
+        more: >-
+          The test is whether anyone waits, not the size of the job. Batch jobs run when the provider has idle
+          GPUs (`submit_batch.sh`), so they can take minutes to hours; the lab book lists 12 to 72 hour windows.
+          Prompt-caching discounts stack on top of the batch price. Anything user-facing (chat, agents, code
+          completion) stays on serverless or a dedicated deployment.
+      - q: >-
+          In the batch file, every request carries its own label, `custom_id` (such as `t-000`). Why does it
+          need one?
+        plain: >-
+          So each answer can be matched to its question. Results can come back in any order, and failed requests
+          go to a separate error file, so answer number 5 is not always for question number 5.
+        picture: >-
+          A cloakroom gives each coat a numbered tag. If staff instead handed coats back in line order and one
+          coat had gone missing, everyone behind it would get the wrong coat. The tag makes the order
+          irrelevant.
+        numbers_source: "lesson 08's scripts"
+        numbers:
+          - >-
+            The lesson's file holds 100 requests, labelled `t-000` to `t-099`.
+          - >-
+            Suppose request `t-042` fails. The results then hold 99 answers.
+          - >-
+            Even if the other 99 came back in order, matching by line order would pair every answer after the
+            gap with the wrong ticket: 57 wrong pairings (`t-043` to `t-099`).
+          - >-
+            Matched by `custom_id`, the 99 are scored correctly and the table says answered 99 of 100.
+        words:
+          - term: "custom_id"
+            def: >-
+              The label on each request in a batch file. Example: `t-042`.
+          - term: "Error file"
+            def: >-
+              Where a batch job puts the requests that failed, apart from the results. Example: why answered can
+              be below 100.
+          - term: "JSONL"
+            def: >-
+              A file with one JSON record per line. Example: one line per request, one line per result.
+        more: >-
+          Batch output is a set of result records, not an ordered response stream: order is not guaranteed and
+          failures are written separately. `score_batch.py` builds a table of labels keyed `t-000` to `t-099`
+          and looks each result up by `custom_id`. Its `find_content()` then searches the record for the reply
+          text, because the exact output shape can differ between providers and versions.
+    say:
+      ask: "Testing every change on our own data sounds expensive. How do we afford it?"
+      means:
+        - phrase: "Evaluation is batch work"
+          meaning: >-
+            Testing a model on a fixed set of examples has nobody waiting for the answers, so it can go in one
+            batch file and come back later.
+        - phrase: "At half price"
+          meaning: >-
+            The Batch API charges about half the normal per-token price (serverless). The Platform Map video's
+            $4.80 a day would be about $2.40.
+        - phrase: "you can afford to evaluate every prompt or model change"
+          meaning: >-
+            The same budget buys twice as many test runs, so every change to the instructions or the model gets
+            tested. Today's 100 tickets cost well under a cent, by the script's own estimate.
+        - phrase: "not just the big ones"
+          meaning: >-
+            Small tweaks cause surprises too. Testing only the big releases lets those slip through.
+    fields:
+      - id: d6-batch-sim
+        label: "Practice batch: answered (of 100), and right category (%)"
+        hint: >-
+          From `python score_batch.py --simulate --target mock`: the answered and category_acc_% columns. Expect
+          100 of 100 and 78.
+        meaning: >-
+          Proves the loop works end to end before you pay: file in, answers matched back by label, scored.
+        example: "100 of 100, 78%"
+      - id: d6-batch-job
+        label: "Your Fireworks batch job name"
+        hint: >-
+          `submit_batch.sh` prints it on the `create job:` line: `triage-batch-` followed by the date and time
+          you started it.
+        meaning: >-
+          Lets you check or finish the job later with `firectl batch-inference-job get <job name>`.
+        example: "`triage-batch-` plus month, day, hour and minute"
+      - id: d6-batch-fireworks
+        label: "Fireworks batch: answered (of 100) / well-formed (%) / right category (%)"
+        hint: >-
+          From `python score_batch.py <downloaded>.jsonl`: the answered, schema_valid_% and category_acc_%
+          columns. Write all three, for example "100 / 100 / 78".
+        meaning: >-
+          A real model's score on the 100 test tickets, which it never trained on, bought at about half the
+          usual price.
+        example: "100 / 100 / 78 (the practice run's figures; yours come from a real model)"
+    done: >-
+      The practice batch shows answered 100 of 100, and your Fireworks batch results are scored the same way.
+      If the job is still running when you stop, you have its name written down and can finish the last two
+      commands later.
+    stuck:
+      - problem: "`Connection refused` on the practice run."
+        fix: "The practice server is not running. From the `03-labs` folder run `make mock &`, then run the command again."
+      - problem: "`firectl: command not found`."
+        fix: "Install it as on Day 1: `brew tap fw-ai/firectl && brew install firectl`, then `firectl signin`."
+      - problem: "A firectl command rejects its options."
+        fix: >-
+          Commands change. Run it with `--help`, for example `firectl batch-inference-job create --help`, and
+          follow what it says; the script's own note says the same.
+      - problem: "The job is still running when you have to stop."
+        fix: >-
+          Nothing is lost: Ctrl+C stops the checking, not the job. Later, from `lessons/08-batch-api`, run
+          `firectl batch-inference-job get <job name>` with the name from the `create job:` line. When it says
+          COMPLETED, run the last two commands.
+      - problem: "The job stays pending and shows no error."
+        fix: >-
+          [Fireworks' batch guide](https://docs.fireworks.ai/guides/batch-inference) (checked 27 September
+          2026) warns that a job on a model batch does not support can stay pending with no error. Batch should
+          still take gpt-oss-20b, but if yours has not started by the time you finish today's other work, start
+          a second job on gpt-oss-120b, which is offered per token: from `lessons/08-batch-api`, run
+          `bash submit_batch.sh accounts/fireworks/models/gpt-oss-120b`. Write down its new job name and
+          follow that one. Your score is then gpt-oss-120b's, so label it that way.
+      - problem: "The job ends FAILED or EXPIRED."
+        fix: >-
+          Read the job details the script printed at the end for the reason. Model ids change: if the model is
+          no longer offered, copy a current one from the Fireworks model library and run
+          `bash submit_batch.sh <that id>`.
+      - problem: "`answered` is below 100."
+        fix: >-
+          Some requests failed and went to the job's error file instead of the results. The score covers the
+          ones answered, each matched to its ticket by `custom_id`: that is exactly why the label exists.
+      - problem: "`Pass a results file, or --simulate.`"
+        fix: >-
+          The path after `score_batch.py` does not point to a file. Use the exact name of the downloaded `.jsonl`
+          file; `ls` lists what is in the folder.
+    replace:
+      - find: "That is the base model's score on the held-out set. Lessons 10 and 11 try to beat it."
+        with: "That is the practice server's made-up score on the 100 test tickets, which no model trains on. Your Fireworks run gives a real model's score on the same tickets. The fine-tunes on Days 7 and 8 are each compared with their own base model."
+
+wrapup:
+  done: >-
+    You have the well-formed share you would quote to a customer (the json_schema row, about 100% on your Mac)
+    and the right-category share beside it, for your Mac and for Fireworks. Your 100 test tickets are scored
+    through the Batch API, or submitted with the job name written down.
+  whiteboards:
+    - video: 08-platform
+      q: >-
+        A customer's app uses 20 million tokens (word pieces) a day: 16 million sent in, 4 million written back.
+        On Fireworks serverless, the model (gpt-oss-120b) costs $0.15 per million tokens in and $0.60 per
+        million out. Should they keep paying per token, or rent one dedicated H100 (a top data-centre GPU) at
+        $8 an hour?
+      given: >-
+        Serverless bills only the tokens used. A dedicated GPU bills every hour it runs, busy or idle. A month
+        is about 730 hours (365 days x 24 hours ÷ 12 months).
+      plain: >-
+        Stay on serverless: about $146 a month, against $5,840 for one dedicated H100, 40 times more. Move to
+        dedicated only when traffic is big and steady enough to keep the GPU busy.
+      picture: >-
+        Taxis against leasing a car: if you ride twice a week, taxis cost far less than a lease you pay whether
+        you drive or not. The lease wins only when you are on the road most of the day. One difference: a
+        dedicated GPU also guarantees steady speed, which some customers need whatever the price.
+      steps:
+        - "Input: 16 million tokens x $0.15 per million = $2.40 a day."
+        - >-
+          Output: 4 million x $0.60 per million = $2.40 a day. Output costs 4 times more per token, so a quarter
+          of the tokens costs the same.
+        - "Per day: $2.40 + $2.40 = $4.80."
+        - "Per month: 730 hours ÷ 24 = 30.4 days; $4.80 x 30.4 = $146 (the video says about $150)."
+        - "One dedicated H100 for a month: $8 x 730 hours = $5,840, used or not."
+        - "$5,840 ÷ $146 = 40: the GPU costs 40 times the token bill."
+        - >-
+          Break-even on price: 40 times the traffic, 20 million x 40 = 800 million tokens a day, with the same
+          4-to-1 split of tokens sent and written.
+        - "Answer: serverless until the traffic justifies the GPU, and say so plainly."
+      note: >-
+        Price is only half the check. At break-even, the GPU must also serve 800 million tokens a day at the
+        customer's speed target; only a benchmark like Day 3's can tell you that. And if none of this traffic
+        needed an instant answer, the Batch API would bill about half: about $2.40 a day.
+      kit_q: >-
+        Put money on it. Twenty million tokens a day, four to one input to output, on a mid sized open model at
+        fifteen cents per million in and sixty cents out.
+      kit_a: >-
+        That is under five dollars a day, about a hundred and fifty a month. One dedicated H one hundred running
+        all month is five thousand eight hundred and forty. The break even is a long way above where most
+        products start.
+      more: >-
+        On screen: input 16M x $0.15 = $2.40; output 4M x $0.60 = $2.40; per day $4.80; per month about $146; one
+        dedicated H100 $8/hr x 730 h = $5,840; recommendation "Serverless until utilisation justifies the GPU —
+        and say so plainly". The prices match the lab book's tables (gpt-oss 120B: $0.15 in, $0.015 cached,
+        $0.60 out per 1M; H100 on-demand $8.00 an hour, billed per GPU-second). 800 million tokens a day is
+        about 9,300 tokens a second around the clock (800,000,000 ÷ 86,400), 80% of them input; whether one H100
+        sustains that at the customer's p95 target is a benchmark question, not a pricing one. Cached input and
+        batch pricing push the break-even further out. Fireworks on-demand deployments can scale to zero after
+        an hour idle by default (the lab book), which stops the bill but not the 730-hour sum for a GPU kept up
+        all month.
+      words:
+        - term: "Serverless"
+          def: "Fireworks' shared, always-on models, billed per token you send and receive."
+        - term: "Dedicated deployment"
+          def: "A GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not."
+        - term: "GPU-hour"
+          def: "One GPU rented for one hour. Example: $8 for an H100; a month is about 730 of them."
+        - term: "Break-even"
+          def: "The point where two options cost the same. Example: about 800 million tokens a day here."
+    - video: 08-platform
+      q: >-
+        A customer sends all its traffic to a big frontier model at $6.00 per million tokens written. You move
+        the routine 90% (the simple, repetitive requests) to a fine-tuned 8B model (8 billion learned numbers)
+        at $0.20 per million. How much cheaper is the moved traffic, and how much cheaper is the whole bill for
+        tokens written?
+      given: >-
+        The video's example table, with numbers made up to show the shape. Big model: $6.00 per million tokens
+        written, 87% right, 95 of 100 replies within 1.9 seconds. Fine-tuned 8B: $0.20 per million, 91% right,
+        0.6 seconds, built in one afternoon for about $2. The other 10% of traffic stays on the big model.
+      plain: >-
+        The moved traffic gets 30 times cheaper. The whole bill for tokens written gets about 7.7 times cheaper,
+        because the 10% still on the big model becomes most of what you pay.
+      picture: >-
+        A firm sends every question to its most expensive senior expert. Handing the routine 90% to a trained
+        specialist makes those answers 30 times cheaper, and often better, but the few still sent to the expert
+        become most of the bill.
+      steps:
+        - "Moved traffic: $6.00 ÷ $0.20 = 30 times cheaper per million tokens written."
+        - "Before, for every million tokens written: $6.00."
+        - >-
+          Assume the routine 90% of traffic also writes 90% of the tokens. After: 10% on the big model,
+          0.1 x $6.00 = $0.60; 90% on the 8B, 0.9 x $0.20 = $0.18.
+        - "Total after: $0.60 + $0.18 = $0.78 per million."
+        - "Whole bill: $6.00 ÷ $0.78 = 7.7 times cheaper."
+        - "The 10% left behind is $0.60 ÷ $0.78 = 77% of the new bill."
+        - "In the same example, quality and speed also improve: 87% to 91% right, 1.9 to 0.6 seconds (3.2 times faster)."
+      note: >-
+        The table is illustrative; the video says its shape matches published case studies. Before quoting a
+        saving, measure the customer's own accuracy and speed with Day 7's eval harness. And remember that on
+        Fireworks a fine-tune runs on a dedicated GPU billed by the hour, so its real cost depends on keeping
+        that GPU busy.
+      kit_q: >-
+        Specialisation is the other lever, and it compounds with the first.
+      kit_a: >-
+        Move the routine ninety percent of traffic to a fine tuned eight billion parameter model and the unit
+        cost falls by roughly thirty times, while quality on that narrow task usually goes up, not down. That is
+        the whole argument for owning your weights, in one table.
+      more: >-
+        On screen ("Specialise the routine traffic"): $ per 1M output $6.00 against $0.20; task accuracy 87%
+        against 91%; p95 latency 1.9 s against 0.6 s; what it cost: one afternoon plus about $2; note
+        "Illustrative numbers, but the shape matches the published case studies." The video's "roughly thirty
+        times" is the unit cost of the moved traffic ($6.00 ÷ $0.20). Blended over all output (assuming equal
+        output length per request): 0.1 x $6.00 + 0.9 x $0.20 = $0.78 per 1M, 7.7 times lower, with 77% of it on the frontier share, so the routing split
+        becomes the next lever. The table prices output tokens only. On Fireworks a LoRA fine-tune is served on a
+        dedicated deployment (the lab book), so its real unit cost depends on keeping that GPU busy: the first
+        whiteboard's question again.
+      words:
+        - term: "Frontier model"
+          def: "One of the largest, most capable models, usually priced highest. Example: $6.00 per million here."
+        - term: "Fine-tune"
+          def: "Further training of an existing model on your own examples. Example: the 8B model here."
+        - term: "Unit cost"
+          def: "The price of one unit of work, such as a million tokens written. Example: $6.00 against $0.20."
+        - term: "Output tokens"
+          def: "The tokens the model writes back; usually priced higher than input. Example: $0.60 against $0.15 per million."
+
+glossary:
+  # New on Day 6
+  - term: "Accuracy (category accuracy)"
+    def: "the share of replies with the right answer, checked against each test example's known label."
+    example: "78% of 50 tickets on the practice server (`category_acc_%`)."
+  - term: "Autoscaling"
+    def: "adding or removing copies of a model as traffic rises and falls."
+    example: "one of the layers a managed platform runs for you."
+  - term: "Back-fill"
+    def: "running a job over all your existing records at once, for example after adding a new field."
+    example: "re-sorting last year's tickets into categories."
+  - term: "Batch API"
+    def: "Fireworks' way to send many requests as one file and collect the answers later, at about half the serverless price."
+    example: "Day 6's 100 tickets in `batch_input.jsonl`."
+  - term: "Batch job (batch-inference job)"
+    def: "one run of the Batch API: your uploaded file of requests, processed when GPUs are free."
+    example: "`triage-batch-…`, checked every 30 seconds until COMPLETED."
+  - term: "Break-even"
+    def: "the point where two options cost the same."
+    example: "about 800 million tokens a day for serverless against one dedicated H100, in the Platform Map example."
+  - term: "Bursty traffic"
+    def: "traffic that comes in sudden peaks with quiet spells between."
+    example: "the Platform Map video matches it to serverless."
+  - term: "Capacity modes"
+    def: "the ways a platform sells computing: serverless, dedicated, batch and reserved."
+    example: "the four in the Platform Map video."
+  - term: "Closed model"
+    def: "a model you can only rent through its maker's service; you never get its weights."
+    example: "where the Platform Map video's customer journey starts."
+  - term: "Completion"
+    def: "the text the model writes back."
+    example: "the JSON reply to one ticket."
+  - term: "Constrained decoding"
+    def: "at each step the server blocks every token that would break the schema or grammar, so the reply cannot come out malformed."
+    example: "`json_schema` mode: 50 of 50 valid in lesson 07's practice run. A reply cut off by the length limit (`max_tokens`) can still break."
+  - term: "custom_id"
+    def: "the label on each request in a batch file, used to match every answer back to its question."
+    example: "`t-000` to `t-099`."
+  - term: "Customer journey (maturity curve)"
+    def: "the usual path: rent a closed model, improve the prompt and context, move to open models, then train on your own data."
+    example: "the Platform Map video's four stages."
+  - term: "Dataset (Fireworks dataset)"
+    def: "a file stored in your Fireworks account for jobs to read or write."
+    example: "`firectl dataset create` uploads the batch file; the job writes its results to another."
+  - term: "Document classification"
+    def: "sorting documents into a fixed set of categories."
+    example: "ticket triage is one kind."
+  - term: "Embedding"
+    def: "a list of numbers that captures a text's meaning, used for search and matching."
+    example: "recomputing them for every document is a typical batch back-fill."
+  - term: "Enforce"
+    def: "make the server block anything that breaks the rules."
+    example: "`json_schema` mode enforces the schema."
+  - term: "Enum"
+    def: "a field that may hold only one value from a fixed list."
+    example: "`category`: billing, outage, how-to or abuse."
+  - term: "Error file"
+    def: "where a batch job puts the requests that failed, apart from the results."
+    example: "why `answered` can be below 100."
+  - term: "Few-shot examples"
+    def: "a few solved examples placed in the prompt to show the model what a good answer looks like."
+    example: "tickets shown with their correct JSON before the real one."
+  - term: "Frontier model"
+    def: "one of the largest, most capable models, usually priced highest."
+    example: "$6.00 per million output tokens in the Platform Map example."
+  - term: "GPU cloud (raw GPU cloud)"
+    def: "a service that rents bare GPUs; the customer runs everything above them."
+    example: "the bottom layer of the Platform Map."
+  - term: "GPU-hour"
+    def: "one GPU rented for one hour."
+    example: "$8 for an H100; a month is about 730 of them."
+  - term: "gpt-oss-20b, gpt-oss-120b"
+    def: "two open mixture-of-experts models with about 21 and 117 billion parameters, of which only about 3.6 and 5.1 billion are used for each token. On Fireworks, gpt-oss-120b is billed per token (serverless); gpt-oss-20b no longer is (its model page, checked 27 September 2026: 'Serverless: Not supported'), but batch jobs still take it."
+    example: "Day 6 runs gpt-oss-120b in step 1 and gpt-oss-20b for step 2's batch job."
+  - term: "Grammar"
+    def: "a precise rulebook for which text is allowed, which a server can enforce one token at a time."
+    example: "llama.cpp turns a JSON schema into one."
+  - term: "Interactive traffic"
+    def: "requests where a person is waiting for the answer."
+    example: "a chat window; it stays on serverless or dedicated, never batch."
+  - term: "JSON"
+    def: "a plain-text format for data that programs can read: named fields inside curly brackets."
+    example: '`{"category": "billing", "severity": 3}`.'
+  - term: "json_object, json_schema"
+    def: "the two enforced modes: `json_object` guarantees valid JSON with any fields; `json_schema` guarantees JSON that follows your schema."
+    example: "both 100% valid in lesson 07's practice run."
+  - term: "JSON schema (schema)"
+    def: "a rulebook for JSON: which fields must appear, what type each holds and which values are allowed."
+    example: "`data/triage_schema.json`: 3 fields, 4 categories, severity 1 to 5."
+  - term: "JSONL"
+    def: "a file with one JSON record per line."
+    example: "`batch_input.jsonl`, 100 lines."
+  - term: "Label"
+    def: "the known right answer stored with each test example."
+    example: "each test ticket's category and severity."
+  - term: "Managed platform"
+    def: "a service that runs everything from the GPUs up to the model: the engine, scaling, routing and the models."
+    example: "Fireworks; its serverless models charge per token instead of per GPU-hour."
+  - term: "Mask (masking)"
+    def: "block a token so the model cannot choose it."
+    example: "constrained decoding masks every token that would break the schema."
+  - term: "Open model (open weights)"
+    def: "a model whose weights anyone can download, run and fine-tune."
+    example: "gpt-oss-120b, which the Platform Map video calls a mid-sized open model."
+  - term: "Output tokens"
+    def: "the tokens the model writes back; providers bill them per million, usually at a higher price than input."
+    example: "$0.60 against $0.15 per million for gpt-oss-120b."
+  - term: "Parse"
+    def: "read text as data; parsing fails when the text is not valid JSON."
+    example: "`parses_%`: 86% when only asked in the prompt, on the practice server."
+  - term: "Pipeline (integration)"
+    def: "the customer's code that sends requests and uses the replies automatically, with no person checking each one."
+    example: "a help desk that routes each ticket by its category."
+  - term: "Poll"
+    def: "ask again at intervals whether a job has finished."
+    example: "`submit_batch.sh` polls every 30 seconds."
+  - term: "Reasoning model"
+    def: "a model that writes out its thinking before its final answer."
+    example: "lesson 07: put the schema in its prompt and validate afterwards."
+  - term: "Reserved capacity"
+    def: "GPUs committed for a long term at a lower hourly price, billed whether used or not."
+    example: "the fourth capacity mode; the lab book warns never to suggest it casually."
+  - term: "response_format"
+    def: "the request setting that asks the server to enforce JSON (`json_object`) or a schema (`json_schema`)."
+    example: "left out in prompt-only mode."
+  - term: "Routing"
+    def: "sending each request to the right model, or to the right copy of it."
+    example: "one of the layers a managed platform runs for you."
+  - term: "Scale to zero"
+    def: "a deployment setting that gives the GPU back after a stretch with no requests, so billing stops."
+    example: "Fireworks on-demand deployments do it after 1 hour idle by default (the lab book)."
+  - term: "Synthetic data"
+    def: "examples made by a program or a model instead of collected from real users."
+    example: "the kit's tickets, from `data/make_tickets.py`."
+  - term: "Ticket triage"
+    def: "sorting incoming support tickets by type and urgency."
+    example: "the kit's shared task for Days 6 to 8."
+  - term: "Unit cost"
+    def: "the price of one unit of work, such as a million tokens written."
+    example: "$6.00 against $0.20 per million in the Platform Map example."
+  - term: "Utilisation"
+    def: "the share of time a GPU does useful work."
+    example: "a dedicated GPU costs the same whether it is busy or idle."
+  - term: "Validate"
+    def: "check a reply with code after it arrives."
+    example: "Day 6's parse and schema checks."
+  # Shared with earlier days: the first day's definition, exactly
+  - term: "4-bit, 8-bit, 16-bit"
+    def: "how many bits store each number; fewer bits, smaller model."
+    example: "step 1's Llama 3.1 8B on your Mac is stored at 4 bits per number."
+  - term: ".env file"
+    def: "the settings file in the `03-labs` folder, holding defaults and your Fireworks key; it never leaves your Mac."
+    example: "`FIREWORKS_MODEL` in it picks the Fireworks model, gpt-oss-120b by default."
+  - term: "API"
+    def: "the agreed format one program uses to send requests to another and get answers back."
+    example: "every server in the kit speaks the same chat API, so one script tests them all."
+  - term: "API key"
+    def: "a secret code that proves a request comes from your account, so it can be billed."
+    example: "`FIREWORKS_API_KEY` in `.env`."
+  - term: "CSV file"
+    def: "a plain table file: one row per line, commas between the columns."
+    example: "`results/07-structured.csv`, read by the Day 10 memo."
+  - term: "Dedicated deployment"
+    def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not."
+    example: "one H100 at $8 an hour is $5,840 a month, busy or idle."
+  - term: "Engine (inference server)"
+    def: "the program that loads a model and answers requests."
+    example: "the serving-engine layer of the Platform Map."
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "Day 7's harness grades the same tickets for validity, accuracy, speed and cost."
+  - term: "felab"
+    def: "the kit's small shared Python toolkit that every lesson script imports."
+    example: "`felab/tickets.py` loads the tickets and grades each reply."
+  - term: "Fine-tune"
+    def: "further training of an existing model on your own examples."
+    example: "Days 7 and 8 train one on the same tickets."
+  - term: "firectl"
+    def: "Fireworks' command-line tool for your account, quotas and deployments."
+    example: "`firectl batch-inference-job get <job name>` checks a batch job."
+  - term: "Fireworks"
+    def: "a cloud service that runs AI models and charges per use; one platform used in this course."
+    example: "today's two paid runs cost about $0.03 together."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "an H100."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "$8 an hour on a dedicated deployment."
+  - term: "Held-out prompts"
+    def: "test prompts the model was never trained on."
+    example: "the 100 tickets in `data/tickets/test.jsonl`."
+  - term: "Input tokens"
+    def: "the tokens you send to the model; providers bill them per million."
+    example: "16 million a day at $0.15 per million in the Platform Map example."
+  - term: "Integer"
+    def: "a whole number."
+    example: "`severity` must be an integer from 1 to 5."
+  - term: "Judge (LLM judge)"
+    def: "a second model that scores answers against a rubric."
+    example: "Day 7 adds one to the ticket test."
+  - term: "Latency"
+    def: "how long someone waits."
+    example: "1.9 s against 0.6 s (p95) in the Platform Map's example table."
+  - term: "Llama 3.1 8B, Llama 3 70B"
+    def: "the open models used in the lessons and videos, with 8 and 70 billion parameters."
+    example: "Day 2's Llama 3.1 8B answers step 1's llama.cpp run."
+  - term: "llama.cpp"
+    def: "the open-source engine used on the Mac; `llama-server` answers requests, `llama-bench` times the engine alone."
+    example: "it turns a JSON schema into a grammar in step 1."
+  - term: "LoRA"
+    def: "a cheap way to customise a model: train a small add-on instead of changing the whole model."
+    example: "on Fireworks it can only be served on a dedicated deployment."
+  - term: "make"
+    def: "a tool that runs named shortcuts listed in a file called `Makefile`."
+    example: "`make mock` starts the practice server."
+  - term: "ms (millisecond)"
+    def: "a thousandth of a second."
+    example: "p95 of 447 ms with the format enforced on the practice server."
+  - term: "p95"
+    def: "the value 95 out of 100 requests stay under."
+    example: "`p95_ms` in lesson 07's table."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "the fine-tuned 8B model in the Platform Map example."
+  - term: "Practice server (mock)"
+    def: "the kit's stand-in server with realistic behaviour and made-up numbers."
+    example: "it breaks about 12 in 100 prompt-only JSON replies on purpose."
+  - term: "Prefix caching (prompt caching)"
+    def: "the server keeps its notes on a prompt's opening and reuses them when the next request starts the same way."
+    example: "its discount stacks on top of batch pricing."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "the instructions, the schema and one ticket."
+  - term: "Request"
+    def: "one message sent to the model for an answer."
+    example: "one line of `batch_input.jsonl`."
+  - term: "Schema-valid rate"
+    def: "the share of replies that come back as correctly formatted data."
+    example: "`schema_valid_%`: 100% enforced, 86% prompt-only, in lesson 07's practice run."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "llama.cpp's `llama-server` on port 8080."
+  - term: "Serverless"
+    def: "Fireworks' shared, always-on models, billed per token you send and receive."
+    example: "20 million tokens a day for about $146 a month in the Platform Map example."
+  - term: "Smoke test"
+    def: "a quick run of everything to prove the setup works before real use."
+    example: "Day 1's `make smoke` already built the ticket data."
+  - term: "System prompt"
+    def: "the fixed instructions at the start of every request that set how the model behaves."
+    example: "the triage instructions plus the schema, sent with every ticket."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "step 1 needs two: one for llama.cpp, one for the scripts."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "the server enforces the schema one token at a time."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "`No module named 'felab'` means it is off in that terminal."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "open models let you download them."
+  - term: "Workload"
+    def: "one kind of job a customer runs."
+    example: "evaluations, back-fills and document classification move to batch."

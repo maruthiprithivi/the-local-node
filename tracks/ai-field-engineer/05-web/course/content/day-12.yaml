@@ -1,0 +1,1161 @@
+# Day 12 · Preference tuning. Plain-language content for the guided course (course-spec.md section 3).
+# Step 1 is lesson 16's second half (generated page lesson16-part2): toy_alignment.py, its three Run commands
+# and README Check yourself items 2, 3 and 4 (course.yaml checks: [2, 3, 4]). Item 1 and the two
+# toy_finetune.py commands belong to Day 11 step 1. Lesson 16's one explain-it line is about reward models and
+# the KL leash, so it is decoded here (Day 11 step 1 needs its own say block for the validator).
+# Every number traces to a kit file: lesson 16 and 18 READMEs and scripts, lesson 17's README, felab,
+# narration.json (the RLHF and Direct Preference Optimization videos) and the lab book. Arithmetic recomputed
+# by hand. toy_alignment.py (default, --beta 0.1, --expert-labels) and make_pairs.py were re-run in
+# python:3.12-slim on optimus: 302 pairs, 71% (78% with experts), the full 8-row sweep, the 5b and DPO lines,
+# 191/196/213/200 mistake kinds, and 27 of 800 train and 3 of 100 valid pairs with rejected == chosen.
+# Kit problems found (kit not edited): (1) toy_alignment.py's closing note "5b lands on the same answer as the
+# exact optimum" holds at the default beta 0.5 (KL 0.34 = 0.34) but not at --beta 0.1 (KL 0.94 against 1.81;
+# 5b keeps the right-category answer). (2) Its "DPO stays closer to SFT" holds against the loose sweep rows,
+# not against 5b at the same beta (0.51 against 0.34 at beta 0.5). (3) make_pairs.py line 43 clamps severity
+# to 1..5, so some wrong_sev rejects equal the chosen answer (27 train, 3 valid) and the docstring's "off by 2"
+# is off by 1 for 47 of them; pref_acc_% cannot pass 97.
+day: 12
+tile: "Teach a model to prefer better answers without losing correctness"
+
+overview:
+  today: >-
+    Watch a model learn to game its scorer in a small simulation (reward hacking). Then teach a real model on
+    your Mac to prefer clean answers with DPO (direct preference optimization), and check it did not get less
+    accurate.
+  example: >-
+    Imagine a support bot rewarded for sounding helpful, while nobody checks whether it sent the ticket to the
+    right team. It learns to give polished answers that earn higher scores even as its real help gets worse.
+    Today's small simulation makes that failure visible. Then you will train a real model to prefer better
+    answers and check that it still chooses the right category.
+  deliverable: >-
+    Before-and-after numbers for three things: how often the model answers in valid JSON, how often it picks the
+    right category, and how clearly it prefers the approved answers.
+  expected: >-
+    Roughly, as in the lesson: valid JSON from about 80% to about 98%, the right category about 70% before and
+    the same or higher after, and the margin (how strongly the model favours the approved answer, on a log
+    scale) from about +1 to about +10.
+  before:
+    - title: "Day 11's LoRA adapter, if you trained it."
+      body: >-
+        Step 2 first merges the small add-on you trained on Day 11 (a LoRA adapter) into the model: train on
+        examples first, then DPO. Without it, DPO still runs, but it polishes a model that gets only about 40% of
+        ticket categories right. Quick check, from the `03-labs` folder:
+      command: "ls lessons/17-full-vs-peft-mlx/adapters/lora"
+      after: >-
+        A list of files means it is there. "No such file or directory" means Day 11's training has not finished:
+        `VARIANTS=lora bash lessons/17-full-vs-peft-mlx/run_variants.sh` trains only the LoRA one, in 5 to 15
+        minutes.
+    - title: "The Python environment from Day 1, and internet for the first run."
+      body: >-
+        Run everything from the `03-labs` folder after `source .venv/bin/activate`. The first DPO run installs
+        `mlx-lm-lora`, the tool that trains DPO with MLX. If Day 11 did not already download it, it also fetches
+        the 0.5-billion-number Qwen model, about 1 GB.
+    - title: "Only for the optional Fireworks part: your key and the spend cap from Day 1."
+      body: >-
+        `dpo_fireworks.sh` trains the same job on Fireworks for cents, then offers to deploy it on a dedicated
+        GPU, which bills by the hour. Skip it and the day stays free.
+  feeds: >-
+    When a team wants better answers, first ask what feedback it has. Written examples can teach a desired
+    format or task; pairs of better and worse answers can teach a preference; a program that checks each answer
+    can provide another training signal. Today you tried the preference route and saw why any scorer must still
+    be checked against what customers actually need.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 1 · Training toys, part 2 (lesson 16-training-toy, toy_alignment.py; README checks 2, 3, 4)
+  # ---------------------------------------------------------------------------------------------------------
+  d12-s1:
+    why: >-
+      You watch a model learn to game its scorer (reward hacking). The scorer learned from people who could not
+      check the ticket's category, so the model trained against it stops getting the category right.
+    why_example: >-
+      In the lesson's table, as the leash loosens (the model may drift further from how it started), the scorer's
+      average rating rises from +1.69 to +2.11. The average real value of the answers, a hidden score of what the
+      customer wants, falls from +4.30 to +2.15.
+    videos:
+      17-rlhf:
+        in_this_video: >-
+          Why models are trained on people's comparisons, the three stages of RLHF (reinforcement learning from
+          human feedback), and the leash that limits a model gaming its scorer.
+        key_points:
+          - point: >-
+              RLHF learns from comparisons, for tasks with no single right answer.
+            detail: >-
+              People struggle to write the perfect reply, but easily pick the better of two. A reward model turns
+              those picks into scores: 2.1 for an apology with a fix, -0.4 for a curt reply, so about a 92% chance
+              a person prefers the first.
+          - point: >-
+              Three stages: train on examples first (SFT), then a reward model, then a loop (PPO) that chases the
+              score on a leash.
+            detail: >-
+              Unleashed, the model games the scorer with flattery, padding and repeated phrases: reward hacking.
+              The KL penalty charges it for drifting from the starting model, and β (beta) sets the leash length.
+          - point: >-
+              Powerful but heavy: 4 models in memory at once, against 1 for ordinary fine-tuning, and many
+              settings to tune.
+            detail: >-
+              The 4 are the model being trained, a frozen copy, the reward model and a value model. Relatives:
+              GRPO (used for many reasoning models) compares a group of answers with each other and drops the
+              value model; Fireworks' RFT (reinforcement fine-tuning) scores each answer with a program, such as
+              tests passing.
+    plain:
+      lead: >-
+        A reward model is a scorer trained on people's choices between two answers. It can only learn what those
+        people could judge. Push a model hard against it and the model learns to please the scorer instead of the
+        customer: reward hacking. A leash (the KL penalty: a charge for drifting far from how the model first
+        answered) limits the damage; better labellers fix it.
+      picture: >-
+        A teacher with no time to check facts grades essays on neatness and brevity. Students learn fast: neat,
+        short essays with wrong facts get top marks. A rule that students may not stray far from how they wrote
+        at the start of term slows this down; only a teacher who checks the facts stops it.
+      numbers_source: "lesson 16's `toy_alignment.py` (one support ticket, six possible answers) and its README table"
+      numbers:
+        - >-
+          Hidden true value of an answer: +3 for the right category, +1.5 for valid JSON (a text format programs
+          can read), +0.8 for a friendly line, minus 1.5 x its length (0.05 to 0.70).
+        - >-
+          Best answer, JSON plus a friendly line with the right category: 3 + 1.5 - (1.5 x 0.35) + 0.8 = 4.775.
+        - >-
+          The fast labellers cannot check the category, so for them it is worth 0. Their favourite is short
+          friendly JSON with the wrong category: 1.5 - (1.5 x 0.10) + 0.8 = 2.15.
+        - >-
+          Leash β at 0.50 (firm), 0.10, 0.02 (loose), from the lesson's table: the scorer's average rating rises
+          +1.69, +1.96, +2.11. The average true value of the model's answers falls +4.30, +3.45, +2.15.
+        - >-
+          At β 0.02 the model nearly always gives the labellers' favourite: average true value 2.15, less than
+          half of the best answer's 4.775.
+      words:
+        - term: "Reward model"
+          def: >-
+            A model trained on people's comparisons to give any answer one score. Example: 2.1 for the apology,
+            -0.4 for the curt reply.
+        - term: "Reward hacking"
+          def: >-
+            Raising the score by exploiting the scorer's blind spots instead of getting better. Example: short
+            friendly JSON with the wrong category.
+        - term: "KL leash (KL penalty)"
+          def: >-
+            A charge for drifting away from the starting model, measured by KL (Kullback-Leibler divergence), so
+            training cannot run off after loopholes. Example: the `KL` column grows from 0.34 to 3.90 in the
+            lesson's table.
+        - term: "β (beta)"
+          def: >-
+            The leash setting: smaller means a longer leash. Example: the toy tries 4 down to 0.01.
+    run:
+      - cmd: "python toy_alignment.py"
+        note: >-
+          Runs the whole story on one support ticket in about 2 seconds. It goes from the starting model to
+          imitation of good agents (SFT), the reward model, RLHF at 8 leash settings, then DPO. **Look for**
+          section 4's agreement figure (71%) and section 5's table: the average rating keeps rising as β shrinks,
+          while the average true value peaks at β 0.50, then falls.
+      - cmd: "python toy_alignment.py --expert-labels"
+        note: >-
+          The same run with labellers who can check the category, so correctness is worth +3 to them too. The
+          reward model now sees correctness and agrees with them 78% of the time. **Look for** every row of
+          section 5 beating the imitation step's average true value (+3.89, the `E[true value]` on the section 2
+          line).
+      - cmd: "python toy_alignment.py --beta 0.1"
+        note: >-
+          Loosens the leash from the default 0.5 to 0.1 for the two training runs: the sampled RLHF run (5b) and
+          DPO (6). The sweep table stays the same. **Look for** the 5b line: its `KL from SFT` (0.94) stops well
+          short of the `exact optimum KL` (1.81). So its 4,000 sampled steps have not yet reached the
+          wrong-category answer the sweep predicts at β 0.10, and 5b still favours the right one. DPO (6) ends
+          close to 5b (`KL from SFT` 0.99).
+    see: >-
+      The first table is Day 11's. Today's has one row per leash setting β, from tight to loose: `E[RM]` is the
+      scorer's average rating, `E[true]` the average real value, `KL` how far the model drifted from its start.
+      The rating climbs row by row; the real value peaks, then falls: reward hacking (your run shows 8 rows, the
+      lesson 3).
+    checks:
+      - q: >-
+          The scorer (the reward model) agrees with the people who labelled its training pairs 71% of the time.
+          Yet the model trained against it still learns to game it (reward hacking). Why?
+        plain: >-
+          Agreeing with the labellers means sharing their blind spot. They could not check the ticket's category,
+          so the scorer never learned to care about it, and the trained model exploits exactly that.
+        picture: >-
+          A trainee copies a senior colleague's marking well, 71 times in 100. But the senior never checks the
+          sums, so neither does the trainee. Students who notice hand in wrong sums in neat handwriting and still
+          get top marks.
+        numbers_source: "lesson 16's `toy_alignment.py` and README"
+        numbers:
+          - >-
+            The labellers score what they can see: +1.5 for valid JSON, +0.8 for friendly, minus 1.5 x length,
+            and 0 for the right category (the true value gives it +3).
+          - >-
+            So they prefer short friendly JSON with the wrong category, 1.5 - (1.5 x 0.10) + 0.8 = 2.15, to JSON
+            plus a friendly line with the right one, 1.5 - (1.5 x 0.35) + 0.8 = 1.775.
+          - >-
+            The reward model matches their choices 71% of the time, blind spot included.
+          - >-
+            The labellers' favourite is only 2% of the imitation model's answers, so only 17 of the 302 pairs
+            include it: 71% agreement says little about it.
+          - >-
+            Loose leash, β 0.02: the scorer's average rating climbs from +1.69 to +2.11, while the average true
+            value sinks from +4.30 to +2.15. The two use different scales, so compare each with its own start.
+        words:
+          - term: "Reward model"
+            def: >-
+              A model trained on people's comparisons to give any answer one score. Example: the toy's scorer.
+          - term: "Labeller"
+            def: >-
+              A person who picks the better of two answers to make training data. Example: the toy's fast
+              labellers, who cannot check the category.
+          - term: "Imitation model (SFT model)"
+            def: >-
+              The model after it copied the agents' examples. Example: the toy's preference pairs are drawn from
+              it.
+          - term: "Reward hacking"
+            def: >-
+              Raising the score through the scorer's blind spots instead of getting better. Example: wrong
+              category, top rating.
+        more: >-
+          The agreement is measured on the training pairs, and those are sampled from the SFT model, so they cover
+          the answers it already writes. The reward model is a Bradley-Terry fit on `VIS`, the features the
+          labellers can see; with fast labellers `VIS = F[:, 1:]` drops the correctness column, so no amount of
+          data teaches it correctness. RLHF then moves probability to the answer the reward model rates highest
+          (RM +2.11), which here has the wrong category. Two answers differ only in category (concise JSON, right
+          and wrong, both RM +1.44), so every pair of them counts as a miss: part of the missing 29%. The labellers
+          are noisy too (Bradley-Terry on `LABEL_U`), so even a perfect copy of their taste would not reach 100%.
+      - q: >-
+          DPO (direct preference optimization: training straight on the chosen and rejected pairs, with no scorer)
+          changed the model less than RLHF with a loose leash did. Is that a good thing?
+        plain: >-
+          Both. DPO only changes how often the model gives answers that appear in the pairs. So it chases a rarely
+          seen loophole less far than loose RLHF does, and ignores a loophole the pairs never show. For the same
+          reason, it cannot discover a better answer the pairs never show.
+        picture: >-
+          A chef who only tweaks dishes that diners compared side by side never serves an untested gimmick. He
+          never discovers a new favourite either. A chef who experiments freely finds both.
+        numbers_source: "lesson 16's `toy_alignment.py` (your default run) and README"
+        numbers:
+          - >-
+            The pairs come from the imitation-trained model: 400 draws of two answers, minus the 98 where both
+            were the same, leaves 302.
+          - >-
+            That model gives the labellers' favourite (short friendly JSON, wrong category) only 2% of the time,
+            so only 17 of the 302 pairs include it.
+          - >-
+            Loose RLHF (β 0.10 in the lesson's table) makes that answer the most likely; the average true value
+            falls from +4.30 at β 0.50 to +3.45.
+          - >-
+            DPO at the default β 0.5 ends 0.51 away from the imitation-trained model (`KL from SFT`), against
+            1.81 for RLHF at β 0.10 and 3.90 at β 0.02.
+          - >-
+            It still copies the labellers' bias where the pairs show it: the favourite rises from 0.02 to 0.18, so
+            DPO's average true value, +3.94, barely beats the imitation step's +3.89.
+        words:
+          - term: "DPO (direct preference optimization)"
+            def: >-
+              Training straight on chosen and rejected pairs with one loss, no scorer and no sampling loop.
+              Example: step 6 of the toy.
+          - term: "Preference pair"
+            def: >-
+              Two answers to the same prompt, one chosen and one rejected. Example: 302 in the toy (400 draws,
+              identical ones dropped).
+          - term: "Loose leash"
+            def: >-
+              A small β, so the model may drift far from where it started. Example: β 0.10 or 0.02.
+          - term: "KL (drift)"
+            def: >-
+              How far a model's choices have moved from another model's; 0 means identical. Example: `KL from
+              SFT` 0.51 for DPO, its drift from the imitation-trained (SFT) model.
+        more: >-
+          DPO's gradient only touches the logits of answers that appear as chosen or rejected (the two `np.add.at`
+          lines), in proportion to how often. It inherits the labellers' bias from the same pairs but follows it
+          less far than the loose sweep rows. RLHF samples from its current policy and can push probability onto
+          any answer the reward model rates highly, rare ones included. So moving less protects you from a flawed
+          reward model and limits you when the reward model is good. Two cautions from the run: the comparison is
+          with loose RLHF, not with RLHF at the same β (at β 0.5 the sampled run 5b drifts KL 0.34 and keeps
+          +4.30, against DPO's 0.51 and +3.94); and with 302 pairs every one of the six answers appears, so "never
+          in the pairs" is the real-world case the toy only hints at.
+      - q: >-
+          What stops reward hacking (a model gaming its scorer) for good?
+        plain: >-
+          Better judgements to learn from: experts who can check correctness, or a program that checks it. Then a
+          well-set leash, and tests that measure real quality instead of the scorer's rating.
+        picture: >-
+          If students game a lazy grader, a stricter rule helps a little. What fixes it is a grader who checks
+          the facts, or an answer key that marks the sums automatically.
+        numbers_source: "lesson 16's `toy_alignment.py` and README, and the RLHF and Training Techniques videos"
+        numbers:
+          - >-
+            Fast labellers: 0 points for the right category. Expert labellers (`--expert-labels`): +3, the same
+            as the true value.
+          - >-
+            With experts, every leash setting improves on the imitation step: average true value +4.08 to +4.78,
+            against +3.89.
+          - >-
+            A program grader, as in Fireworks RFT, scores each answer from 0 to 1, for example tests passing or
+            an exact match (the RLHF and Training Techniques videos).
+          - >-
+            The leash alone limits the damage but cannot fix bad labels (the script's own summary).
+        words:
+          - term: "RFT (reinforcement fine-tuning)"
+            def: >-
+              Fireworks' reinforcement training that scores answers with a program instead of a reward model.
+              Example: a grader checking the category.
+          - term: "Grader"
+            def: >-
+              Anything that scores an answer: a program, a judge model or a person. Example: a program that gives
+              1 if the JSON is valid and the category matches, else 0.
+          - term: "Expert labels"
+            def: >-
+              Choices made by people who can check correctness. Example: `--expert-labels` in the toy.
+          - term: "Eval"
+            def: >-
+              A repeatable test of a model on a fixed set of prompts. Example: `pref_eval.py` in step 2.
+        more: >-
+          In the toy, `--expert-labels` sets `LABEL_U = TRUE_U` and lets the reward model see the correctness
+          feature (`VIS = F`), so the proxy and the goal line up. In production: fix the labels (expert labellers, or
+          a programmatic grader as in Fireworks RFT), tune β on a held-out eval that measures true quality, and
+          keep that eval running after training, because a rising reward alone proves nothing.
+    say:
+      ask: "We trained a reward model on our labellers' choices. Why not optimise against it as hard as we can?"
+      means:
+        - phrase: "A reward model is a proxy for what the customer wants"
+          meaning: >-
+            The scorer is a stand-in, trained on labellers' choices. It rates what the labellers could judge, not
+            everything the customer cares about.
+        - phrase: "Optimise it too hard and it stops tracking the goal"
+          meaning: >-
+            Push the model to maximise that score and it finds loopholes. In the lesson the average rating rose
+            from +1.69 to +2.11 while the average true value fell from +4.30 to +2.15.
+        - phrase: "so I keep a KL leash"
+          meaning: >-
+            I charge the model for drifting from its starting point, so it can improve but not run off after
+            loopholes. β sets how long the leash is.
+        - phrase: "where correctness can be checked by a program"
+          meaning: >-
+            For a task such as "valid JSON with the right category", code can mark each answer right or wrong.
+        - phrase: "I'd rather use a grader, which is what reinforcement fine-tuning on Fireworks does"
+          meaning: >-
+            Then I score answers with that program instead of a learned scorer. Fireworks sells this as RFT: a
+            grader scores each answer from 0 to 1.
+    fields:
+      - id: d12-rm-agree
+        label: "How often the reward model agrees with its labellers (%)"
+        hint: >-
+          Section 4 of `python toy_alignment.py`, at the end of the `4 · REWARD MODEL` line:
+          "agrees with its labellers on ...% of pairs".
+        unit: "%"
+        meaning: >-
+          High agreement, yet the scorer still gets gamed: it copied the labellers' blind spot along with their
+          taste.
+        example: "71, as in the lesson (the script uses a fixed random seed, so your run should match)"
+      - id: d12-peak-beta
+        label: "Leash setting where the average true value peaks (β)"
+        hint: >-
+          Section 5: the row with the highest `E[true]`. The line under the table, "TRUE value peaks near
+          β = ...", gives it too.
+        unit: "β"
+        meaning: >-
+          Looser than this, the model starts gaming the scorer: the rating still rises but the real value falls.
+          In a real project this is the setting you tune on an eval.
+        example: "0.5: +4.30, the highest of all 8 rows; the script's line under the table says the same."
+      - id: d12-true-value
+        label: "Average true value with a firm and a very loose leash (`E[true]` at β 0.50 and 0.02)"
+        hint: >-
+          The `E[true]` column of section 5, those two rows. Write both, for example "+4.30 / +2.15".
+        unit: "true value"
+        meaning: >-
+          How much real value the model's answers carry on average, on a firm leash and on a very loose one. The
+          drop is reward hacking in one pair of numbers.
+        example: "+4.30 / +2.15 (the lesson's rows)"
+    done: >-
+      Section 5 of your run shows the scorer's average rating (`E[RM]`) rising as β shrinks, while the average
+      true value (`E[true]`) peaks and then falls. In the `--expert-labels` run, every row beats the imitation
+      step.
+    stuck:
+      - problem: "`ModuleNotFoundError: No module named 'numpy'`"
+        fix: >-
+          The Python environment is off. From the `03-labs` folder run `source .venv/bin/activate`, then run the
+          script again. If it still fails, run `pip install numpy`.
+      - problem: "`--beta 0`, as on the RLHF video's command card, prints the same as the default."
+        fix: >-
+          The script treats 0 as its default, 0.5, because one of its lines divides by β. For a loose leash use a
+          small number instead, such as `python toy_alignment.py --beta 0.02`.
+      - problem: "Your section 5 table has 8 rows, not 3."
+        fix: >-
+          That is expected: the script tries 8 leash settings, from 4 down to 0.01. The lesson shows 3 of them
+          (0.50, 0.10 and 0.02).
+      - problem: "At `--beta 0.1`, 5b still favours the right-category answer, but the sweep says β 0.10 ends on the wrong one."
+        fix: >-
+          Expected: the sampled run stops short of the optimum. Compare the two KL numbers on the 5b line: 0.94
+          reached, 1.81 for the optimum. The script's closing note that 5b lands on the optimum holds at the
+          default β 0.5 (0.34 and 0.34), not here.
+    replace:
+      - find: "The DPO loop is the loss from video 18, written out gradient by gradient."
+        with: "The DPO loop is the loss from step 2's video (Direct Preference Optimization), written out gradient by gradient."
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 2 · Preference tuning with DPO (lesson 18-preference-dpo)
+  # ---------------------------------------------------------------------------------------------------------
+  d12-s2:
+    why: >-
+      DPO (direct preference optimization) teaches a model which of two answers is better, straight from pairs.
+      You pair 800 correct ticket answers, each with one of four realistic mistakes, train on your Mac, and check
+      the format improves without costing accuracy.
+    why_example: >-
+      A support-ticket system needs a reply it can read and the correct destination team. After training,
+      count both on 100 tickets the model has never seen. In the lesson's sample, readable replies improve
+      from about 80 to 98, while correct categories must stay at least as common as before. A prettier reply
+      is not an improvement if more tickets go to the wrong team.
+    start_first:
+      command: "cd lessons/18-preference-dpo && bash dpo_mlx.sh"
+      note: >-
+        Run it from the `03-labs` folder with the Python environment on (`source .venv/bin/activate`). It builds
+        the 800 pairs, installs the DPO training tool (`mlx-lm-lora`) the first time, merges Day 11's LoRA add-on
+        if it finds it, then trains for 10 to 20 minutes. Watch the video while it runs. For the commands below,
+        open a second terminal, go to `03-labs`, run `source .venv/bin/activate`, then
+        `cd lessons/18-preference-dpo`.
+    videos:
+      18-dpo:
+        in_this_video: >-
+          How DPO gets RLHF's result from the same pairs with one simple loss, what β does, and how your own
+          product already produces preference pairs.
+        key_points:
+          - point: >-
+              DPO learns straight from chosen and rejected pairs with one simple loss: no reward model, no
+              trial-and-error loop.
+            detail: >-
+              Each step makes the chosen answer more likely and the rejected one less, compared with a frozen copy.
+              In the video's step the gap reaches 1.2, and with β (the leash setting) at 0.1 the loss falls from
+              0.69 to 0.63.
+          - point: >-
+              It needs 2 models in memory instead of RLHF's 4, and trains almost as steadily as ordinary
+              fine-tuning.
+            detail: >-
+              The 2 are the model being trained and the frozen reference copy. Pairs often come free from your
+              product: an agent's edit of a draft is chosen, the original draft rejected.
+          - point: >-
+              Fine-tune on examples first, then DPO, and measure both win rate (how often the new answer is
+              preferred to the old) and task accuracy.
+            detail: >-
+              DPO refines a model that already does the task. Start β around 0.1; lower lets the model move
+              further. Improving taste can quietly cost correctness, so check accuracy every time.
+    plain:
+      lead: >-
+        DPO trains a model on pairs of answers to the same question: one chosen, one rejected. It learns to make
+        the chosen kind more likely and the rejected kind less. There is no separate scorer and no trial-and-error
+        loop, only a loss (a score of how wrong the model still is, which training shrinks) computed from the
+        pairs.
+      picture: >-
+        A new support agent watches a supervisor edit drafts: this version, not that one. After hundreds of
+        before-and-after edits, the agent drafts like the supervisor. Edits that only fix tone teach tone, not
+        facts, which is why accuracy is checked separately.
+      numbers_source: "lesson 18's scripts and README, Qwen2.5-0.5B-Instruct on your Mac"
+      numbers:
+        - >-
+          Pairs: 800 for training and 100 for checking, one per support ticket.
+        - >-
+          Each rejected answer is one of four mistakes picked at random, so about 800 ÷ 4 = 200 of each: chatty
+          (the right JSON wrapped in chat), prose (a paragraph, no JSON), wrong category, wrong severity.
+        - >-
+          Training: 200 steps x 2 pairs = 400 pairs seen, half of the 800, in 10 to 20 minutes.
+        - >-
+          Memory: two copies of the model, the trained one and a frozen reference. 0.5 billion numbers x 2 bytes =
+          about 1 GB each.
+        - >-
+          Roughly, as the lesson expects: valid JSON about 80% to about 98%, chatty about 20% to about 1%, right
+          category about 70% to the same or higher.
+      words:
+        - term: "DPO (direct preference optimization)"
+          def: >-
+            Training straight on chosen and rejected pairs with one loss, no scorer and no sampling loop.
+            Example: `dpo_mlx.sh`.
+        - term: "Preference pair"
+          def: >-
+            Two answers to the same prompt, one chosen and one rejected. Example: clean JSON against the same
+            JSON wrapped in chat.
+        - term: "Reference model"
+          def: >-
+            A frozen copy of the starting model that training measures drift against. Example:
+            `--reference-model-path` in `dpo_mlx.sh`.
+        - term: "Loss"
+          def: >-
+            The single number training tries to shrink; for DPO it falls as the chosen and rejected answers pull
+            apart. Example: 0.69 at the start, 0.63 after the video's step.
+    run:
+      - cmd: "python make_pairs.py"
+        note: >-
+          Turns each support ticket into a pair: the correct JSON as chosen, one realistic mistake as rejected,
+          in a Mac format and a Fireworks format. **Look for** `train: 800 pairs`, `valid: 100 pairs`, the four
+          mistake kinds at about 200 each (191 to 213), and one example pair. If `dpo_mlx.sh` is already running
+          from before the video, it built these: read its output and skip this command.
+      - cmd: "python pref_eval.py --target mock --label mock"
+        note: >-
+          First start the practice server: from `03-labs`, run `make mock &`. Then this rehearses against it: it
+          sends the 100 test tickets and prints the five measures you compare later. The numbers mean nothing; it
+          proves the scoring works.
+      - cmd: "bash dpo_mlx.sh"
+        note: >-
+          Trains DPO on your Mac for 10 to 20 minutes, as a small add-on saved in `adapters/dpo`. It first prints
+          `DPO starting from:` and a model: `sft_model` if Day 11's LoRA was merged in, else the plain instruct
+          model. That model is `<START>` below. At the end it prints two server commands: run each in its own
+          terminal and leave them running. If you started it before the video, let that run finish.
+      - cmd: "MLX_MODEL=<START> python pref_eval.py --target mlx --label before"
+        note: >-
+          Scores the model before DPO on the 100 test tickets, through the server on port 8081 (no add-on).
+          Replace `<START>` with the model `dpo_mlx.sh` printed. **Look for** `valid_%` near 80 and `chatty_%`
+          near 20, roughly as the lesson expects; yours will differ.
+      - cmd: "MLX_URL=http://localhost:8082/v1 MLX_MODEL=<START> python pref_eval.py --target mlx --label after-dpo"
+        note: >-
+          The same 100 tickets through the server on port 8082, which adds the DPO add-on. **Look for**
+          `valid_%` near 98, `chatty_%` near 1, and `category_%` the same as before or higher.
+      - cmd: "python pref_eval.py --pairwise <START> --label pairs-before"
+        note: >-
+          No server needed: it loads the model itself. For each of the 100 checking pairs it compares how likely
+          the model is to write the chosen answer against the rejected one. **Look for** `pref_acc_%` near 60 and
+          a `margin` near +1. The row prints as `pairwise base`: the script names pairwise rows itself.
+      - cmd: "python pref_eval.py --pairwise <START> --adapter adapters/dpo --label pairs-after"
+        note: >-
+          The same with the DPO add-on loaded. **Look for** `pref_acc_%` near 95 and a `margin` near +10: the
+          model now clearly favours the chosen answers. The row prints as `pairwise +dpo`. 3 of the 100 checking
+          pairs are identical (the kit's wrong-severity mistake cannot push a severity-5 ticket higher, or a
+          severity-1 ticket lower), so 97% is the ceiling.
+      - cmd: "bash dpo_fireworks.sh"
+        note: >-
+          Optional and paid. Runs the same DPO job on Fireworks, on Qwen2.5 7B Instruct by default. Training
+          costs cents: the lab book lists $1.00 per million training tokens for LoRA DPO up to 16B. It asks before
+          deploying, because a dedicated deployment bills by the hour ($8 an hour for an H100 in the lab book);
+          the script deletes it on exit. Afterwards run `make fw-check`: it should list nothing.
+    see: >-
+      Only the pattern matters; your numbers will differ. The first table scores 100 test tickets before and
+      after DPO: `valid_%` JSON that fits the ticket format, `chatty_%` chat or prose, `category_%` and
+      `severity_%` right answers, `avg_chars` average length (≈ means about the same, the up arrow higher). In
+      the second, `pref_acc_%` is how often the model favours the chosen answer and `margin` by how much; format
+      should jump while category holds.
+    checks:
+      - q: >-
+          Why merge Day 11's small add-on (the SFT adapter, trained on examples) into the model first, instead of
+          running DPO on the plain instruct model?
+        plain: >-
+          DPO polishes a model that already does the task. The plain model gets only about 40% of ticket
+          categories right, so the approved answers are still unlikely for it, and DPO mostly learns to avoid the
+          rejected text.
+        picture: >-
+          Coaching someone's handwriting helps once they can form the letters. Show a beginner pairs of neat and
+          messy pages and they mostly learn what to avoid, not how to write.
+        numbers_source: "lesson 17's README (Day 11), `dpo_mlx.sh` and the RLHF and DPO videos"
+        numbers:
+          - >-
+            Day 11's expected table: before its training, the model gets about 40% of ticket categories right;
+            after training, all three methods score well above that.
+          - >-
+            `dpo_mlx.sh` merges Day 11's LoRA into `sft_model`, then runs DPO from there and uses it as the frozen
+            reference too.
+          - >-
+            Without it, DPO starts from the plain instruct model, the one at about 40%.
+          - >-
+            The RLHF video's rule: "You cannot reinforce behaviour the model never produces." The DPO video's:
+            SFT first, then DPO.
+        words:
+          - term: "SFT (supervised fine-tuning)"
+            def: >-
+              Training on examples of the answers you want. Example: Day 11's LoRA on 800 support tickets.
+          - term: "Adapter (LoRA)"
+            def: >-
+              A small add-on of extra learned numbers trained on top of a frozen model. Example: Day 11's, in
+              `adapters/lora`.
+          - term: "Fuse"
+            def: >-
+              Bake an adapter's numbers into the model so it becomes one self-contained model. Example:
+              `sft_model`.
+          - term: "Instruct model"
+            def: >-
+              A model already trained to follow instructions and chat. Example: Qwen2.5-0.5B-Instruct.
+        more: >-
+          DPO only reshapes probability between responses the model can already produce. Starting from a model
+          that already emits valid triage JSON, the pairs refine format and correctness at the margin. From the
+          raw instruct model the chosen answers are unlikely, so much of the loss is reduced by pushing the
+          rejected text down. The same model is the frozen reference (`--reference-model-path "$START"`), so the
+          reference also knows the task.
+      - q: >-
+          What does β (beta, the leash setting, 0.1 in `dpo_mlx.sh`) actually do?
+        plain: >-
+          It sets how far the model may drift from its frozen starting copy before training stops pushing it
+          further. A smaller β lets it move further.
+        picture: >-
+          Think of β as how short the leash is. On a short leash (large β), the dog gets a few steps away and the
+          leash goes taut. On a long leash (small β), it wanders much further before it is pulled back.
+        numbers_source: "the DPO video's worked step, recomputed at other β values"
+        numbers:
+          - >-
+            Margin: the chosen answer +0.8, the rejected -0.4, both against the frozen copy: 0.8 - (-0.4) = 1.2.
+          - >-
+            β 0.1: 0.1 x 1.2 = 0.12. The sigmoid σ turns any number into a value between 0 and 1: σ(0.12) = 0.53.
+            Loss = -log(0.53) = 0.63, down from 0.69 when the margin was 0.
+          - >-
+            β 0.05: the same margin earns only 0.06, loss 0.66, so training keeps pulling the two apart for longer.
+          - >-
+            β 0.2: 0.24, loss 0.58, so less drift is needed before the pull fades.
+        words:
+          - term: "β (beta)"
+            def: >-
+              The leash: how far the model may move from the reference. Example: 0.1 in `dpo_mlx.sh`.
+          - term: "Margin"
+            def: >-
+              How much more the model favours the chosen answer than the rejected one. Example: 1.2 in the DPO
+              video.
+          - term: "Log-probability"
+            def: >-
+              The natural log of how likely the model is to write an answer; DPO works in these. Example: +0.8
+              against the reference.
+          - term: "Loss"
+            def: >-
+              The single number training tries to shrink. Example: 0.69 at the start, 0.63 after one step.
+        more: >-
+          L = −log σ(β · [(log π(y_c) − log π_ref(y_c)) − (log π(y_r) − log π_ref(y_r))]). Its gradient is scaled
+          by σ(−β · margin), which shrinks as β · margin grows, so a larger β saturates at a smaller margin (a
+          tighter leash). β is the same KL coefficient as in RLHF: DPO is derived from that KL-regularised
+          objective, with the leash built into the loss. Set it with `BETA=0.2 bash dpo_mlx.sh`.
+      - q: >-
+          Suppose half your rejected answers are chatty (the right JSON wrapped in chat), and none have the wrong
+          category (`wrong_cat`). What happens to category accuracy after DPO?
+        plain: >-
+          The model learns to fix its format, not to get categories right. Category accuracy may stay flat or even
+          slip, because nothing in the pairs rewards the right category.
+        picture: >-
+          If a supervisor only ever corrects greetings and sign-offs, the new agent writes polite emails that may
+          still send customers to the wrong team.
+        numbers_source: "lesson 18's `make_pairs.py` and README"
+        numbers:
+          - >-
+            The lesson's 800 pairs: each rejected answer is one of four mistakes, about 200 each (800 ÷ 4).
+          - >-
+            Only the wrong-category kind differs from the chosen answer in its category. Chatty, prose and
+            wrong-severity answers all keep the right one.
+          - >-
+            The question's mix: 400 chatty (half of 800) and 0 wrong-category, so no pair teaches the category.
+          - >-
+            Watch `category_%`: the lesson expects it to hold at about 70% or rise. A drop means taste has cost
+            correctness.
+        words:
+          - term: "Chatty answer"
+            def: >-
+              The right JSON wrapped in friendly chat, so a program cannot read it. Example: "Sure! Here's the
+              JSON you asked for: ..." (`chatty_%` also counts prose answers.)
+          - term: "wrong_cat pair"
+            def: >-
+              A pair whose rejected answer is valid JSON with the wrong category. Example: 213 of the 800.
+          - term: "Category accuracy"
+            def: >-
+              The share of test tickets given the right category. Example: `category_%`, about 70% before.
+          - term: "Preference pair"
+            def: >-
+              Two answers to the same prompt, one chosen and one rejected. Example: 800 in this lesson.
+        more: >-
+          DPO raises the log-probability gap along whatever separates chosen from rejected. If no pair separates
+          on category, the gradient carries no category signal, and drift from the reference (bounded by β) can
+          move it either way. The README's fixes: a larger β, fewer iterations, or more `wrong_cat` pairs, so
+          correctness is part of what "preferred" means. `make_pairs.py`'s own rule: pairs should differ in the
+          thing you care about.
+      - q: >-
+          When would you use ORPO (odds-ratio preference optimization, a relative of DPO) instead of DPO?
+          Fireworks runs it with `--loss-method ORPO`.
+        plain: >-
+          When you want to teach the task and the preference in one training run, without keeping a second,
+          frozen copy of the model in memory.
+        picture: >-
+          DPO is coaching after a course: first the course, then a coach who compares you with your old self.
+          ORPO is one class that teaches the skill and the taste together, with no old self to compare against.
+        numbers_source: "the DPO and RLHF videos, `dpo_mlx.sh` and `dpo_fireworks.sh`"
+        numbers:
+          - >-
+            RLHF with PPO: 4 models in memory. DPO: 2, the model being trained and a frozen reference.
+          - >-
+            ORPO: no reference copy, so only the model being trained, and no separate example-training step
+            first.
+          - >-
+            On your Mac, each copy of the 0.5-billion-number model is 0.5 billion x 2 bytes = about 1 GB.
+          - >-
+            For the Qwen2.5 7B model `dpo_fireworks.sh` uses (7.6 billion numbers), a frozen copy at 2 bytes each
+            is 7.6 x 2 = about 15 GB.
+        words:
+          - term: "ORPO (odds-ratio preference optimization)"
+            def: >-
+              A preference method that does example training and preference training in one run, with no
+              reference model. Example: `--loss-method ORPO`.
+          - term: "Reference model"
+            def: >-
+              A frozen copy of the starting model that training measures drift against. Example: one of DPO's 2
+              models.
+          - term: "SFT (supervised fine-tuning)"
+            def: >-
+              Training on examples of the answers you want. Example: Day 11's LoRA.
+          - term: "bf16"
+            def: >-
+              A 16-bit number format, 2 bytes per number, used for training. Example: the 0.5B model is about
+              1 GB in bf16.
+        more: >-
+          ORPO adds an odds-ratio term, −λ · log σ(log(odds(chosen) / odds(rejected))) with odds(y) = P(y) ÷
+          (1 − P(y)), to the ordinary SFT loss on the chosen answer, so it needs neither a reference model nor a
+          separate SFT stage. With no reference there is no explicit leash to a known-good model, so evaluate
+          accuracy as carefully as with DPO. On Fireworks:
+          `firectl dpo-job create --loss-method ORPO` with `--orpo-lambda` (the comment at the top of
+          `dpo_fireworks.sh`).
+    say:
+      ask: >-
+        Our fine-tuned support model still wraps its JSON in chat and breaks our parser. We have no budget for
+        labellers. What would you do?
+      means:
+        - phrase: "Their agents already edit the model's drafts"
+          meaning: >-
+            Support staff already fix the model's replies as part of their day.
+        - phrase: "Every edit is a preference pair"
+          meaning: >-
+            Each fix gives two answers to the same ticket: the edited one (chosen) and the original draft
+            (rejected). That is free training data.
+        - phrase: "Run DPO on an SFT'd model"
+          meaning: >-
+            Train on those pairs with DPO, starting from the model already fine-tuned on examples (SFT). Here that
+            is Day 11's LoRA, merged in.
+        - phrase: "the formatting failures disappear"
+          meaning: >-
+            As the lesson expects: valid JSON from about 80% to about 98%, chatty replies from about 20% to about
+            1%.
+        - phrase: "I'd watch category accuracy so taste doesn't cost correctness"
+          meaning: >-
+            I compare the right-category rate before and after, because pairs that differ only in style can
+            quietly make answers less accurate.
+        - phrase: "where correctness can be checked by code, I'd use RFT with a grader instead"
+          meaning: >-
+            If a program can mark an answer right or wrong, I train with RFT (reinforcement fine-tuning), which
+            scores each answer with that program instead of preferences.
+    fields:
+      - id: d12-valid-json
+        label: "Valid JSON before and after DPO (%)"
+        hint: >-
+          `valid_%` in the `before` and `after-dpo` rows of `pref_eval.py`. Write both, for example "80 / 98".
+        unit: "%"
+        meaning: >-
+          The share of the 100 test tickets answered with JSON that fits the ticket format. DPO should push it
+          up.
+        example: "about 80 / 98, as the lesson expects"
+      - id: d12-category
+        label: "Right category before and after DPO (%)"
+        hint: >-
+          `category_%`, same two rows. Write both as before / after, for example "70 / 70".
+        unit: "%"
+        meaning: >-
+          The correctness check: it must not drop. If it does, taste has cost correctness.
+        example: "about 70, then the same or higher, as the lesson expects"
+      - id: d12-margin
+        label: "Preference margin before and after DPO"
+        hint: >-
+          `margin` in the `pairwise base` and `pairwise +dpo` rows. Write both as before / after; the lesson
+          shows about +1 and about +10.
+        unit: "log scale"
+        meaning: >-
+          On average over the 100 checking pairs, how much more likely the model finds the chosen answer than
+          the rejected one, on a log scale: +1 is about 2.7 times as likely, +10 about 22,000 times (e^1 = 2.72,
+          e^10 = 22,026). It should grow a lot after DPO.
+        example: "about +1 / +10, as the lesson expects"
+    done: >-
+      `pref_eval.py` has printed your `before` and `after-dpo` rows and both pairwise rows. Valid JSON went up,
+      chatty went down, `category_%` did not drop, and the margin grew.
+    stuck:
+      - problem: "`pref_eval.py --target mock` says `Connection refused`."
+        fix: >-
+          The practice server is not running. From the `03-labs` folder run `make mock &`, then try again.
+      - problem: "`pref_eval.py --target mlx` says `Connection refused`."
+        fix: >-
+          The two model servers are not running. `dpo_mlx.sh` printed their commands at the end. In each new
+          terminal, first go to `03-labs` and run `source .venv/bin/activate`, then
+          `cd lessons/18-preference-dpo`. Start `mlx_lm.server --model <START> --port 8081` in one terminal and
+          the same with `--adapter-path adapters/dpo --port 8082` in another. When both are up, run the check
+          again.
+      - problem: "You do not know what to type for `<START>`."
+        fix: >-
+          Use the model `dpo_mlx.sh` printed on its `DPO starting from:` line, such as the full path to
+          `sft_model`. It is also saved in the file `.state` in the lesson folder.
+      - problem: "`dpo_mlx.sh` starts from the instruct model, not `sft_model`."
+        fix: >-
+          It did not find Day 11's LoRA in `lessons/17-full-vs-peft-mlx/adapters/lora`. DPO still runs, but on a
+          model that gets only about 40% of categories right (check yourself 1). From `03-labs`, run
+          `VARIANTS=lora bash lessons/17-full-vs-peft-mlx/run_variants.sh` (5 to 15 minutes), then
+          `bash lessons/18-preference-dpo/dpo_mlx.sh` again, and restart both servers with the new `<START>` it
+          prints (`sft_model`).
+      - problem: "`mlx_lm_lora.train` stops with an unknown option or argument error."
+        fix: >-
+          The tool's options change between versions, and the script says its `--help` wins. Run
+          `mlx_lm_lora.train --help`, match the options at the top of `dpo_mlx.sh` to it, and run it again.
+      - problem: "`category_%` dropped after DPO."
+        fix: >-
+          Taste has cost correctness. The lesson's fixes: a larger β (`BETA=0.2 bash dpo_mlx.sh`), fewer steps
+          (`ITERS=100 bash dpo_mlx.sh`), or more wrong-category pairs, so correctness is part of what "preferred"
+          means.
+      - problem: "The pairwise rows are not in `results/18-pref.csv`."
+        fix: >-
+          They have different columns, so the kit's recorder saves each one in a new file named
+          `results/18-pref-<time>.csv`. Copy the numbers from the terminal or from those files.
+      - problem: "`dpo_fireworks.sh` says the base model is not found or not DPO-enabled."
+        fix: >-
+          Model ids change. Pick one the Fireworks model library marks as DPO-enabled and run
+          `BASE_MODEL=accounts/fireworks/models/<id> bash dpo_fireworks.sh`. Afterwards run `make fw-check`: it
+          should list nothing.
+    replace:
+      - find: "taste has cost correctness (video 18)"
+        with: "taste has cost correctness (the Direct Preference Optimization video at the top of this step)"
+      - find: "if you did lesson 17 first"
+        with: "if you trained Day 11's LoRA first"
+      - find: "fuses lesson 17's LoRA into an SFT model if present"
+        with: "fuses Day 11's LoRA into an SFT model if present"
+      - find: "**Back to →** [the course README](../../README.md) · the lab book's training section"
+        with: ""
+
+wrapup:
+  done: >-
+    Your table shows, before and after DPO: valid JSON (up), the right category (not down) and the margin between
+    chosen and rejected answers (grown). And you can explain, with the toy's numbers, why a scorer that cannot
+    check correctness gets gamed.
+  whiteboards:
+    - video: 17-rlhf
+      q: >-
+        A customer complains that an outage cost them a day. A reward model (a scorer trained on people's choices)
+        rates answer A, an apology with the cause, a fix and a credit, at 2.1. It rates answer B, accurate but with
+        no apology, at -0.4. How likely is a person to prefer A?
+      given: >-
+        The reward model turns each answer into one number. The chance a person prefers A depends only on the gap
+        between the two numbers, passed through the sigmoid (σ): a curve that turns any number into a chance
+        between 0% and 100%. A gap of 0 gives 50%.
+      plain: >-
+        About 92%: a bit more than 9 times in 10. A gap of 2.5 points on the scorer's scale is a strong
+        preference, but never a certainty.
+      picture: >-
+        Like chess ratings: the bigger the gap between two players' ratings, the more surely the stronger one
+        wins, but an upset is always possible.
+      steps:
+        - >-
+          Gap between the two scores: 2.1 - (-0.4) = 2.1 + 0.4 = 2.5.
+        - >-
+          Sigmoid of the gap: σ(2.5) = 1 ÷ (1 + e^-2.5), where e is about 2.718 and e^-2.5 means 1 divided by e
+          to the power 2.5.
+        - >-
+          e^2.5 is about 12.18, so e^-2.5 = 1 ÷ 12.18 = 0.082.
+        - >-
+          1 ÷ (1 + 0.082) = 1 ÷ 1.082 = 0.924, about 92%.
+        - >-
+          The other side: the chance of preferring B is 1 - 0.924 = 0.076, about 8%.
+        - >-
+          Training the reward model means adjusting its scores until chances like these match tens of thousands
+          of real human choices (the video's figure).
+      note: >-
+        The reward model knows only what its labellers could judge. In step 1's toy they could not check the
+        ticket's category, and the trained model exploited exactly that.
+      kit_q: >-
+        Worked example · the reward model's job · prompt: the outage complaint
+      kit_a: >-
+        answer A · apology, cause, fix, credit: score 2.1. answer B · accurate, no apology: score −0.4.
+        P(person prefers A) = σ(2.1 + 0.4): ≈ 92%. training data: tens of thousands of comparisons. The reward
+        model turns human judgement into a number an optimizer can chase.
+      more: >-
+        This is the Bradley-Terry model: P(A preferred to B) = σ(r_A − r_B), and the reward model is fitted by
+        minimising −log σ(r_chosen − r_rejected) over the comparisons. Only differences matter, so adding a
+        constant to every score changes nothing. `toy_alignment.py` fits exactly this in its step 4, on the
+        features the labellers could see. The DPO loss has the same −log σ shape, with the reward replaced by β
+        times the log-probability ratio to the reference.
+      words:
+        - term: "Reward model"
+          def: >-
+            A model trained on people's comparisons to give any answer one score. Example: 2.1 and -0.4 here.
+        - term: "Sigmoid (σ)"
+          def: >-
+            A curve that turns any number into a value between 0 and 1; 0 gives 0.5. Example: σ(2.5) = 0.92.
+        - term: "Bradley-Terry model"
+          def: >-
+            The rule that turns two scores into the chance a person prefers one: the sigmoid of the gap. Example:
+            this whiteboard.
+        - term: "Comparison"
+          def: >-
+            A person's pick of the better of two answers to the same prompt. Example: A over B.
+    - video: 18-dpo
+      q: >-
+        In one DPO training step, the model has made the chosen answer 0.8 more likely and the rejected answer 0.4
+        less likely, both in log terms against a frozen copy of the starting model. β is 0.1. What is the loss,
+        and what was it when training started?
+      given: >-
+        DPO compares log-probabilities (the natural log of how likely the model is to write an answer), each minus
+        the frozen reference copy's. +0.8 in log terms means about 2.2 times as likely as the frozen copy thinks
+        (e^0.8 = 2.23); -0.4 means about two thirds as likely (e^-0.4 = 0.67). The margin is the chosen change
+        minus the rejected change. β, the leash setting, scales the margin. The loss, the number training tries
+        to shrink, is -log σ(β x margin).
+      plain: >-
+        About 0.63, down from 0.69 at the start. The further the chosen and rejected answers pull apart, the lower
+        the loss.
+      picture: >-
+        A see-saw: DPO pushes the chosen end up and the rejected end down. The loss says how level it still is:
+        level at the start (0.69), a little tipped after this step (0.63).
+      steps:
+        - >-
+          Chosen change: +0.8. Rejected change: -0.4.
+        - >-
+          Margin: 0.8 - (-0.4) = 1.2.
+        - >-
+          Times β: 0.1 x 1.2 = 0.12.
+        - >-
+          Sigmoid: σ(0.12) = 1 ÷ (1 + e^-0.12) = 1 ÷ (1 + 0.887) = 0.530.
+        - >-
+          Loss: -log(0.530) = 0.63 (natural log).
+        - >-
+          At the start both answers match the reference: margin 0, σ(0) = 0.5, loss = -log(0.5) = 0.69.
+        - >-
+          For comparison, a margin of 5 at the same β gives σ(0.5) = 0.62 and a loss of 0.47: more separation,
+          lower loss.
+      note: >-
+        This margin is measured against the frozen copy. `pref_eval.py --pairwise` in step 2 reports a different
+        margin: the raw gap in log-probability between chosen and rejected, with no reference subtracted. Its growth
+        from before to after is what tracks DPO's progress.
+      kit_q: >-
+        Worked example · one DPO step · β = 0.1 · log-probabilities relative to the reference
+      kit_a: >-
+        chosen: log π − log π_ref: +0.8. rejected: log π − log π_ref: −0.4. β × margin: 0.1 × 1.2 = 0.12. loss =
+        −log σ(0.12): 0.63 (0.69 at start). Read it: The loss falls as chosen and rejected pull apart.
+      more: >-
+        L = −log σ(β[(log π(y_c) − log π_ref(y_c)) − (log π(y_r) − log π_ref(y_r))]). e^−0.12 = 0.8869,
+        σ(0.12) = 0.5300, −ln 0.5300 = 0.6349. The gradient of the loss with respect to the margin is
+        −β · σ(−β · margin); its size is 0.1 x 0.470 = 0.047 here, against 0.05 at the start: it shrinks as the
+        pair separates, which is the leash at work. `toy_alignment.py` step 6 computes σ(−β · margin) as `s`
+        (0.470 here) and applies `b * s` as the gradient (the two `np.add.at` lines).
+      words:
+        - term: "DPO (direct preference optimization)"
+          def: >-
+            Training straight on chosen and rejected pairs with one loss, no scorer and no sampling loop.
+        - term: "Log-probability"
+          def: >-
+            The natural log of how likely the model is to write an answer. Example: +0.8 against the reference.
+        - term: "Reference model"
+          def: >-
+            A frozen copy of the starting model that DPO measures drift against.
+        - term: "Loss"
+          def: >-
+            The single number training tries to shrink. Example: 0.69 falling to 0.63.
+
+glossary:
+  # Shared with earlier days: every def is the earliest day's text, word for word (Days 1, 4, 6, 7, 8, 10 and
+  # 11); only the examples are Day 12's. Terms another day names differently use that day's name.
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "`pref_eval.py` on 100 held-out tickets."
+  - term: "Flag"
+    def: "an option typed after a command that changes how the program runs."
+    example: "`--expert-labels`, `--beta 0.1`."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "the H100 a Fireworks deployment runs on."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "$8 an hour on demand in the lab book."
+  - term: "Held-out prompts"
+    def: "test prompts the model was never trained on."
+    example: "`test.jsonl`: 100 tickets, 30 of them in phrasings never seen in training."
+  - term: "Localhost"
+    def: "your own computer, used as an address."
+    example: "`http://localhost:8082/v1`, the server with the DPO add-on."
+  - term: "make"
+    def: "a tool that runs named shortcuts listed in a file called `Makefile`."
+    example: "`make mock &`, `make fw-check`."
+  - term: "MLX"
+    def: "Apple's own software for running and training models on Apple chips; `mlx_lm.server` is its model server."
+    example: "`mlx_lm.server --port 8082` serves the model with the DPO add-on."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "0.5B = half a billion."
+  - term: "pip, wheel"
+    def: "pip installs Python packages; a wheel is a ready-built package file."
+    example: "`pip install numpy`."
+  - term: "Port"
+    def: "a numbered door on a computer where one server program listens for requests."
+    example: "8081 serves the model before DPO, 8082 after."
+  - term: "Practice server (mock)"
+    def: "the kit's stand-in server with realistic behaviour and made-up numbers."
+    example: "`pref_eval.py --target mock`."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "a support ticket to triage."
+  - term: "Schema-valid rate"
+    def: "the share of replies that come back as correctly formatted data."
+    example: "`valid_%` in `pref_eval.py`."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "`mlx_lm.server`."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "step 2 uses up to four: training, commands and two servers."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "Fireworks bills training per million tokens."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "the kit's `.venv` in `03-labs`."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "about 1 GB for the 0.5B Qwen model in bf16."
+  - term: "Accuracy (category accuracy)"
+    def: "the share of replies with the right answer, checked against each test example's known label."
+    example: "`category_%`: about 70% before DPO, as the lesson expects; it must not drop."
+  - term: "Adapter (LoRA adapter)"
+    def: "the small set of extra numbers LoRA trains and saves; the base model stays unchanged."
+    example: "Day 11's in `adapters/lora`; today's DPO add-on in `adapters/dpo`."
+  - term: "Base model"
+    def: "the model a fine-tune starts from and leaves unchanged."
+    example: "`BASE` in `dpo_mlx.sh`, Qwen2.5-0.5B-Instruct; in the toy, the step 1 model that SFT starts from."
+  - term: "β (beta)"
+    def: "the leash in RLHF and DPO: how far training may pull the model from its starting copy; smaller means a longer leash."
+    example: "0.1 in `dpo_mlx.sh`; the toy tries 4 down to 0.01."
+  - term: "bf16 (bfloat16)"
+    def: "a 16-bit number format used for training, 2 bytes per number."
+    example: "the 0.5B Qwen model is about 1 GB in bf16."
+  - term: "DPO (direct preference optimization)"
+    def: "training from pairs of answers where one is marked better, to teach taste or judgement."
+    example: "`dpo_mlx.sh`: 200 steps of 2 pairs each, drawn from 800 pairs."
+  - term: "Fine-tune"
+    def: "further training of an existing model on your own examples."
+    example: "Day 11's LoRA on 800 support tickets."
+  - term: "Fireworks"
+    def: "a cloud service that runs AI models and charges per use; one platform used in this course."
+    example: "`dpo_fireworks.sh` runs today's job there."
+  - term: "firectl"
+    def: "Fireworks' command-line tool for your account, quotas and deployments."
+    example: "`firectl dpo-job create --loss-method DPO`."
+  - term: "Fuse (fused model)"
+    def: "baking the adapter into the base model's numbers to make one self-contained model."
+    example: "`mlx_lm.fuse` builds `sft_model` from Day 11's LoRA."
+  - term: "Gradient"
+    def: "the correction worked out for each trainable number at each training step."
+    example: "DPO's gradient only touches answers that appear in the pairs."
+  - term: "Grader"
+    def: "anything that scores a model's reply: a code check, a judge model or a person."
+    example: "what Fireworks RFT trains against: 1 if the JSON is valid and the category matches, else 0."
+  - term: "Instruct model"
+    def: "a model already trained to follow instructions and chat."
+    example: "Qwen2.5-0.5B-Instruct."
+  - term: "Iteration (training step)"
+    def: "one update: the model sees a small batch of examples and adjusts."
+    example: "`dpo_mlx.sh` runs 200, of 2 pairs each."
+  - term: "JSON"
+    def: "a plain-text format for data that programs can read: named fields inside curly brackets."
+    example: "`{\"category\": \"billing\", \"severity\": 4}`."
+  - term: "KL leash (KL penalty)"
+    def: "a charge for drifting from the starting model, added to the reward so training cannot run off after loopholes."
+    example: "β sets its length."
+  - term: "LoRA"
+    def: "a cheap way to customise a model: train a small add-on instead of changing the whole model."
+    example: "Day 11's adapter, under 1% of the weights."
+  - term: "Loss (training loss)"
+    def: "a score of how wrong the model's guesses are on the examples it trains on; lower is better."
+    example: "DPO's falls from 0.69 to 0.63 in the video's step."
+  - term: "numpy"
+    def: "a Python library for fast math on lists of numbers."
+    example: "lesson 16's toys run on numpy alone, in seconds."
+  - term: "Proxy"
+    def: "a stand-in measure used because the real goal is hard to measure directly."
+    example: "the reward model's score for what the customer wants."
+  - term: "Qwen2.5-0.5B-Instruct"
+    def: "a small open instruct model with about half a billion parameters, used in the training lessons."
+    example: "about 1 GB in bf16."
+  - term: "Reward hacking"
+    def: "a model raising its score by exploiting the scorer's blind spots instead of getting better."
+    example: "short friendly JSON with the wrong category in the toy."
+  - term: "Reward model"
+    def: "a model trained on people's comparisons to give any answer a single score."
+    example: "2.1 for the apology, -0.4 for the curt reply."
+  - term: "RFT (reinforcement fine-tuning)"
+    def: "training against a grader that scores each answer from 0 to 1, for tasks where correctness can be checked automatically."
+    example: "a grader that checks the JSON is valid and the category matches."
+  - term: "RLHF (reinforcement learning from human feedback)"
+    def: "training a model to chase a reward model's score, learned from people's comparisons, on a leash."
+    example: "SFT, then a reward model, then PPO."
+  - term: "SFT (supervised fine-tuning)"
+    def: "training on examples of the right answer, to teach format, tone and domain patterns."
+    example: "Day 11's LoRA on 800 support tickets."
+  - term: "Ticket triage"
+    def: "sorting incoming support tickets by type and urgency."
+    example: "category billing, severity 4."
+  - term: "Dedicated deployment"
+    def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not."
+    example: "$8 an hour for an H100 in the lab book."
+  # New on Day 12
+  - term: "Bradley-Terry model"
+    def: "the rule that turns two scores into the chance a person prefers one: the sigmoid of the gap between them."
+    example: "scores 2.1 and -0.4 give about 92%."
+  - term: "Chatty answer (chatty_%)"
+    def: "a reply that wraps the JSON in chat or writes prose, so a program cannot read it."
+    example: "about 20% before DPO, about 1% after, as the lesson expects."
+  - term: "Chosen and rejected"
+    def: "the two answers in a preference pair: the one a person approved, and the one they edited away or turned down."
+    example: "chosen: the clean JSON; rejected: the same JSON wrapped in chat."
+  - term: "Expert labels"
+    def: "preference choices made by people who can check correctness."
+    example: "`toy_alignment.py --expert-labels`: the reward model then agrees with them 78% of the time."
+  - term: "Goodhart's law"
+    def: "when a measure becomes the target, it stops being a good measure."
+    example: "the toy's average rating rises while the average true value falls."
+  - term: "GRPO"
+    def: "a reinforcement method that scores a group of answers to the same prompt against each other, with no value model."
+    example: "used for many reasoning models (the RLHF video)."
+  - term: "Imitation model (SFT model)"
+    def: "the model after it copied examples of good answers."
+    example: "the toy's step 2 model, which the preference pairs are drawn from."
+  - term: "KL (Kullback-Leibler divergence)"
+    def: "a measure of how far one model's choices have drifted from another's; 0 means identical."
+    example: "0.34 at β 0.50 and 3.90 at β 0.02 in the toy."
+  - term: "Labeller"
+    def: "a person who picks the better of two answers to make training data."
+    example: "the toy's fast labellers cannot check the ticket's category."
+  - term: "Log-probability (log-prob)"
+    def: "the natural log of how likely a model is to write a given answer; DPO and `pref_eval.py --pairwise` work in these."
+    example: "the chosen answer +0.8 against the reference in the DPO video, about 2.2 times as likely."
+  - term: "Margin"
+    def: "in DPO, how much more the model favours the chosen answer than the rejected one, in log-probability."
+    example: "1.2 in the DPO video (against the frozen copy); `pref_eval.py --pairwise` reports the raw gap, about +1 before and +10 after."
+  - term: "mlx-lm-lora"
+    def: "a tool built on MLX that trains preference methods such as DPO on a Mac."
+    example: "`mlx_lm_lora.train --train-mode dpo`."
+  - term: "ORPO (odds-ratio preference optimization)"
+    def: "a preference method that does example training and preference training in one run, with no reference model."
+    example: "`--loss-method ORPO` on Fireworks."
+  - term: "Policy"
+    def: "in reinforcement learning, the model being trained, seen as a rule for choosing answers."
+    example: "RLHF's policy writes answers and the reward model scores them."
+  - term: "Policy gradient (REINFORCE)"
+    def: "learning by sampling answers and making the above-average ones more likely."
+    example: "the toy's sampled RLHF run, 5b."
+  - term: "PPO"
+    def: "the classic reinforcement algorithm in RLHF: sample answers, score them, make high scorers more likely, on a leash."
+    example: "it needs 4 models in memory."
+  - term: "Preference pair"
+    def: "two answers to the same prompt, one chosen and one rejected."
+    example: "800 in lesson 18, one per training ticket."
+  - term: "Preference tuning"
+    def: "training a model on which answers people prefer, rather than on single correct answers."
+    example: "RLHF and DPO."
+  - term: "Reference model"
+    def: "a frozen copy of the starting model that DPO and RLHF measure drift against."
+    example: "`--reference-model-path` in `dpo_mlx.sh`."
+  - term: "Reinforcement learning"
+    def: "training by trial and error: the model tries answers, gets a score, and makes high-scoring answers more likely."
+    example: "the PPO loop in RLHF."
+  - term: "RLAIF"
+    def: "RLHF with an AI judge in place of human labellers."
+    example: "cheaper labels (the RLHF video)."
+  - term: "Sampling"
+    def: "letting the model write answers at random, following its own probabilities."
+    example: "RLHF samples answers at every training step; DPO does not."
+  - term: "Severity (severity_%)"
+    def: "how urgent a ticket is, from 1 to 5; `severity_%` is the share rated correctly."
+    example: "the card-declined ticket is a 4."
+  - term: "Sigmoid (σ)"
+    def: "a curve that turns any number into a value between 0 and 1; 0 gives 0.5."
+    example: "σ(2.5) = 0.92."
+  - term: "True value"
+    def: "in the toy, the hidden score of what people really want, which the fast labellers' reward model cannot see."
+    example: "4.775 for right-category JSON with a friendly line; `E[true]` is its average over the model's answers."
+  - term: "Value model"
+    def: "in PPO, an extra model that predicts how good an answer in progress will turn out, to steady training."
+    example: "one of RLHF's 4 models."
+  - term: "Win rate"
+    def: "how often people or a judge prefer the new model's answer to the old one's."
+    example: "the DPO video says to measure it together with task accuracy."

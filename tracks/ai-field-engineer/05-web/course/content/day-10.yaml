@@ -1,0 +1,915 @@
+# Day 10 · Capstone and rehearsal. Plain-language content for the guided course (course-spec.md section 3).
+# Sources (kit root = fireworks-field-engineer-kit/):
+#   L15    03-labs/lessons/15-capstone/README.md (Run lines 20-26, slides 30-34, drill 36-46, say 50-53)
+#   memo   03-labs/lessons/15-capstone/build_memo.py (defaults lines 36-45; reads lines 48-53; capacity 56-60, mock rows
+#          dropped once real rows exist line 56; cached share 0.9 line 70; 730 h line 72; best/worst eval lines 75-76;
+#          crossover 80-81; cap warning 82-84)
+#   L03    03-labs/lessons/03-concurrency-sweep/README.md lines 36, 50-52 (8 per copy; 41.4 and 3,357 ms, both TTFT p95)
+#   L10    03-labs/lessons/10-lora-fireworks/README.md line 54 (38 min, $5.07); 1_train.sh line 6 (0.3M tokens, an
+#          estimate); 3_deploy.sh lines 3-9; 5_teardown.sh line 7; _state.sh lines 7-8 (qwen2p5-7b-instruct, DEPLOY_RATE 8)
+#   L11    03-labs/lessons/11-lora-local-mlx/3_eval_local.sh line 15 (Day 8 also writes results/09-eval.csv)
+#   L13    03-labs/lessons/13-speculative-decoding/README.md line 4 (30-45 min of one deployment)
+#   smoke  03-labs/scripts/smoke_test.sh lines 21-40 (practice-server rows in all six files the memo reads)
+#   guard  03-labs/lessons/00-setup/fireworks_guardrails.sh lines 7-8 (bills from the moment it starts)
+#   mock   03-labs/felab/mock_server.py line 85 (-lora model ~93% accuracy)
+#   narr   04-video-source/src/narration.json lines 943-1079 (The Platform Map; scenes 0-based: 5 Bullets, 6 Worked,
+#          7 BeforeAfter, so today's rewatch [5, 7] ends before BeforeAfter); line 1593 (QLoRA On Your Own Box)
+#   LB     02-lab-book/field-engineer-lab-book.html lines 530 and 542 (product criticism), 655 (on-demand, per
+#          GPU-second, scale-to-zero after 1 h idle by default, shorten it), 656 (Batch API 50%), 661 (multi-LoRA:
+#          quota 100, BF16 only), 676 (gpt-oss 120B 0.15 / 0.015 / 0.60), 681 (4-16B tier $0.20 flat), 689 (H100 $8),
+#          693 (per GPU-second; region-pinned 1.5x), 699 (LoRA SFT <=16B $0.50), 707 (read 23 Sept 2026, retirements),
+#          717 (the trap), 750 (break-even test, 24x7), 921-947 (capstone, memo template; Risks: cold starts line 946),
+#          1097 (ask them), 1121 (known ambiguities)
+#   FG     02-lab-book/inference-field-guide.html line 1083 (feedback to product); 628 (3/4 word per token)
+#   README kit README.md lines 155, 157 (model ids change; make fw-check)
+# Arithmetic (memo defaults): 2e6 x 3,200 / 1e6 x 0.07 = 448; 2e6 x 60 / 1e6 x 0.30 = 36; 448 + 36 = 484;
+#   448 x 0.1 = 44.80; 448 x 0.9 / 2 = 201.60; 44.80 + 201.60 = 246.40; 246.40 + 36 = 282.40; 120 / 8 x 1.2 = 18;
+#   18 x 8 x 730 = 105,120; 105,120 / 282.40 = 372.2; 372.2 x 2e6 = 744.5 million (memo prints 744,475,921).
+#   60 x 0.75 = 45 words; 3,200 x 0.75 = 2,400 words; 3,357 / 41.4 = 81.
+#   README scenario: 5e6 x 3,200 / 1e6 x 0.15 = 2,400; 5e6 x 60 / 1e6 x 0.60 = 180; 2,580; 2,400 x 0.55 + 180 = 1,500;
+#   with --cached-discount 0.9: 2,400 x 0.19 + 180 = 636.
+#   LoRA: 0.3 x 0.50 = 0.15; 38 / 60 x 8 = 5.07; 5.07 / 0.15 = 33.8; 8 x 730 = 5,840; 20 x 0.20 = 4.00 a day;
+#   4.00 x 30.42 = 121.67; 5,840 / 121.67 = 48.0.
+#   Platform Map: 16 x 0.15 = 2.40; 4 x 0.60 = 2.40; 4.80 x 730 / 24 = 146.0; 5,840 / 146 = 40; cached 14.4 x 0.015 =
+#   0.216, 1.6 x 0.15 = 0.24, 0.456 + 2.40 = 2.856, x 30.42 = 86.87; 5,840 / 86.87 = 67.2; 5,840 x 1.5 = 8,760;
+#   8,760 / 146 = 60; 8,760 / 86.87 = 100.8; 6.00 / 0.20 = 30; 5,840 / 6.00 = 973.3; 973.3 / 30.42 = 32.0;
+#   5,840 / 12 = 486.67; 486.67 / 6.00 = 81.1.
+# Glossary: shared terms copied verbatim from the first day that defines them (Days 1 to 7). "Eval (eval harness)"
+# matches Day 4, the first day that defines it (lower case).
+
+day: 10
+tile: "Turn your measurements into a customer recommendation and a ten-minute talk"
+
+overview:
+  today: >-
+    Turn what you measured on Days 1 to 9 into a sizing memo: the written advice a field engineer sends a
+    customer after the first call, on how to run their work and what each option costs. Build a 10-minute,
+    five-slide talk from it and give it out loud once. Then write one specific criticism of Fireworks, backed by
+    something you hit yourself.
+  example: >-
+    Imagine a customer asks whether to pay for each AI request or rent a chip that runs all month. For the
+    traffic in the video's example, paying per request is about $146 a month; keeping one chip reserved is about
+    $5,840. That bill alone makes the first option easier to justify at this traffic level. Today you will use
+    your own speed and capacity measurements to write a recommendation a customer can act on.
+  deliverable: >-
+    `results/SIZING_MEMO.md`, five slides built from it, and one product criticism with a number you measured
+    and a source, with the date you read it.
+  expected: >-
+    Paying per token costs the memo's example customer $484 a month, or $282 with caching (reusing the repeated
+    opening of each prompt), whatever you measured; the GPU bill depends on how many people one copy served in
+    your Day 3 test.
+  before:
+    - title: "Your results from Days 1 to 9."
+      body: >-
+        The memo reads six files in `03-labs/results/`: the Day 1 and 2 timing table, Day 3's concurrency sweep,
+        Day 5's caching test, Day 6's valid-reply rate, the Day 7 and 8 eval table and Day 9's speculation test.
+        Day 1's smoke test also saved practice-server rows in all six. Once the memo is built, check that it
+        quotes your own runs, not rows marked `mock`. From the `03-labs` folder:
+      command: "ls results/*.csv"
+      after: >-
+        Look for `01-latency.csv`, `03-sweep.csv`, `06-prefix.csv`, `07-structured.csv`, `09-eval.csv` and
+        `13-spec.csv`. A missing file shows up in the memo as TODO, never as a guess.
+    - title: "Your numbers from the earlier wrap-ups."
+      body: >-
+        Each day's wrap-up saved the numbers you typed, on this device. Open the wrap-up pages for Days 1, 3, 5
+        and 7 and press Copy all on each to gather what your slides need: the Day 1 timings, the Day 3 capacity,
+        the Day 5 caching speed-up and the Day 7 eval table.
+    - title: "Nothing still billing on Fireworks."
+      body: >-
+        Day 9 ran a paid deployment. Today is free, so first confirm nothing was left running. From the `03-labs`
+        folder:
+      command: "make fw-check"
+      after: >-
+        It should list no deployments. If one is there, delete it with `firectl deployment delete` followed by
+        its id.
+  feeds: >-
+    A customer can use your sizing memo to choose how to run the system and what to budget. Its five slides
+    help you explain the recommendation to a team. The memo draws on your own speed benchmark (Days 1 and 3)
+    and model-improvement results (Days 7 and 8); the product criticism records a real obstacle you found.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 1 · Sizing memo and 10-minute talk (lesson 15-capstone). No Check yourself items in the README.
+  # ---------------------------------------------------------------------------------------------------------
+  d10-s1:
+    why: >-
+      Turn what you measured on Days 1 to 9 into a sizing memo, the written advice a customer gets after the
+      first call. Then build a 10-minute talk from it.
+    why_example: >-
+      The memo's example customer, a support-ticket assistant, handles 2 million tickets a month. Paying per
+      token costs $484 a month, or $282 if the repeated opening of each prompt is reused (cached), as the memo
+      assumes.
+    plain:
+      lead: >-
+        A field engineer is paid for the recommendation, not the benchmark. One script turns what you measured
+        into a sizing memo: what the customer needs, how many server copies, what each option costs a month and
+        which to pick.
+      picture: >-
+        A builder's quote for a new kitchen. It starts from your measurements, prices two or three options,
+        recommends one and lists what could go wrong. You decide from the quote, not from the tape measure.
+      numbers_source: "the memo's example customer in `build_memo.py`, with the practice server's capacity from Day 3"
+      numbers:
+        - >-
+          The customer: 2,000,000 tickets a month, each about 3,200 tokens sent to the model (about 2,400 words)
+          and 60 written back (about 45 words), with 120 people at the busiest moment.
+        - >-
+          Paying per token (serverless), at the script's built-in example prices ($0.07 per million tokens in,
+          $0.30 per million out). In: 2,000,000 x 3,200 = 6,400 million tokens; 6,400 x $0.07 = $448. Out:
+          2,000,000 x 60 = 120 million; 120 x $0.30 = $36. Total $484 a month.
+        - >-
+          With caching: the script assumes 90% of each prompt is the same opening and bills that part at half
+          price. Full price on 10%: $448 x 0.1 = $44.80. Half price on 90%: $448 x 0.9 ÷ 2 = $201.60. Input
+          $246.40, plus $36 out = $282 a month.
+        - >-
+          Dedicated GPUs: the practice server holds 8 people per copy, so 120 ÷ 8 x 1.2 (20% spare) = 18 copies.
+          18 x $8 an hour x 730 hours = $105,120 a month. The 8 is a stand-in: a data-center GPU holds far more
+          people, so a real dedicated bill would be lower.
+        - >-
+          Crossover: the GPUs cost $105,120 ÷ $282.40 = 372 times the cached serverless bill. That bill grows with
+          traffic and the GPU bill does not, so they meet at 372 x 2 million = about 744 million tickets a month.
+          This keeps today's 18 copies fixed, and they could not carry 372 times the traffic: read it as "at this
+          capacity, dedicated does not pay". So: serverless now.
+        - >-
+          Your own memo uses your real-server sweep rows (Day 3's llama.cpp run on your Mac) when they exist, so
+          your copies, GPU bill and crossover will differ from these.
+      words:
+        - term: "Sizing memo"
+          def: >-
+            A short document recommending how to run a customer's workload: how many copies, which option, what it
+            costs, with the maths shown. Example: `results/SIZING_MEMO.md`.
+        - term: "Serverless"
+          def: >-
+            Fireworks' shared, always-on models, billed per token you send and receive. Example: $282 a month for
+            the example customer, with caching.
+        - term: "Dedicated deployment"
+          def: >-
+            A GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not.
+            Example: $8 an hour, $5,840 for a month.
+        - term: "Crossover (break-even)"
+          def: >-
+            The traffic at which two ways of serving cost the same; below it, paying per token is cheaper. Example:
+            about 744 million tickets a month here, if the current copies could carry it.
+    run:
+      - cmd: "python build_memo.py"
+        note: >-
+          Builds the memo for the script's example customer: Acme Cloud's support-ticket assistant, 120 people at
+          the busiest moment, 2 million tickets a month, and a promise that 95 of 100 first words arrive within
+          1,000 ms (one second). It prints the memo and saves it as `results/SIZING_MEMO.md`. **Look for** $484
+          and $282 in section 5. A section with no result file says TODO (still to do), never a guess; Day 1's
+          smoke test saved practice-server numbers in all six files, so check each number comes from your own run.
+          Each section names the lesson its numbers come from: lesson 01 is Day 1, 03 is Day 3, 05 is Day 4, 06 is
+          Day 5, 07 and 08 are Day 6, 09 to 11 are Days 7 and 8, 13 is Day 9.
+      - cmd: "python build_memo.py --peak-concurrency 200 --tickets-per-month 5e6 --slo-ms 800"
+        note: >-
+          The same memo for a bigger customer: 200 people at once, 5 million tickets a month (`5e6` means
+          5 x 1,000,000), 95 of 100 first words within 800 ms, and the lab book's gpt-oss 120B prices ($0.15 per
+          million tokens in, $0.60 out) with a GPU at $8 an hour. It overwrites the first memo. For a real
+          customer, change these numbers to theirs. **Look for** $2,580 a month on serverless and $1,500 with
+          caching. The script assumes cached input costs half price, but the lab book lists gpt-oss 120B's at
+          $0.015, 90% off: add `--cached-discount 0.9` and the cached bill drops to $636.
+      - cmd: "open ../../results/SIZING_MEMO.md"
+        note: >-
+          Opens the memo in your Mac's default app for `.md` files (Markdown: plain text with light formatting,
+          such as # for a heading). If it prints an error instead, run `open -e ../../results/SIZING_MEMO.md` to
+          open it in TextEdit. **Look for** seven sections, from "1. What they need" to "7. Risks and what I'd
+          validate next", and in section 3 the name of the server your capacity was measured on.
+    checks: []
+    say:
+      ask: "A new customer asks: should we run this on serverless or on dedicated GPUs? How would you approach it?"
+      means:
+        - phrase: "I'd start with their traffic shape and SLO"
+          meaning: >-
+            Before any test, I write down how much they send and when (the traffic shape) and their speed promise
+            (the SLO, service level objective). The memo's example: 120 people at the busiest moment, 3,200 tokens
+            in and 60 out per ticket, 2 million tickets a month, and 95 of 100 first words within 1,000 ms.
+        - phrase: "measure a concurrency curve on the candidate model"
+          meaning: >-
+            I run Day 3's test on the model I would propose: raise the number of people using it at the same time
+            until the first word comes too late. On the practice server, with 8 people, 95 of 100 got their first
+            word within 41.4 ms (thousandths of a second). With 16, 95 of 100 got it within 3,357 ms, over 3
+            seconds: about 80 times longer, because requests were waiting in line.
+        - phrase: "apply the cheap levers first (caching and structured output)"
+          meaning: >-
+            I use the fixes that need no new hardware before buying any: reuse the repeated opening of each prompt
+            (Day 5) and force well-formed replies so nothing is retried (Day 6). If 90% of each prompt is cached at
+            half price, as the memo assumes, the bill falls from $484 to $282 a month.
+        - phrase: "only then decide between serverless and dedicated"
+          meaning: >-
+            Then I choose between paying per token on shared models (serverless) and renting GPUs by the hour
+            (dedicated), using the numbers above.
+        - phrase: "with the crossover point written down"
+          meaning: >-
+            The memo states the monthly volume at which the two cost the same, so the customer knows when to look
+            again. With the practice server's capacity: about 744 million tickets a month, 372 times the example's
+            2 million. That keeps today's 18 copies fixed, and they could not carry 372 times the traffic, so read
+            it as: at this capacity, dedicated does not pay. Serverless for now.
+    fields:
+      - id: d10-capacity
+        label: "People one copy holds within the speed promise, and copies needed at the busiest moment"
+        hint: >-
+          Memo section 3, Capacity: the two numbers in bold (between ** marks when you open the plain file). Write
+          both, for example 8 / 18. The first line ends with the server it was measured on.
+        unit: "people / copies"
+        meaning: >-
+          Your Day 3 measurement drives everything below it: fewer people per copy means more copies and a bigger
+          dedicated bill.
+        example: "8 / 18 (the practice server, the kit's sample: 120 ÷ 8 x 1.2 = 18)"
+      - id: d10-serverless
+        label: "Monthly bill paying per token, without and with caching"
+        hint: "Memo section 5, the first two rows. Write both, for example $484 / $282."
+        unit: "$ a month"
+        meaning: >-
+          What the customer pays with no hardware of its own. The memo assumes 90% of each prompt is cached, at half
+          price by default.
+        example: "$484 / $282 (the example customer)"
+      - id: d10-dedicated
+        label: "Monthly bill on dedicated GPUs"
+        hint: "Memo section 5, the third row: copies x $8 an hour x 730 hours."
+        unit: "$ a month"
+        meaning: "A fixed bill, paid whether the GPUs are busy or idle."
+        example: "$105,120 (18 x $8 x 730)"
+      - id: d10-crossover
+        label: "Crossover: tickets a month at which dedicated costs the same as serverless with caching"
+        hint: "The Crossover line under the section 5 table."
+        unit: "tickets a month"
+        meaning: >-
+          Below it, serverless is cheaper. The figure keeps today's copies fixed, so re-size the copies before you
+          quote a volume near it. A fine-tune or a strict speed promise can need dedicated GPUs at any volume.
+        example: "about 744 million (744,475,921), 372 times the example's 2 million"
+      - id: d10-talk-minutes
+        label: "How long your talk took, the first time out loud"
+        hint: "Time yourself with the five slides. The target is 10 minutes, about 2 per slide."
+        unit: "min"
+        meaning: "One timed run shows where you ramble and where a number is missing."
+        example: "10"
+    done: >-
+      `results/SIZING_MEMO.md` has your own number in every section you ran and a crossover volume written down.
+      You have five slides and have given the talk out loud once, in about 10 minutes.
+    stuck:
+      - problem: "`ModuleNotFoundError: No module named 'felab'`"
+        fix: >-
+          The virtual environment is off in this window. From the `03-labs` folder run
+          `source .venv/bin/activate`, then `cd lessons/15-capstone` and run the command again.
+      - problem: "A section says TODO although you did that day."
+        fix: >-
+          The memo reads fixed file names in `results/`. From `lessons/15-capstone`, run `ls ../../results/` and
+          look for that day's file (the list is under Before you start on the Day 10 overview). If it is missing,
+          run that day's main command again; the practice-server version is free.
+      - problem: "Replicas, the dedicated cost and the crossover say TODO, but `03-sweep.csv` is there."
+        fix: >-
+          No crowd size in your sweep kept the memo's speed promise, by default 95 of 100 first words within
+          1,000 ms. Once your sweep has any real-server rows, the memo ignores the practice-server rows. From
+          `lessons/15-capstone`, open `../../results/03-sweep.csv` and read the `ttft_p95` column (in ms). Pass the
+          customer's real target with `--slo-ms`, or run Day 3's sweep again with smaller crowds, for example
+          `--levels 1,2,4`.
+      - problem: "The memo warns that capacity came from a laptop or mock server."
+        fix: >-
+          Expected: your Day 3 sweep ran on your Mac or the practice server. Data-center GPUs running a production
+          engine such as vLLM hold far more people per copy, so treat the copies and the dedicated cost as
+          placeholders and say so on your risks slide. Day 9's optional DGX Spark step, or a Fireworks deployment,
+          gives real figures.
+      - problem: "The fine-tune row names `mock mock-8b-lora` instead of your own model."
+        fix: >-
+          The memo compares every row in `results/09-eval.csv`, including the practice-server rows Day 1's smoke
+          test saved. Open that file in TextEdit, delete the lines containing `mock mock-8b`, keep the first line
+          (the column names), save, and run `python build_memo.py` again.
+      - problem: "The crossover is hundreds of millions of tickets a month."
+        fix: >-
+          Not a bug in your data: the memo assumes today's copies carry any volume. With a handful of people per
+          copy, the dedicated option needs many GPUs, so serverless wins by a wide margin: with the practice
+          server's 8, the example's crossover is about 744 million tickets, 372 times its volume. Replace the
+          capacity with a real GPU measurement before you quote it.
+      - problem: "`open` says no application knows how to open the memo."
+        fix: >-
+          Your Mac has no app set for `.md` files. Run `open -e ../../results/SIZING_MEMO.md` to open it in
+          TextEdit instead.
+      - problem: "The talk runs well over 10 minutes."
+        fix: >-
+          Five slides in 10 minutes is about 2 minutes each. Keep one number per point, and move tables to a
+          backup slide you show only if asked.
+    replace:
+      - find: "turns every CSV in `results/` into"
+        with: "turns six of the CSV files in `results/` into"
+      - find: "reads lessons 01–13 and writes"
+        with: "reads what you measured on Days 1 to 9 and writes"
+      - find: "the lesson 03 concurrency curve with the SLO line, plus the lesson 01 TTFT/ITL table."
+        with: "the Day 3 concurrency curve with the SLO line, plus the Day 1 TTFT/ITL table."
+      - find: "prefix caching (lesson 06), schema-constrained output (lesson 07) and a fine-tune (lessons 09–11)"
+        with: "prefix caching (Day 5), schema-constrained output (Day 6) and a fine-tune (Days 7 and 8)"
+      - find: "queueing (01, 03)"
+        with: "queueing (Days 1 and 3)"
+      - find: "TP (04, 05, 12)"
+        with: "TP (Days 4 and 9)"
+      - find: "LoRA needs (15)"
+        with: "LoRA needs (today's memo)"
+      - find: "quality, p95 and $/1k (09–11)"
+        with: "quality, p95 and $/1k (Days 7 and 8)"
+      - find: "active vs total params (12)"
+        with: "active vs total params (Day 9)"
+      - find: "acceptance on their traffic (13)"
+        with: "acceptance on their traffic (Day 9)"
+      - find: "batch for evals (06, 08)"
+        with: "batch for evals (Days 5 and 6)"
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 2 · One product criticism (generated page product-criticism). No lesson: body + fields (textareas).
+  # ---------------------------------------------------------------------------------------------------------
+  d10-s2:
+    why: >-
+      Write one specific criticism of Fireworks, backed by a number, from something you hit on Days 1 to 9. The
+      lab book lists it among the four things to bring: field engineers are hired partly to have opinions.
+    why_example: >-
+      On Day 7 your LoRA fine-tune trained for cents, but serving it needed a GPU reserved by the hour: the
+      lesson's sample eval ran 38 minutes, about $5.07. That gap, with its numbers, is a criticism.
+    plain:
+      lead: >-
+        A good product criticism names one thing you hit yourself, backs it with a number, says who it hurts and
+        offers a fix. It shows you used the product for real and will carry customers' problems back to the
+        people who build it.
+      picture: >-
+        A restaurant critic who writes "the food was bad" gets ignored. One who writes "the fish arrived long
+        after everything else at most tables, and a second grill would fix it" gets a call from the owner.
+      numbers_source: "Day 7's LoRA lesson, the lab book's prices and the Platform Map video's traffic"
+      numbers:
+        - >-
+          Training the LoRA: 800 examples read twice is about 0.3 million training tokens, by the script's own
+          estimate. At $0.50 per million (the price for models up to 16 billion learned numbers), that is about
+          $0.15.
+        - >-
+          Serving it: Fireworks runs a trained LoRA only on a dedicated deployment, $8 an hour for an H100, busy or
+          idle.
+        - >-
+          The lesson's sample run kept the GPU for 38 minutes to test the add-on, then deleted it: 38 ÷ 60 x $8 =
+          $5.07, about 34 times the training cost ($5.07 ÷ $0.15).
+        - >-
+          Kept ready all month: $8 x 730 hours = $5,840. For scale, the Platform Map video's 20 million tokens a
+          day, at the base model's per-token price ($0.20 per million): 20 x $0.20 = $4.00 a day, about $122 a
+          month. The always-ready GPU costs about 48 times more ($5,840 ÷ $122).
+        - >-
+          Fireworks bills a dedicated deployment from the moment it starts, used or not. By default it gives the
+          GPU back only after 1 hour with no requests (the lab book), a setting you can shorten. So each forgotten
+          session costs about $8 more: delete it in the same sitting.
+      words:
+        - term: "LoRA"
+          def: >-
+            A small add-on trained on your examples while the big model stays unchanged. Example: Day 7's
+            ticket-sorting add-on, trained for about $0.15.
+        - term: "Dedicated deployment"
+          def: >-
+            A GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not.
+            Example: $8 an hour for an H100.
+        - term: "Serverless"
+          def: >-
+            Fireworks' shared, always-on models, billed per token you send and receive. Example: about $122 a
+            month for 20 million tokens a day at $0.20 per million.
+        - term: "Multi-LoRA"
+          def: >-
+            One deployment serving many LoRA add-ons on the same base model, so they share its cost. Example: up
+            to 100 add-ons by default on Fireworks.
+    fields:
+      - id: d10-crit-what
+        label: "What you hit, in one sentence"
+        hint: >-
+          One thing, specific: what you were doing, on which day, and what happened. Not "the docs are confusing".
+        meaning: "The criticism itself, specific enough that someone at Fireworks could reproduce it."
+        example: >-
+          Training my LoRA cost cents, but serving it needed a dedicated deployment billed by the hour (Day 7).
+      - id: d10-crit-evidence
+        label: "Your evidence: numbers and sources"
+        hint: >-
+          Your own figures first (the last lines of Day 7's `5_teardown.sh` print minutes and dollars), then the
+          page that says so and the date you read it.
+        meaning: "What turns an opinion into a finding."
+        example: >-
+          About $0.15 to train by the script's estimate (0.3 million tokens x $0.50); the eval deployment ran 38
+          minutes, $5.07. LoRA docs: dedicated only. Pricing page: fine-tuned models at base-model prices. The
+          lab book read both on 23 September 2026; read them again and write your own date.
+      - id: d10-crit-impact
+        label: "Who it hurts, and how much"
+        hint: "Name one kind of customer and put a monthly number on it."
+        meaning: "Why the product team should care, in the customer's money or time."
+        example: >-
+          A customer with one fine-tune and light traffic, 20 million tokens a day: about $122 a month at the base
+          model's per-token price, but up to $5,840 a month to keep its dedicated H100 ready around the clock, 48
+          times more.
+      - id: d10-crit-proposal
+        label: "What you would change"
+        hint: "A fix the product team could act on, and how you would know it worked."
+        meaning: >-
+          Turns the criticism into a product proposal: the lab book's "turn recurring pain into product proposals".
+        example: >-
+          Per-token serving for LoRAs on the most-used base models. First, make the pricing page and the LoRA docs
+          agree, and show the hourly cost when a deployment starts.
+      - id: d10-crit-line
+        label: "Your short version, to say out loud"
+        hint: >-
+          About 20 seconds, the capstone drill's pace: what works, what you hit, one number, your proposal, a
+          question back.
+        meaning: "What you say when they ask what you would change about Fireworks."
+        example: >-
+          Fine-tuning on Fireworks was easy: my LoRA trained for about 15 cents. Serving it cost $5 for a 38-minute
+          eval, because trained LoRAs run only on a dedicated GPU, $5,840 a month if kept ready. I'd propose
+          per-token serving for LoRAs on popular base models. How do field engineers get that onto the roadmap?
+    done: >-
+      All five boxes are filled in. The criticism names one thing you hit, has at least one number you measured
+      and one source with the date you read it, and ends in a proposal. You have said the short version out loud
+      once.
+    stuck:
+      - problem: "I skipped Day 7, so I have no fine-tune of my own."
+        fix: >-
+          Use something you did hit: Day 9's speculative decoding test also needed a dedicated deployment (30 to
+          45 minutes of one), or a model name that no longer worked. If you ran into nothing, you can use the docs
+          disagreement in section 1 above, but say you found it by reading, not by running.
+      - problem: "Everything worked, so I have nothing to criticise."
+        fix: >-
+          Look for what cost you time or money rather than what broke: a step that needed a GPU billed by the hour,
+          a price you had to look up in two places, a limit you only found in a changelog (the provider's list of
+          recent changes). A small, specific friction beats a big, vague one.
+      - problem: "My criticism may be out of date."
+        fix: >-
+          The lab book read Fireworks' pages on 23 September 2026 and warns that prices move weekly. Read the
+          pricing page and the LoRA deployment docs again before sharing your recommendation. If it has been fixed, say
+          so and ask what drove the change: that shows you keep up.
+      - problem: "It sounds like a complaint."
+        fix: >-
+          Start with what works, with a number, and end with your proposal and a question. Cut "always", "never"
+          and "broken"; keep your one measured number.
+    body: |
+      Five short boxes turn "something annoyed me" into useful product feedback. Fill them in under **Explain what you learned** below as you work through this page. They are saved on this device and collected in the Day 10 wrap-up.
+
+      ### 1. Pick one thing you hit yourself
+
+      The strongest criticism comes from your own run, not from a forum post. These are the ones the course's own steps run into. Pick one you actually met, or one of your own.
+
+      - **A fine-tune can only be served on a GPU rented by the hour.** On Day 7 your LoRA (a small add-on trained on your examples) cost cents to train. Fireworks then serves a trained LoRA only on a dedicated deployment: a GPU reserved for you at about $8 an hour, busy or idle. The QLoRA On Your Own Box video from Day 7 says the same: serving a LoRA on a hosted platform usually needs dedicated capacity.
+      - **The docs disagree about it.** The lab book found the pricing page saying fine-tuned models serve "at the same price as base models", while the LoRA docs say trained LoRAs deploy only to on-demand (dedicated) deployments.
+      - **Two of the course's experiments needed a GPU billed by the hour.** Day 7's LoRA and Day 9's speculative decoding test (30 to 45 minutes of one deployment) both run on a dedicated deployment, because LoRA serving and a custom draft model are only available there.
+      - **Sharing one GPU among many fine-tunes rules out the smaller number formats.** A number format is how many bits store each of the model's numbers; Day 4 showed fewer bits run faster. Multi-LoRA (many add-ons on one deployment) needs a 16-bit setup, BF16. The 8-bit and 4-bit setups, FP8 and FP4, cannot host add-ons. So the cheapest way to share a GPU and the fastest way to run one do not combine.
+      - **An idle deployment keeps billing for an hour.** A dedicated (on-demand) deployment bills from the moment it starts, used or not. By default it scales to zero (gives its GPU back) only after 1 hour with no requests, a setting the lab book says to shorten. So a forgotten eval costs about another $8.
+      - **Model names change under you.** The lab book read Fireworks' prices on 23 September 2026, and several models were due to retire two days later. The kit's own fix for "model id is not found" is "ids change; copy a current one". A customer's code that names a model breaks when it retires.
+      - **The request limit is described two ways:** the published limits page says a flat 6,000 requests a minute, while a recent changelog entry (Fireworks' dated list of product changes) describes adaptive limits, ones that change instead of staying at a flat number.
+
+      ### 2. Back it with numbers
+
+      Without a number it is an opinion. Write down three things.
+
+      - **Your own figures.** How long the deployment ran and what it cost: the last lines of Day 7's `5_teardown.sh` print both. Or the minutes you lost, and how many tries it took.
+      - **The source.** Which page says what, and the date you read it. Fireworks' prices and features change weekly, so the date matters.
+      - **The comparison.** The same job done another way, in the same unit: dollars a month, minutes or percent.
+
+      ### 3. Say who it hurts, and how much
+
+      Name one kind of customer and put a monthly number on it. A team with one fine-tune and light traffic pays up to $5,840 a month to keep one H100 ready around the clock ($8 x 730 hours). Letting it scale to zero saves money, but then the first request after a quiet hour waits for a GPU to start (a cold start). For scale, take the Platform Map video's 20 million tokens a day. At the base model's per-token price, $0.20 per million (the lab book's price for models of 4 to 16 billion learned numbers, which includes Day 7's 7B base model), that is $4.00 a day, about $122 a month. The always-ready GPU costs about 48 times that ($5,840 ÷ $122).
+
+      ### 4. Propose a fix, not a complaint
+
+      Offer something the product team could act on, and say how you would know it worked. For the LoRA example:
+
+      - per-token (serverless) serving for LoRAs on the most-used base models. Multi-LoRA already shares one base deployment among up to 100 add-ons inside one account; the proposal extends that across customers;
+      - until then, make the pricing page and the LoRA docs say the same thing, and show the hourly cost when `firectl deployment create` starts a GPU;
+      - a shorter default idle time before a deployment scales to zero (gives its GPU back).
+
+      You would know it worked when more trained fine-tunes get deployed and fewer deployments sit idle.
+
+      ### 5. Say it constructively
+
+      Five beats, in about 20 seconds, the pace of the capstone drill:
+
+      1. **What works**, honestly, with a number.
+      2. **What you hit**, in one specific sentence.
+      3. **The evidence and the impact**: one number you measured, one for the customer.
+      4. **Your proposal.**
+      5. **A question back**, such as the lab book's: how do field engineers get fixes into the platform?
+
+      Five rules:
+
+      - One criticism, not a list. Depth beats breadth.
+      - Criticise the product, never the people who built it.
+      - Say how you know and when: "in the docs I read last week".
+      - Check it again before sharing it. If it has been fixed, update your feedback.
+      - Leave out "always", "never" and "broken".
+
+      ### Worked example
+
+      With the lesson's sample figures from Day 7. Put your own in their place.
+
+      - **What works:** fine-tuning was easy: 800 examples trained for about $0.15, by the script's estimate (about 0.3 million training tokens x $0.50 per million). Check the real charge in your Fireworks account.
+      - **What you hit:** serving the LoRA needed a dedicated deployment, billed by the hour.
+      - **Evidence:** the eval deployment ran 38 minutes: 38 ÷ 60 x $8 = $5.07, about 34 times the training. The LoRA docs say dedicated only; the pricing page says fine-tuned models serve at base-model prices. The lab book read both on 23 September 2026: read them again.
+      - **Who it hurts:** a customer with one fine-tune and light traffic, such as the Platform Map video's 20 million tokens a day. At the base model's per-token price that is about $122 a month; keeping the GPU ready around the clock costs up to $5,840, about 48 times more.
+      - **Proposal:** per-token serving for LoRAs on the most-used base models. First, make the two pages agree and show the hourly cost when a deployment starts.
+      - **Short version, out loud:**
+
+      > "Fine-tuning on Fireworks was easy: my LoRA trained for about 15 cents. Serving it cost $5 for a 38-minute eval, because trained LoRAs run only on a dedicated GPU, $5,840 a month if kept ready. I'd propose per-token serving for LoRAs on popular base models. How do field engineers get that onto the roadmap?"
+
+wrapup:
+  done: >-
+    Your sizing memo shows a crossover volume (the monthly volume at which serverless and dedicated cost the
+    same). You have five slides, one product criticism with a number and a source with the date you read it, and
+    you have given the 10-minute talk out loud once.
+  whiteboards:
+    - video: 08-platform
+      q: >-
+        Build slide 4 of your talk, the cost options, for the Platform Map video's customer: 20 million tokens
+        (word pieces) a day, 16 million in and 4 million out, on gpt-oss 120B (a large open model, about 120
+        billion learned numbers). Price three options, serverless, serverless with caching and one dedicated GPU,
+        and say where they cross over.
+      given: >-
+        Serverless prices (lab book): $0.15 per million tokens in, $0.015 per million for input the server has
+        cached (reused from an earlier request), $0.60 per million out. A dedicated H100 GPU: $8 an hour, busy or
+        idle; a month is 730 hours. For the caching option, assume 90% of the input is a repeated opening, as the
+        capstone memo does.
+      plain: >-
+        Serverless costs about $146 a month, or about $87 with caching. One dedicated H100 costs $5,840. Recommend
+        serverless with caching, and put the crossover on the slide: the GPU only pays off at about 67 times
+        today's traffic.
+      picture: >-
+        Taxis at full fare, taxis with a regular-rider discount, or a car of your own. The discount costs nothing
+        extra, so it always beats full fare. The car costs the same every month, so it only pays off once you ride
+        so much that even your discounted fares add up to more.
+      steps:
+        - "Serverless: input 16 million x $0.15 per million = $2.40 a day; output 4 million x $0.60 = $2.40. Total $4.80 a day."
+        - "Per month: $4.80 x 30.4 days (730 hours ÷ 24) = about $146."
+        - >-
+          Serverless with caching: 90% of the input, 14.4 million tokens, at $0.015 per million = $0.216; the other
+          1.6 million at $0.15 = $0.24. Input $0.456 a day instead of $2.40.
+        - "Output is unchanged: $0.456 + $2.40 = $2.856 a day, x 30.4 = about $87 a month."
+        - "Dedicated: $8 x 730 hours = $5,840 a month, however much traffic it carries."
+        - >-
+          Crossover: serverless bills grow in step with traffic; the GPU's does not. So they meet at $5,840 ÷ $146
+          = 40 times today's traffic, or $5,840 ÷ $87 = about 67 times against serverless with caching.
+        - >-
+          Slide 4 says: serverless with caching now; dedicated only past about 67 times today's traffic, or when a
+          fine-tune or a strict speed promise needs its own GPU.
+      note: >-
+        The 90% cached share is an assumption: measure the customer's real reuse (Day 5) before it goes on a
+        slide. And check with a sweep (Day 3) that one GPU could carry the traffic at the crossover.
+      kit_q: >-
+        Worked example · 20M tokens a day · 16M input · 4M output · gpt-oss-120b pricing
+      kit_a: >-
+        input: 16M × $0.15 = $2.40. output: 4M × $0.60 = $2.40. per day: $4.80. per month: ≈ $146. one dedicated
+        H100: $8/hr × 730 h = $5,840. Recommendation: Serverless until utilisation justifies the GPU — and say so
+        plainly.
+      more: >-
+        The video's $146 is $4.80 x 30.42 = $146.0; the narration rounds it to "about a hundred and fifty a
+        month". The cached price is the lab book's for gpt-oss 120B ($0.015 per million, 90% off). `build_memo.py`
+        assumes 90% of input is cached but at only 50% off, so pass `--cached-discount 0.9` for this model. The
+        lab book's memo template asks for these rows: Option A, serverless with its cache hit rate and monthly
+        total; Option B, dedicated with its break-even volume. A region-pinned deployment costs 1.5 times as much
+        ($8,760 a month), which moves the crossovers to 60 and about 100 times today's traffic.
+      words:
+        - term: "Cached input"
+          def: >-
+            Input tokens the server reused from an earlier request, billed at a discount. Example: $0.015 instead
+            of $0.15 per million for gpt-oss 120B.
+        - term: "Dedicated deployment"
+          def: >-
+            A GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not.
+            Example: $8 an hour, $5,840 a month.
+        - term: "Crossover (break-even)"
+          def: >-
+            The traffic at which two ways of serving cost the same; below it, paying per token is cheaper. Example:
+            about 67 times today's traffic here.
+        - term: "Utilisation"
+          def: >-
+            The share of time a GPU does useful work. Example: the video's rule, serverless until utilisation
+            justifies the GPU.
+    - video: 08-platform
+      q: >-
+        The table right after today's rewatch (you watched it on Day 6): a customer's routine requests go to a
+        large frontier model at $6.00 per million output tokens. A fine-tuned 8B model (8 billion learned numbers)
+        would cost $0.20. How much cheaper is that, and what must be true before you promise the saving on
+        Fireworks?
+      given: >-
+        Per million output tokens (the tokens the model writes): frontier model $6.00, fine-tuned 8B $0.20. Task
+        accuracy 87% before, 91% after. p95 latency (95 of 100 requests finish within it) 1.9 s before, 0.6 s
+        after. The video says these numbers are examples, not measurements. On Fireworks a trained LoRA fine-tune
+        is served only on a dedicated deployment, $8 an hour (lab book).
+      plain: >-
+        30 times cheaper per token, and better at the task. But on Fireworks the fine-tune needs its own GPU,
+        about $5,840 a month kept ready around the clock. The saving is real only once the traffic pays for that
+        GPU, or several fine-tunes share it.
+      picture: >-
+        A new supplier sells each box at a thirtieth of your current price, but only if you rent their warehouse
+        by the month. For a big shop that is a bargain; for a small one the rent eats the saving.
+      steps:
+        - "Unit cost: $6.00 ÷ $0.20 = 30. Per output token the fine-tuned model is 30 times cheaper, as the video says."
+        - "Quality: task accuracy rises from 87% to 91%, and p95 latency falls from 1.9 s to 0.6 s."
+        - >-
+          The catch on Fireworks: a trained LoRA serves only on a dedicated deployment. One H100 kept ready all
+          month: $8 x 730 hours = $5,840.
+        - >-
+          Break-even on output tokens alone: $5,840 ÷ $6.00 per million = about 973 million output tokens a month,
+          about 32 million a day.
+        - "Below that, the fixed GPU costs more than the frontier bill it replaces. Above it, the 30-times saving shows up."
+        - >-
+          Shared by 12 fine-tunes (Day 7's customer who wanted one per business unit, 12 in all), each carries
+          $5,840 ÷ 12 = about $487 a month and breaks even at about 81 million output tokens a month ($487 ÷
+          $6.00).
+        - >-
+          Answer: specialise the routine traffic once volume passes the break-even, or several fine-tunes share one
+          deployment, and show the maths in the memo.
+      note: >-
+        The break-even counts only output tokens at the frontier price and assumes one GPU can carry the traffic:
+        measure both before quoting. The gap between the video's per-token price and Fireworks' dedicated-only
+        rule is also a ready-made product criticism for today's step 2.
+      kit_q: >-
+        Specialise the routine traffic · frontier model · fine-tuned 8B. Specialisation is the other lever, and it
+        compounds with the first.
+      kit_a: >-
+        $ per 1M output: $6.00 · $0.20. task accuracy: 87% · 91%. p95 latency: 1.9 s · 0.6 s. what it cost: — ·
+        one afternoon + ~$2. Illustrative numbers, but the shape matches the published case studies. Move the
+        routine ninety percent of traffic to a fine tuned eight billion parameter model and the unit cost falls by
+        roughly thirty times, while quality on that narrow task usually goes up, not down.
+      more: >-
+        The narration's "roughly thirty times" is per output token: $6.00 ÷ $0.20 = 30. The video's $0.20 equals
+        the flat serverless price the lab book lists for 4B to 16B models, so it assumes the fine-tune is billed
+        like its base model. The lab book warns that the pricing page says exactly that, "at the same price as
+        base models", while the LoRA docs say trained LoRAs deploy only to on-demand deployments: reconcile the two
+        before promising serverless economics for a fine-tune. Multi-LoRA needs a BF16 deployment shape; FP8 and
+        FP4 shapes cannot host adapters.
+      words:
+        - term: "Frontier model"
+          def: >-
+            One of the largest, most capable models, usually priced highest. Example: $6.00 per million output
+            tokens here.
+        - term: "Unit cost"
+          def: >-
+            The price of one unit of work, such as a million tokens written. Example: $6.00 against $0.20.
+        - term: "LoRA"
+          def: >-
+            A small add-on trained on your examples while the big model stays unchanged. Example: Day 7's
+            ticket-sorting fine-tune.
+        - term: "Multi-LoRA"
+          def: >-
+            One deployment serving many LoRA add-ons on the same base model, so they share its cost. Example: 12
+            fine-tunes, about $487 a month each.
+
+glossary:
+  # Also defined on earlier days: definitions copied verbatim from the first day that defines them.
+  - term: "Adapter (LoRA adapter)"
+    def: "the small set of extra numbers LoRA trains and saves; the base model stays unchanged."
+    example: "multi-LoRA serves many adapters from one deployment."
+  - term: "Agent"
+    def: "a program that calls a model many times, using tools, to finish a task."
+    example: "the memo's example customer, Acme Cloud's support-ticket agent."
+  - term: "Base model"
+    def: "the model a fine-tune starts from and leaves unchanged."
+    example: "Qwen2.5 7B Instruct on Day 7."
+  - term: "Batch API"
+    def: "Fireworks' way to send many requests as one file and collect the answers later, at about half the serverless price."
+    example: "the memo's lever for evals and back-fills."
+  - term: "Break-even"
+    def: "the point where two options cost the same."
+    example: "about 67 times today's traffic for the Platform Map customer with caching."
+  - term: "Cached tokens (cached_tokens)"
+    def: "input tokens the server reused instead of reading again; Fireworks reports them and bills them at a discount."
+    example: "the memo bills 90% of each prompt at the cached rate."
+  - term: "Capacity (of one replica)"
+    def: "the most people one copy of the server serves at once while keeping the speed promise."
+    example: "8 on the practice server, the kit's sample."
+  - term: "Cold start"
+    def: "a slow request while a server that was idle or newly started loads the model."
+    example: "the first request after a deployment has scaled to zero."
+  - term: "Concurrency (people served at once)"
+    def: "how many conversations the server runs at the same moment."
+    example: "120 at the memo's example customer's busiest moment."
+  - term: "Concurrency sweep"
+    def: "the same test run at 1, 2, 4, 8, 16 and 32 people at once, then drawn as a curve."
+    example: "slide 2 of your talk."
+  - term: "Constrained decoding"
+    def: "at each step the server blocks every token that would break the schema or grammar, so the reply cannot come out malformed."
+    example: "the memo's schema-constrained output lever (Day 6)."
+  - term: "CSV file"
+    def: "a plain table file: one row per line, commas between the columns."
+    example: "`results/03-sweep.csv`, which the memo reads for capacity."
+  - term: "Decode"
+    def: "the writing phase, one token at a time, fetching the whole model for each (a mixture-of-experts model fetches only the part it uses)."
+    example: "sets the typing speed in the drill's first question."
+  - term: "Dedicated deployment"
+    def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not."
+    example: "$8 an hour, $5,840 for a month."
+  - term: "Dense model"
+    def: "a model that uses all of its numbers for every token."
+    example: "the smaller model in the drill's MoE question."
+  - term: "DGX Spark"
+    def: "NVIDIA's desktop AI computer, with 128 GB of memory shared by its CPU and GPU."
+    example: "Day 9's optional step measures real capacity on it."
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "Day 7's table of quality, p95 and $ per 1,000 tasks."
+  - term: "felab"
+    def: "the kit's small shared Python toolkit that every lesson script imports."
+    example: "`No module named 'felab'` means the virtual environment is off."
+  - term: "Fine-tune"
+    def: "further training of an existing model on your own examples."
+    example: "the memo's LoRA lever, Days 7 and 8."
+  - term: "firectl"
+    def: "Fireworks' command-line tool for your account, quotas and deployments."
+    example: "`firectl deployment create` starts a GPU billed by the hour."
+  - term: "Fireworks"
+    def: "a cloud service that runs AI models and charges per use; one platform used in this course."
+    example: "the product your criticism is about."
+  - term: "FP8"
+    def: "an 8-bit number format, 1 byte per number, with built-in math on H100."
+    example: "FP8 deployment shapes cannot host LoRA adapters."
+  - term: "Frontier model"
+    def: "one of the largest, most capable models, usually priced highest."
+    example: "$6.00 per million output tokens in the Platform Map example."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "H100; on a Mac it shares memory with everything else."
+  - term: "GPU-hour"
+    def: "one GPU rented for one hour."
+    example: "$8 for an H100; a month is about 730 of them."
+  - term: "gpt-oss-20b, gpt-oss-120b"
+    def: "two open mixture-of-experts models with about 21 and 117 billion parameters, of which only about 3.6 and 5.1 billion are used for each token. On Fireworks, gpt-oss-120b is billed per token (serverless); gpt-oss-20b no longer is (its model page, checked 27 September 2026: 'Serverless: Not supported'), but batch jobs still take it."
+    example: "the Platform Map video's worked example uses gpt-oss 120B prices."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "$8 an hour on Fireworks."
+  - term: "Headroom"
+    def: "spare capacity kept for surprises."
+    example: "the memo adds 20%: 120 ÷ 8 x 1.2 = 18 copies."
+  - term: "Input tokens"
+    def: "the tokens you send to the model; providers bill them per million."
+    example: "$0.15 per million for gpt-oss 120B."
+  - term: "ITL (inter-token latency)"
+    def: "the gap between one token and the next while a reply is being written."
+    example: "half of slide 2's Day 1 timing table."
+  - term: "JSON"
+    def: "a plain-text format for data that programs can read: named fields inside curly brackets."
+    example: "the memo's example customer needs its replies as JSON for its ticketing system."
+  - term: "JSON schema (schema)"
+    def: "a rulebook for JSON: which fields must appear, what type each holds and which values are allowed."
+    example: "the memo's schema-constrained output lever (Day 6)."
+  - term: "KV cache"
+    def: "the model's notes on the conversation so far (keys and values), so it does not reread everything for each new word."
+    example: "the \"KV maths\" in the drill's 70B question."
+  - term: "LoRA"
+    def: "a cheap way to customise a model: train a small add-on instead of changing the whole model."
+    example: "on Fireworks it can only be served on a dedicated deployment."
+  - term: "make"
+    def: "a tool that runs named shortcuts listed in a file called `Makefile`."
+    example: "`make fw-check`."
+  - term: "ms (millisecond)"
+    def: "a thousandth of a second."
+    example: "the memo's speed promise: 95 of 100 first words within 1,000 ms."
+  - term: "Multi-LoRA"
+    def: "one server keeps one base model and many adapters, applying the right adapter to each request."
+    example: "12 business units on one deployment; up to 100 adapters by default on Fireworks."
+  - term: "NVIDIA"
+    def: "the company whose GPUs run most data-center AI."
+    example: "maker of the H100 and the DGX Spark."
+  - term: "Output tokens"
+    def: "the tokens the model writes back; providers bill them per million, usually at a higher price than input."
+    example: "$0.60 against $0.15 per million for gpt-oss-120b."
+  - term: "p95"
+    def: "the value 95 out of 100 requests stay under."
+    example: "the memo's speed promise: 95 of 100 first words within 1,000 ms."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "a fine-tuned 8B model in the Platform Map example."
+  - term: "Peak traffic"
+    def: "the most people using the service at the same moment."
+    example: "120 for the memo's example customer."
+  - term: "Practice server (mock)"
+    def: "the kit's stand-in server with realistic behaviour and made-up numbers."
+    example: "its rows show up in the memo as `mock`."
+  - term: "Preamble"
+    def: "the long fixed opening sent with every request: instructions, tool list and rules."
+    example: "the memo assumes it is 90% of each ticket's input."
+  - term: "Prefill"
+    def: "the reading phase; the model reads the whole prompt at once."
+    example: "the drill's first question: high TTFT, fine typing speed."
+  - term: "Prefix caching (prompt caching)"
+    def: "the server keeps its notes on a prompt's opening and reuses them when the next request starts the same way."
+    example: "lever 1 on slide 3."
+  - term: "Quantization (quantize)"
+    def: "storing numbers with fewer bits."
+    example: "part of the drill's 70B-on-one-GPU answer."
+  - term: "Queueing"
+    def: "waiting in line for a free seat on the server."
+    example: "one cause of high TTFT in the drill."
+  - term: "Replica"
+    def: "one complete running copy of the server and model."
+    example: "18 replicas for 120 people."
+  - term: "RPM (requests per minute)"
+    def: "how many requests an account may send each minute."
+    example: "a flat 6,000 on Fireworks' published limits."
+  - term: "Scale to zero"
+    def: "a deployment setting that gives the GPU back after a stretch with no requests, so billing stops."
+    example: "after 1 hour with no requests by default on Fireworks, according to the lab book."
+  - term: "Serverless"
+    def: "Fireworks' shared, always-on models, billed per token you send and receive."
+    example: "$484 a month for the memo's example customer, $282 with caching."
+  - term: "SLO (service level objective)"
+    def: "the speed promise."
+    example: "95 of 100 first words within 1,000 ms, the memo's default."
+  - term: "Smoke test"
+    def: "a quick run of everything to prove the setup works before real use."
+    example: "Day 1's `make smoke`, which also saved practice-server rows in `results/`."
+  - term: "Speculative decoding"
+    def: "a small draft model guesses several tokens and the big model checks them all in one pass; the output does not change."
+    example: "Day 9 measures when it pays."
+  - term: "Teardown"
+    def: "deleting everything that bills by the hour at the end of a session, then checking the list is empty."
+    example: "`5_teardown.sh`, then `make fw-check`."
+  - term: "Ticket triage"
+    def: "sorting incoming support tickets by type and urgency."
+    example: "the memo's example customer, Acme Cloud."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "1,000 tokens is roughly 750 words."
+  - term: "Traffic profile"
+    def: "the shape of the load a test uses: tokens in, tokens out, requests per second, and the speed promise with its percentile."
+    example: "3,200 tokens in and 60 out per ticket, 120 people at the busiest moment."
+  - term: "Training token"
+    def: "one token read during training; managed training bills every token on every pass."
+    example: "800 examples read twice: about 0.3 million."
+  - term: "TTFT (time to first token)"
+    def: "how long until the first token (word piece) of the reply appears."
+    example: "the memo's speed promise is set on it."
+  - term: "Unit cost"
+    def: "the price of one unit of work, such as a million tokens written."
+    example: "$6.00 against $0.20 per million in the Platform Map example."
+  - term: "Utilisation"
+    def: "the share of time a GPU does useful work."
+    example: "a dedicated GPU costs the same whether it is busy or idle."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "`build_memo.py` needs it, like every lesson."
+  - term: "vLLM"
+    def: "an open-source engine for NVIDIA GPUs built for many users at once."
+    example: "the memo's warning says production GPUs running it hold far more people per copy."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "the \"weights + KV maths\" in the drill's 70B question."
+  - term: "Workload"
+    def: "one kind of job a customer runs."
+    example: "the memo's example: support-ticket triage, 2 million tickets a month."
+  # New on Day 10 (except "bf16 (bfloat16)", copied verbatim from Day 11 so the two agree).
+  - term: "Acceptance rate"
+    def: "the share of a draft model's guessed tokens the big model keeps; speculative decoding only pays when it is high."
+    example: "the drill's speculative decoding question: acceptance on their traffic."
+  - term: "Active parameters"
+    def: "the numbers a mixture-of-experts model actually uses for each token, as opposed to all the numbers it stores."
+    example: "why an MoE can write faster than a smaller dense model."
+  - term: "bf16 (bfloat16)"
+    def: "a 16-bit number format used for training, 2 bytes per number."
+    example: "multi-LoRA on Fireworks also needs a BF16 deployment shape."
+  - term: "Cached input"
+    def: "input tokens the server reused from an earlier request, billed at a discount."
+    example: "$0.015 instead of $0.15 per million for gpt-oss 120B."
+  - term: "Changelog"
+    def: "a provider's dated list of changes to its product."
+    example: "where the lab book found adaptive rate limits described."
+  - term: "Crossover"
+    def: "the monthly volume at which two ways of serving cost the same; the memo's name for the break-even."
+    example: "about 744 million tickets a month for the memo's example customer, if its current 18 copies could carry that much."
+  - term: "Deployment shape"
+    def: "a preset for a dedicated deployment on Fireworks: the GPU and the number format it runs."
+    example: "`--deployment-shape default` in Day 7's deploy script."
+  - term: "Discovery call"
+    def: "the first meeting where you learn a customer's task, volume, speed target, quality bar and data limits."
+    example: "the memo is what you send after it."
+  - term: "FP4"
+    def: "a 4-bit number format, half a byte per number, with built-in math on the newest NVIDIA GPUs."
+    example: "FP4 deployment shapes cannot host LoRA adapters."
+  - term: "Lever"
+    def: "a change that moves cost or speed without new hardware."
+    example: "the memo's five: caching, constrained output, batch, a LoRA fine-tune, speculative decoding."
+  - term: "Markdown"
+    def: "plain text with light formatting marks, such as # for a heading; the files end in `.md`."
+    example: "`SIZING_MEMO.md`."
+  - term: "MoE (mixture of experts)"
+    def: "a model split into many expert parts, of which only a few run for each token."
+    example: "the drill asks why an MoE can beat a smaller dense model on speed."
+  - term: "Model id"
+    def: "the exact name a program uses to pick a model on Fireworks."
+    example: "`accounts/fireworks/models/gpt-oss-120b`."
+  - term: "Model retirement"
+    def: "the provider switching a model off; code that names it stops working."
+    example: "the lab book saw several models due to retire two days after it read the prices."
+  - term: "Number format"
+    def: "the way each of a model's numbers is stored, including how many bits it takes."
+    example: "BF16 (16 bits), FP8 (8 bits), FP4 (4 bits)."
+  - term: "On-demand deployment"
+    def: "Fireworks' name for a dedicated deployment: a private copy of a model, billed by the second at an hourly rate."
+    example: "the only way Fireworks serves a trained LoRA."
+  - term: "Proof of concept (POC)"
+    def: "a small working version of the customer's system, built to prove it meets their needs before they commit."
+    example: "slide 5: the next two weeks of a POC."
+  - term: "Region-pinned deployment"
+    def: "a dedicated deployment fixed to one region (US, EU or APAC), billed at 1.5 times the normal rate."
+    example: "$8,760 a month for one H100 instead of $5,840."
+  - term: "Sizing memo"
+    def: "a short document recommending how to run a customer's workload: how many copies, which option, what it costs, with the maths shown."
+    example: "`results/SIZING_MEMO.md`."
+  - term: "TODO"
+    def: "a marker for work not done yet; the memo prints it where a number is missing."
+    example: "`TODO (run lesson 01)`."
+  - term: "TP (tensor parallelism)"
+    def: "splitting each layer of a model across several GPUs that work on every token together."
+    example: "part of the drill's 70B-on-one-GPU answer."

@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "the-local-node",
+  "compatibility_date": "2026-09-29",
+  "assets": { "directory": "./dist", "not_found_handling": "404-page" },
+  "routes": [
+    { "pattern": "thelocalnode.dev", "custom_domain": true }
+  ]
+}

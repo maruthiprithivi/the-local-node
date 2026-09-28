@@ -1,0 +1,1091 @@
+# Day 4 · Memory levers. Plain-language content for the guided course (course-spec.md section 3).
+# Step 2, the overview, the wrap-up and the step 1 checks and explain-it line follow the approved Day 4 sheet.
+# Every number traces to a kit file: lesson 04 and 05 READMEs and scripts, narration.json, the lab book and
+# the field guide.
+day: 4
+tile: "See why models that fit run out of memory, then fix it"
+
+overview:
+  today: >-
+    Shrink a model (billions of learned numbers) by storing each number with fewer bits (the 0s and 1s it is
+    kept in). See what that buys (faster replies, more free memory) and what it can cost (answer quality).
+    Then measure how much memory long conversations use, and fix a server that runs out.
+  example: >-
+    Imagine a support bot reading a very long case history. It keeps working notes so it does not have to reread
+    the whole conversation for every new word it writes. Those notes share the chip's memory with the model.
+    In this lesson's extreme long-conversation example, the notes take more than three times as much space as
+    the model itself. That is why a model can fit in memory while the conversation still runs out of room.
+  deliverable: >-
+    A count of how many long conversations fit in 20 GB of spare memory, before and after the fix. The fix
+    stores the notes with 8 bits per number instead of 16, which about halves them.
+  expected: >-
+    4 conversations of 32,768 tokens (about 25,000 words each) before, 8 after.
+  before:
+    - title: "About 17 GB of free disk space (about 30 GB if you keep every download)."
+      body: >-
+        Step 1 downloads the same model (Llama 3.1 8B, made of 8 billion learned numbers) three times, each
+        shrunk to a different size: 8.5 + 4.9 + 4.0 = 17.4 GB. Start that download first; it takes the
+        longest. Later the quality check downloads the 8-bit and 3-bit versions again (8.5 + 4.0 = 12.5 GB)
+        into llama.cpp's own folder. So once step 1's speed test (`quant_bench.sh`) has printed its table,
+        delete `lessons/04-quantization/models/`, or have about 30 GB free.
+    - title: "The llama.cpp server from Day 2 still starts."
+      body: >-
+        Today's scripts start llama.cpp (the program that runs the model on your Mac) many times. Quick check,
+        from the `03-labs` folder:
+      command: "bash lessons/02-three-local-servers/serve_llamacpp.sh"
+      after: >-
+        Wait for a line saying it is listening (ready for requests). Then stop it with Ctrl+C.
+  feeds: >-
+    On Day 10 you answer "Can we run a 70B (a 70-billion-number model) on one GPU?" with today's sums: the
+    model's size at 16, 8 or 4 bits, plus the notes each conversation needs. Your sizing memo (Day 10's written
+    hardware recommendation) also names today's two fixes for when prompts get longer: limit how long a
+    conversation may get, and store the notes in 8 bits.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 1 · Quantization (lesson 04-quantization)
+  # ---------------------------------------------------------------------------------------------------------
+  d4-s1:
+    why: >-
+      Quantization stores a model's numbers with fewer bits (the 0s and 1s each number is kept in), so the
+      model gets smaller. You store one model at three sizes, see that the smaller one writes faster, then
+      check it still answers well.
+    why_example: >-
+      Lesson example: the 4-bit version (4.9 GB) writes 86 tokens (word pieces) per second; the 8-bit version
+      (8.5 GB) writes 52. That is 1.65 times faster.
+    start_first:
+      command: "cd lessons/04-quantization && bash quant_bench.sh"
+      note: >-
+        First, in the `03-labs` folder, switch on the lab's Python environment from Day 1:
+        `source .venv/bin/activate`. The command downloads the same model at three sizes (about 17 GB), times
+        each one and prints a table. Leave it running while you watch the video below. For the commands
+        further down, open a second terminal window, go to `03-labs`, run `source .venv/bin/activate`, then
+        `cd lessons/04-quantization`.
+    videos:
+      04-quantization:
+        in_this_video: >-
+          Why storing a model's numbers in fewer bits makes it faster and fits more people on one chip, and how
+          to prove the answers stay good.
+        key_points:
+          - point: >-
+              Storing a model at 8 bits instead of 16 halves its size; on NVIDIA's H100 (a data-center AI chip)
+              and newer chips it also about doubles the math speed.
+            detail: >-
+              A 70-billion-number model is 140 GB at 16 bits (2 bytes per number) and 70 GB at 8 bits. On one
+              80 GB H100 that leaves 10 GB spare. Each 8K-token conversation (about 6,000 words) needs about
+              2.6 GB of notes, so only 3 whole ones fit (10 ÷ 2.6 = 3.8).
+          - point: >-
+              Storing it at 4 bits cuts it to a quarter of the 16-bit size, but prove quality on the customer's
+              own tests first.
+            detail: >-
+              The same model is 35 GB at 4 bits, leaving 45 GB spare. At 2.6 GB of notes per conversation that
+              is at most 17 (45 ÷ 2.6 = 17.3); the video plays safe and says about 14. Its rule: if 2 fewer
+              replies in 100 come back in the exact format asked for, but the server writes twice as many tokens
+              per second, that is usually a good trade; 20 fewer in 100 never is.
+          - point: >-
+              Storing the conversation notes (the KV cache) in 8 bits is often a bigger win than shrinking the
+              model.
+            detail: >-
+              It doubles how many people fit in the same memory. You measure it in step 2: 20 GB of spare memory
+              holds 4 conversations of 32,768 tokens with 16-bit notes, and 8 with 8-bit notes.
+    plain:
+      lead: >-
+        Quantization stores each of the model's billions of learned numbers (its weights) with fewer bits, so the
+        model gets smaller. Smaller writes faster, because each new token (word piece) means fetching the whole
+        model from memory. Shrink it too far and the answers start to slip.
+      picture: >-
+        Before every dish, the whole recipe book travels to the cook on a conveyor belt that moves a fixed number
+        of pages per second. Print the book in smaller type and it arrives sooner, so dishes come out faster.
+        Print it too small and the cook starts misreading recipes.
+      numbers_source: "Llama 3.1 8B on an M4 Max Mac, lesson 04's sample figures"
+      numbers:
+        - >-
+          Three sizes of the same model: 8.5 GB at 8-bit, 4.9 GB at 4-bit, 4.0 GB at 3-bit. At 16-bit it would
+          be about 16 GB (8 billion numbers x 2 bytes). (The real formats use a little more than their names:
+          about 8.5, 4.8 and 3.9 bits per number.)
+        - >-
+          Each new token needs one full fetch of the model. An M4 Max (a high-end Apple chip) moves 546 GB per
+          second, so it can fetch the 8.5 GB model 546 ÷ 8.5 = 64 times a second: at most 64 tokens per second.
+          At 4.9 GB: 546 ÷ 4.9 = 111.
+        - >-
+          Sample writing speed: 52 tokens per second at 8-bit, 86 at 4-bit. That is 58% of the bytes
+          (4.9 ÷ 8.5) for 1.65 times the speed (86 ÷ 52).
+        - >-
+          Share of the limit reached at 4-bit: 86 ÷ 111.4 = 77%. Real servers reach 60 to 85% of their limit.
+        - >-
+          Reading the prompt barely moves: 1,150 tokens per second at 8-bit, 1,050 at 4-bit.
+        - >-
+          Quality alarm: 12 quick questions per size. If 8-bit gets 11 right and 3-bit only 7, you have found the
+          quality cliff (the size below which answers suddenly get worse).
+      words:
+        - term: "Decode"
+          def: >-
+            The writing phase: the model writes one token at a time and fetches the whole model for each.
+            Example: 86 tokens per second at 4-bit (the `tg128` column).
+        - term: "Prefill"
+          def: >-
+            The reading phase: the model reads the whole prompt at once before writing. Example: 1,050 tokens per
+            second at 4-bit (the `pp512` column).
+        - term: "Memory bandwidth"
+          def: >-
+            How many GB per second memory delivers to the chip. Example: an M4 Max moves 546 GB/s.
+        - term: "Ceiling (speed limit)"
+          def: >-
+            The fastest a model can write: memory bandwidth ÷ model size. Example: 546 ÷ 4.9 = 111 tokens per
+            second.
+    run:
+      - cmd: "python ceiling_check.py --demo"
+        note: >-
+          Prints the lesson's sample table for an M4 Max (546 GB per second) without downloading anything.
+          **Look for** writing speed (`tg128`) rising as the model shrinks, 52 to 86 to 98 tokens per second,
+          while reading speed (`pp512`) stays near 1,000. It also saves these sample rows in
+          `03-labs/results/04-quant.csv`, so do not quote them as your own.
+      - cmd: "bash quant_bench.sh"
+        note: >-
+          Downloads the model at three sizes (about 17 GB, the long part), times each with `llama-bench`
+          (llama.cpp's timing tool, run without a server), then prints the same table for your Mac. If you
+          started it before the video, let that run finish instead of starting a second one. **Look for** every
+          `efficiency_%` (the share of the speed limit reached) between 60 and 85.
+      - cmd: "for q in Q8_0 Q4_K_M Q3_K_M; do"
+        note: >-
+          Starts the server with each size in turn, asks it 12 quick questions, then stops it. Run it after
+          `quant_bench.sh` finishes. **Look for** a line such as `Q8_0: 11/12` per size; a clear drop at 3-bit
+          is the quality cliff. The first run downloads the 8-bit and 3-bit versions again (12.5 GB) and can
+          outlast the loop's 20-second wait: see Stuck? if a size prints a connection error.
+    see: >-
+      Each row is one size of the same model. `size_gb` is its size; `pp512` how fast it reads a prompt;
+      `tg128` how fast it writes (both in tokens per second). `ceiling` is its speed limit (memory speed ÷
+      size); `efficiency_%` the share of that limit it reached. From Q8_0 (8-bit) to Q4_K_M (4-bit), writing
+      rises from 52 to 86 (1.65 times) while reading stays about the same. These are the lesson's sample figures
+      for an M4 Max; your rows follow your own Mac's memory speed and print smallest model first.
+    checks:
+      - q: >-
+          Shrinking the stored model from 8 bits to about 4 nearly doubles how fast it writes (decode), but
+          barely changes how fast it reads your prompt (prefill). Why?
+        plain: >-
+          Writing waits on memory: each new token needs the whole model fetched once, so a smaller model arrives
+          faster. Reading your prompt waits on math instead, and fewer bits do not make a Mac's math faster.
+        picture: >-
+          Before every dish, the whole recipe book comes to the cook on a conveyor belt that moves a fixed number
+          of pages per second. Halve the pages and the cook turns out nearly twice as many dishes a minute.
+          Reading the prompt is one delivery followed by lots of cooking, so a thinner book barely helps.
+        numbers_source: "lesson 04 sample figures, M4 Max"
+        numbers:
+          - >-
+            Model size: 8.5 GB at 8-bit, 4.9 GB at 4-bit (58% of the bytes).
+          - >-
+            Writing: 52 tokens/s becomes 86, 1.65 times faster.
+          - >-
+            Reading the prompt: 1,150 tokens/s becomes 1,050, about the same (9% slower).
+          - >-
+            Speed limits (M4 Max memory speed, 546 GB/s, ÷ model size): 546 ÷ 8.5 = 64 and 546 ÷ 4.9 = 111
+            tokens/s.
+        words:
+          - term: "Decode"
+            def: >-
+              The writing phase, one token at a time. Example: the `tg128` column (write 128 tokens) measures it.
+          - term: "Prefill"
+            def: >-
+              The reading phase, the whole prompt at once. Example: `pp512` measures it.
+          - term: "Bandwidth-bound"
+            def: >-
+              Slowed by how fast memory delivers data (bandwidth, in GB per second). Example: decode; an M4 Max
+              delivers 546 GB/s.
+          - term: "Compute-bound"
+            def: >-
+              Slowed by calculation speed rather than memory. Example: prefill.
+        more: >-
+          A batch-1 decode step does about two floating-point operations per parameter while streaming every
+          weight (the GPU Bandwidth video), so bytes set the pace. Prefill (`pp512`) reuses each weight read
+          across 512 tokens, so matrix-math throughput sets the pace. llama.cpp's smaller formats must be unpacked
+          before the math, which is why prefill even dips slightly.
+      - q: >-
+          On an NVIDIA H100 (a GPU: the kind of chip that runs AI models in data centers), models are often
+          stored as FP8, an 8-bit number format. Where does that fit in with shrinking a model to fewer bits
+          (quantization) on a Mac?
+        plain: >-
+          It is the same shrinking idea, but the H100 can also do its math directly on 8-bit numbers. So both
+          fetching the model and doing the math get faster, not only the fetching.
+        picture: >-
+          On a Mac, a thinner recipe book only makes each delivery faster. On an H100 the cook has also learned
+          the book's shorthand, so the cooking speeds up too.
+        numbers_source: "the GPU Bandwidth video (Day 3) and the Quantization video"
+        numbers:
+          - >-
+            A 70B model: 70 billion x 2 bytes = 140 GB at 16-bit; 70 GB at 8-bit; 35 GB at 4-bit.
+          - >-
+            H100 memory speed: 3,350 GB/s, about 6 times an M4 Max's 546.
+          - >-
+            Writing-speed limit: 3,350 ÷ 70 = 48 tokens/s at 8-bit; 3,350 ÷ 35 = about 96 at 4-bit.
+          - >-
+            The extra on H100: built-in 8-bit math, roughly double the math speed, so prompt reading speeds up
+            too.
+          - >-
+            The next generation, Blackwell, adds built-in 4-bit math (NVFP4).
+        words:
+          - term: "FP8"
+            def: >-
+              An 8-bit number format, 1 byte per number. Example: a 70B model is 70 GB in FP8.
+          - term: "Tensor cores"
+            def: >-
+              The parts of an NVIDIA GPU built for fast matrix math. Example: the H100's tensor cores do math
+              directly on FP8 numbers.
+          - term: "NVFP4"
+            def: >-
+              NVIDIA's 4-bit number format with built-in math on Blackwell GPUs.
+          - term: "Blackwell"
+            def: >-
+              The NVIDIA GPU generation after H100. Example: the B200 chip, whose memory moves 8,000 GB/s.
+        more: >-
+          On Apple silicon the GGUF formats only cut bytes; the math still runs at higher precision, which is why
+          prefill stayed flat in the previous question. On H100, FP8 weights halve decode bytes and FP8 tensor
+          cores roughly double matrix-math throughput, which helps prefill and large batches. The Quantization
+          video: "FP8 on H100+ is close to free; four-bit needs measurement."
+      - q: >-
+          The customer worries that a smaller, faster version of the model will give worse answers. What do you
+          do?
+        plain: >-
+          Test it instead of arguing. Run 50 of their own real prompts at each size and show quality, speed and
+          cost side by side.
+        picture: >-
+          A bakery wants to switch to a cheaper flour. You bake their best-sellers both ways and let their own
+          customers taste, instead of quoting a lab report.
+        numbers_source: "lesson 04's quality check and the Quantization video's sample table"
+        numbers:
+          - >-
+            Lesson 04's quick alarm: 12 questions per size. If the 3-bit version gets 7 right where the 8-bit gets
+            11, quality has fallen off a cliff.
+          - >-
+            For a customer: 50 of their own prompts at each size (lesson 09, on Day 7, builds the test).
+          - >-
+            The Quantization video's example table (made-up numbers to show the shape): at 8-bit instead of
+            16-bit, accuracy slipped from 89% to 88%, total output rose from 24 to 46 tokens per second,
+            conversations per GPU from 3 to 7.
+          - >-
+            The video's rule: if 2 fewer replies in 100 come back in the exact format asked for, but the server
+            writes twice as many tokens per second, that is usually a good trade; 20 fewer in 100 never is.
+        words:
+          - term: "Eval"
+            def: >-
+              A repeatable test of a model on a fixed set of prompts. Example: 50 of the customer's prompts.
+          - term: "Precision"
+            def: >-
+              How many bits each stored number gets. Example: 16-bit, 8-bit, 4-bit.
+          - term: "Quality cliff"
+            def: >-
+              The size below which answers suddenly get worse. Example: the 3-bit version (Q3) slips on
+              multi-step and format questions first.
+          - term: "Throughput"
+            def: >-
+              Total output across everyone at once. Example: 24 against 46 tokens/s in the Quantization video's
+              sample.
+        more: >-
+          Lesson 09's table has valid, accuracy, judge, p95 and $/1k tasks columns, and says never to show one
+          column alone. Pick the precision per workload, on held-out prompts. The Quantization video states its
+          rule in schema validity and throughput.
+    say:
+      ask: "Should we run this model in FP8 or 4-bit?"
+      means:
+        - phrase: "Decode speed"
+          meaning: >-
+            How fast the model writes its reply, one token at a time.
+        - phrase: "is bandwidth over bytes per token"
+          meaning: >-
+            The top speed is how many GB per second memory delivers, divided by how many GB must be fetched for
+            each token (the whole model). M4 Max: 546 ÷ 4.9 = about 111 tokens/s.
+        - phrase: "Quantization changes the denominator"
+          meaning: >-
+            Storing the model in fewer bits shrinks the bottom number, so the result goes up. 8.5 GB gives about
+            64 tokens/s; 4.9 GB gives about 111.
+        - phrase: "I never recommend a precision without running the customer's own eval at that precision"
+          meaning: >-
+            Precision means how many bits each number gets. Before saying "use 4-bit", I test each option on the
+            customer's own prompts, because fewer bits can cost accuracy. For this question: FP8 on an H100
+            usually costs little quality; the Quantization video calls it "close to free". 4-bit buys more speed
+            and room but carries more risk, so it needs that test most.
+    fields:
+      - id: d4-tg128
+        label: "Writing speed at 8-bit, 4-bit and 3-bit (tokens per second)"
+        hint: >-
+          The `tg128` column of your `quant_bench.sh` table. Your table lists the 3-bit row (Q3_K_M) first, so
+          read it bottom to top: 8-bit, 4-bit, 3-bit, for example "52 / 86 / 98".
+        unit: "tok/s"
+        meaning: >-
+          How fast each size writes its reply. Your speed limit is your Mac's memory speed ÷ the model's size: an
+          M4 Pro moves 273 GB/s, so its limit for the 4.9 GB model is 273 ÷ 4.9 = about 56 tokens per second.
+          Find your chip under Apple menu, About This Mac; `ceiling_check.py` looks up its memory speed for you.
+        example: "52 / 86 / 98 (the lesson's sample figures for an M4 Max, 546 GB/s)"
+      - id: d4-efficiency
+        label: "Share of the speed limit reached, same three sizes (%)"
+        hint: >-
+          The `efficiency_%` column, in the same order: bottom row first. 60 to 85% is normal. Well below 60%
+          means something else is slowing the Mac: step 1's Stuck? section lists the usual causes.
+        unit: "%"
+        meaning: >-
+          Your writing speed ÷ the speed limit (memory speed ÷ model size). It shows the formula holds on your
+          own machine.
+        example: "81 / 77 / 72 (at 4-bit: 86 ÷ 111.4 = 77%)"
+      - id: d4-quality
+        label: "Quality check score at 8-bit, 4-bit and 3-bit (out of 12)"
+        hint: >-
+          The line such as `Q8_0: 11/12` that each run prints after its 12 questions (server log lines may
+          surround it). The scores are also saved in `03-labs/results/04-quality.csv` (column `score`).
+        unit: "of 12"
+        meaning: >-
+          How many of 12 quick questions each size got right: a smoke alarm for the quality cliff, not a full
+          test. A customer gets 50 of their own prompts instead.
+        example: "The lesson's alarm example: 11 at 8-bit against 7 at 3-bit would be a cliff."
+    done: >-
+      The benchmark table shows all three sizes with an efficiency column (expect 60 to 85%), and the quality
+      check has printed a score out of 12 for each size.
+    stuck:
+      - problem: "The download stops because the disk is full."
+        fix: >-
+          The three sizes need about 17 GB, and the quality loop later stores the 8-bit and 3-bit versions again
+          (about 12.5 GB). Free some space and run `bash quant_bench.sh` again: sizes already downloaded are
+          skipped. Once its table has printed, you can delete the `models` folder inside
+          `lessons/04-quantization`. If the disk filled during the quality loop instead, delete that folder now
+          (the speed test no longer needs it) and run the loop again.
+      - problem: "It stops with `Unknown bandwidth — pass --bw`."
+        fix: >-
+          The script's list of Apple chips does not include yours. The error lists the chips it knows with their
+          speeds; your Mac's tech specs page on Apple's website lists its memory bandwidth. Then run
+          `python ceiling_check.py --bw 273`, with your figure in place of 273. The timings are already saved,
+          so nothing downloads again.
+      - problem: "Efficiency is well below 60%."
+        fix: >-
+          Something else is slowing the Mac: another app using memory heavily, a hot Mac slowing itself down, or
+          part of the model running on the Mac's main processor instead of its graphics cores. Close big apps
+          (video calls, browser tabs playing video), plug in, and run `bash quant_bench.sh` again; downloads are
+          skipped if you have not deleted `models/`. Some chips, such as the M3 Max and M4 Max, come in two
+          versions, and the script assumes the faster one (`felab/hardware.py`). If yours is slower, run
+          `python ceiling_check.py --bw` followed by your figure in GB per second.
+      - problem: "The quality loop prints a connection error (for example `Connection refused`) for one size."
+        fix: >-
+          The server was still downloading that size when the questions started: the loop waits only 20
+          seconds. Start that size alone, for example `bash ../02-three-local-servers/serve_llamacpp.sh Q8_0`,
+          wait for the line saying it is listening, stop it with Ctrl+C, then run the loop again.
+      - problem: "`llama-bench: command not found`"
+        fix: >-
+          llama.cpp is missing. Day 1's setup installs it; to add it again, run `brew install llama.cpp`, then
+          `bash quant_bench.sh`.
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 2 · KV cache and context length (lesson 05-kv-cache)
+  # ---------------------------------------------------------------------------------------------------------
+  d4-s2:
+    why: >-
+      You watch the model's notes on one long conversation (the KV cache) outgrow the model itself, then halve
+      them by storing them in 8 bits. Running out of memory for these notes is the most common failure in real
+      AI services.
+    why_example: >-
+      One 131,072-token conversation (about 98,000 words) needs 17.18 GB of notes at 16 bits, and 9.13 GB at 8
+      bits.
+    videos:
+      02-kv-cache:
+        in_this_video: >-
+          Why the model's notes on each conversation, not the model itself, decide how many people one GPU (the
+          chip that runs the model) can serve, and two cheap ways to fit more.
+        key_points:
+          - point: >-
+              Every token adds the same amount of notes, and the model's settings file tells you how much.
+            detail: >-
+              For Llama 3.1 8B it is 128 KB per token. A 4,096-token chat (about 3,000 words) needs
+              128 KB x 4,096 = 512 MiB of notes, about half a GB (MiB: the unit llama.cpp prints, about a million
+              bytes).
+          - point: >-
+              Some servers set aside room for the longest possible conversation up front. vLLM (a server program
+              for NVIDIA chips) uses PagedAttention instead: it hands out memory a small page at a time as each
+              conversation grows.
+            detail: >-
+              The video says the same chip then serves 2 to 4 times more users.
+          - point: >-
+              Storing the notes in 8 bits instead of 16 about halves them (to 53% in llama.cpp's 8-bit format,
+              q8_0, which stores a little extra), so about twice as many people fit.
+            detail: >-
+              In 20 GB of spare memory: 4 conversations of 32,768 tokens with 16-bit notes, 8 with 8-bit notes.
+    plain:
+      lead: >-
+        While a model writes, it keeps notes on the conversation so far (the KV cache), so it never has to reread
+        it. The notes share memory with the model and grow with every token and every person, until they can
+        outgrow the model itself.
+      picture: >-
+        A waiter has one notebook. The menu (the model) takes the first pages; each table's running order (its
+        notes) takes more as the meal goes on. A few very long dinners and the notebook is full, though the menu
+        itself fits fine.
+      numbers_source: "Llama 3.1 8B stored at 4 bits, lesson 05"
+      numbers:
+        - >-
+          The model itself: 4.9 GB.
+        - >-
+          Notes per token: 2 kinds (keys and values) x 32 layers x 8 note sets x 128 numbers each x 2 bytes per
+          number (16 bits) = 131,072 bytes, which is 128 KB (1 KB = 1,024 bytes here).
+        - >-
+          A 4,096-token conversation (about 3,000 words): 131,072 bytes x 4,096 = 0.537 GB of notes, about half a
+          GB.
+        - >-
+          32 times longer (131,072 tokens, about 98,000 words): 32 x 0.537 = 17.18 GB, three and a half times the
+          model.
+        - >-
+          The same notes stored in 8 bits: 9.13 GB, about half (llama.cpp prints this as 8,704 MiB).
+      words:
+        - term: "Token"
+          def: >-
+            A chunk of text, about three quarters of a word. 1,000 tokens is roughly 750 words.
+        - term: "KV cache"
+          def: >-
+            The model's notes on the conversation so far (its keys and values), so it does not reread everything
+            for each new word. Each person has their own.
+        - term: "Context length"
+          def: >-
+            The most tokens one conversation may hold. Example: 131,072 at the model's maximum.
+        - term: "Layer"
+          def: >-
+            One of 32 stacked processing stages each token passes through; each keeps its own notes.
+    run:
+      - cmd: "python kv_calc.py"
+        note: >-
+          Run it with the Python environment on, as in step 1. It works out the notes' size for one 8,192-token
+          conversation (about 6,000 words) on Llama 3.1 8B. **Look for** 128 KiB per token (the script prints
+          KiB, 1,024 bytes; the videos write 128 KB) and 1.07 GB per conversation.
+      - cmd: "python kv_calc.py --ctx 131072"
+        note: >-
+          The same sum for the longest conversation the model allows (131,072 tokens, about 98,000 words).
+          **Look for** 17.18 GB, three and a half times the 4.9 GB model.
+      - cmd: "python kv_calc.py --ctx 32768 --free-gb 20"
+        note: >-
+          How many 32,768-token conversations (about 25,000 words each) fit in 20 GB of spare memory.
+          **Look for** 4, then 8 on the line that switches the notes to 8 bits (q8_0).
+      - cmd: "bash context_ladder.sh"
+        note: >-
+          Starts the real server six times and prints the memory it set aside for notes each time. **Look for**
+          each 8-bit row at about half the 16-bit row above it. On a Mac with 16 to 24 GB of memory, the longest
+          16-bit row may say "failed to start": that is the lesson. If every row is exactly half of the lesson's,
+          see Stuck? below.
+    see: >-
+      Each row is one server start: conversation length in tokens (ctx), note format (f16 = 16-bit, q8_0 =
+      8-bit) and the memory set aside for notes. From the 4,096 rows to the 32,768 rows, 8 times the tokens
+      means 8 times the memory (512 to 4,096 MiB, 0.54 to 4.29 GB). In each pair the 8-bit row is about half,
+      and it may start even where the 16-bit row says "failed to start".
+    checks:
+      - q: >-
+          Inside each layer of Llama 3.1 8B, 32 parts look back over the conversation. A design called GQA
+          (grouped-query attention) makes them share 8 sets of notes instead of keeping 32. Why does that matter
+          so much for memory?
+        plain: >-
+          Sharing makes the notes 4 times smaller. That one design choice is what makes long conversations
+          affordable.
+        picture: >-
+          32 reporters cover the same meeting. Instead of each writing a full transcript, they work in 8 teams of
+          4 and each team shares one transcript. Same meeting, a quarter of the paper.
+        numbers_source: "the lesson 05 formula"
+        numbers:
+          - >-
+            Only one number in the notes formula changes: 8 note sets per layer instead of 32.
+          - >-
+            With 8: 128 KB per token. With 32: 512 KB, 4 times more.
+          - >-
+            One 131,072-token conversation (about 98,000 words): 17.18 GB with sharing, 68.72 GB without.
+          - >-
+            68.72 GB is 14 times the 4.9 GB model, and most of an 80 GB H100 (NVIDIA's data-center AI chip).
+        words:
+          - term: "GQA (grouped-query attention)"
+            def: >-
+              Groups of the look-back parts (attention heads) share one set of notes. Example: 8 KV heads instead
+              of 32.
+          - term: "KV head (note set)"
+            def: >-
+              One set of notes kept in each layer. Example: Llama 3.1 8B keeps 8 per layer.
+          - term: "Layer"
+            def: >-
+              One of the stacked processing stages each token passes through; each keeps its own notes. Example:
+              32 in Llama 3.1 8B.
+          - term: "H100"
+            def: >-
+              NVIDIA's data-center GPU with 80 GB of memory. Example: the GPU in the KV Cache, GPU Bandwidth and
+              Quantization videos.
+        more: >-
+          GQA keeps 32 query heads but shares each K/V head across a group of 4 of them, so attention still looks
+          at the text 32 ways while only 8 K/V heads are cached. Per token: 2 x 32 x 8 x 128 x 2 bytes = 128 KiB
+          with GQA; 2 x 32 x 32 x 128 x 2 bytes = 512 KiB without. The KV Cache video puts the usual saving at 4
+          to 8 times; the field guide notes that Llama 3 70B needs only about 0.3 MB per token because of it.
+      - q: >-
+          A customer's prompts are almost always short: 95 out of 100 are under 3,000 tokens (about 2,250 words).
+          But they set the limit to 128K tokens (128 x 1,024 = 131,072 tokens, about 98,000 words) "to be safe".
+          What does that cost them?
+        plain: >-
+          On a server that sets aside room for the full limit up front, as llama.cpp does, they pay for memory
+          they never use. The same GPU (the chip that runs the model) then serves far fewer people at once.
+        picture: >-
+          A restaurant sets a 40-seat table for every party "to be safe", but almost every party is 2 or 3 people.
+          After a few parties the room is full while most chairs sit empty, and new guests wait at the door.
+          Servers with PagedAttention (vLLM) add chairs as guests arrive, so they waste far less, though a few
+          huge parties can still fill the room.
+        numbers_source: "Llama 3.1 8B, from lesson 05's `kv_calc.py`"
+        numbers:
+          - >-
+            The model keeps notes on every token it has read: 128 KB per token.
+          - >-
+            Room for 128K tokens: 128 KB x 131,072 = about 17 GB per person. With 20 GB free, that is 1 person.
+          - >-
+            Room for 8K tokens (8,192, still more than double the 3,000 they use): 128 KB x 8,192 = 1.07 GB per
+            person. 20 ÷ 1.07 = 18.7, so 18 people.
+          - >-
+            The fix: set the limit near real use, about 8K here.
+        words:
+          - term: "Token"
+            def: >-
+              A chunk of text, about three quarters of a word. 1,000 tokens is roughly 750 words.
+          - term: "KV cache"
+            def: >-
+              The model's notes on the conversation so far, so it does not reread everything for each new word.
+              Each person has their own, and it grows with every token.
+          - term: "p95"
+            def: >-
+              The size that 95 out of 100 requests stay under.
+          - term: "People served at once (concurrency)"
+            def: >-
+              How many conversations the GPU runs at the same moment.
+        more: >-
+          llama.cpp sets aside the whole `-c` cache at startup, split evenly across its `--parallel` slots (see
+          `lessons/02-three-local-servers/serve_llamacpp.sh`). vLLM's PagedAttention hands out cache in small
+          pages as requests grow, so it wastes far less; a high maximum still lets a few very long requests take
+          most of the memory. Check the sums: `python kv_calc.py --ctx 131072 --free-gb 20` prints 17.18 GB and 1
+          conversation; `python kv_calc.py --ctx 8192 --free-gb 20` prints 1.07 GB and 18.
+      - q: >-
+          Storing the conversation notes with 8 bits per number instead of 16 (an FP8 KV cache) halves their
+          memory. What does it cost you?
+        plain: >-
+          A small risk that answers get a little worse on some tasks. You measure it on the customer's own
+          examples before you switch it on.
+        picture: >-
+          Saving a photo at lower quality roughly halves the file, and usually nobody can tell. Sometimes the fine
+          print blurs, so you compare both versions before sending it to a client.
+        numbers_source: "Llama 3.1 8B, lesson 05's `kv_calc.py`"
+        numbers:
+          - >-
+            16-bit: 2 bytes per number. 8-bit (q8_0): 1 byte per number plus a small shared scaling number stored
+            with each block of numbers, 1.0625 bytes in all.
+          - >-
+            One 131,072-token conversation (about 98,000 words): 16,384 MiB (17.18 GB) becomes 8,704 MiB
+            (9.13 GB): 53%, not 50%, because of that extra.
+          - >-
+            20 GB of spare memory at 32,768 tokens: 4 conversations become 8.
+          - >-
+            The price: a small risk to answer quality on some tasks. Check it by running lesson 09's test (Day 7)
+            on 50 of the customer's prompts, with 16-bit and with 8-bit notes, and compare.
+        words:
+          - term: "FP8 and q8_0"
+            def: >-
+              Two 8-bit formats; FP8 on NVIDIA data-center GPUs, q8_0 in llama.cpp on your Mac.
+          - term: "Bit"
+            def: >-
+              A single 0 or 1; 8 bits make a byte. Example: a 16-bit number takes 2 bytes.
+          - term: "Byte"
+            def: >-
+              8 bits. Example: one 16-bit number takes 2 bytes.
+          - term: "Eval harness"
+            def: >-
+              A repeatable test that scores a model on a fixed set of prompts. Example: lesson 09 (Day 7).
+        more: >-
+          q8_0 stores 8-bit integers in blocks that share a scale, which is where 1.0625 bytes per value comes from
+          (`kv_calc.py` line 25); FP8 is the equivalent on H100-class GPUs and is exactly half of FP16. Run the
+          same eval with the 16-bit and the 8-bit cache and compare before you promise the doubled capacity.
+    say:
+      ask: "The model fits on the GPU, but we still run out of memory under load. Why?"
+      means:
+        - phrase: "Weights fit"
+          meaning: >-
+            The model itself, its learned numbers (the weights), is 4.9 GB and fits easily.
+        - phrase: "the cache doesn't"
+          meaning: >-
+            The per-person notes (the KV cache) run out; one 131,072-token conversation (about 98,000 words)
+            needs 17.18 GB.
+        - phrase: "I size KV per token from the config"
+          meaning: >-
+            I work out how much memory each token of notes takes from the model's settings file. For Llama 3.1
+            8B it is 128 KB.
+        - phrase: "cap context to the real p95"
+          meaning: >-
+            I set the maximum conversation length to what 95 of 100 real requests need, not the model's maximum.
+            For a customer whose requests are almost all under 3,000 tokens, a limit of 8,192 still leaves room
+            to spare: in 20 GB it serves 18 people instead of 1 at 131,072.
+        - phrase: "quantize the cache"
+          meaning: >-
+            I store the notes with 8 bits per number instead of 16, like saving a photo at lower quality. It
+            takes about half the space: 9.13 GB instead of 17.18 GB.
+        - phrase: "doubles concurrency on the same GPU"
+          meaning: >-
+            About twice as many people served at once, with no new hardware. In 20 GB at 32,768 tokens: 4 people
+            become 8.
+    fields:
+      - id: d4-kv-32k
+        label: "Notes for a 32,768-token conversation (about 25,000 words), 16-bit and 8-bit (MiB)"
+        hint: >-
+          The `32768 f16` and `32768 q8_0` rows of `context_ladder.sh`. Write both, for example "4,096 / 2,176".
+          If you see exactly half of these (2,048 and 1,088), the script copied only the last number on
+          llama.cpp's line. In `lessons/05-kv-cache`, run `grep -i "kv buffer size" logs/ctx32768_f16.log` (then
+          the same for `logs/ctx32768_q8_0.log`): the MiB number on that line is the full figure.
+        unit: "MiB"
+        meaning: >-
+          How much memory the notes for one 32,768-token conversation take, stored at 16 bits and at 8 bits. It
+          is 8 times the 4,096-token figure (8 times the tokens), and the 8-bit figure is about half the 16-bit
+          one. MiB is the unit llama.cpp prints, about a million bytes; 1,000 MiB is about 1 GB.
+        example: "4,096 / 2,176 MiB (4.29 / 2.28 GB)"
+      - id: d4-kv-f16-131k
+        label: "Notes for one 131,072-token conversation (about 98,000 words), 16-bit (MiB)"
+        hint: >-
+          The `131072 f16` row of `context_ladder.sh`. Expect about 16,384 (17.18 GB). If it failed to start,
+          type "failed": that is the lesson. If it shows 8,192, exactly half, run
+          `grep -i "kv buffer size" logs/ctx131072_f16.log` in `lessons/05-kv-cache`: the MiB number on that
+          line is the full figure.
+        unit: "MiB"
+        meaning: >-
+          How much memory the notes take for the longest conversation the model allows, at 16 bits per number.
+          It is more than three times the 4.9 GB model.
+        example: "16,384 MiB (17.18 GB), or \"failed\" on a 16 to 24 GB Mac"
+      - id: d4-kv-q8-131k
+        label: "Notes for one 131,072-token conversation, 8-bit (MiB)"
+        hint: >-
+          The `131072 q8_0` row. Expect about 8,704 (9.13 GB), a little over half of 16,384 (it may also fail on
+          a 16 GB Mac). If it shows 4,352, exactly half, read `logs/ctx131072_q8_0.log` the same way.
+        unit: "MiB"
+        meaning: >-
+          The same notes stored with 8 bits per number: the fix. About half the memory, so about twice as many
+          conversations fit.
+        example: "8,704 MiB (9.13 GB)"
+      - id: d4-users-20gb
+        label: "Conversations of 32,768 tokens that fit in 20 GB"
+        hint: >-
+          From `python kv_calc.py --ctx 32768 --free-gb 20`. Expect 4, and 8 with 8-bit notes: write both, for
+          example "4 / 8".
+        unit: "conversations"
+        meaning: >-
+          How many people one machine serves at once with 20 GB of memory left over after the model loads, before
+          and after the fix.
+        example: "4 / 8"
+    done: >-
+      The calculator says about 17 GB (17.18) for one 131,072-token conversation (about 98,000 words). And the
+      real server shows the 8-bit notes at about half the 16-bit size, for example 2,176 MiB (2.28 GB) against
+      4,096 MiB (4.29 GB) at 32,768 tokens.
+    stuck:
+      - problem: "Every 8-bit (q8_0) row fails, even the short 4,096-token one."
+        fix: >-
+          Turn on the server's flash attention setting. (Flash attention is a faster way to run the look-back
+          step; llama.cpp needs it to store the notes in 8 bits.) Run `EXTRA="-fa on" bash context_ladder.sh`. On
+          older llama.cpp versions use `EXTRA="-fa" bash context_ladder.sh`.
+      - problem: "The 131,072-token 16-bit row says failed to start."
+        fix: >-
+          That is the lesson. The notes (17.18 GB) plus the 4.9 GB model need about 22 GB, but a Mac gives the
+          model only about 70% of its memory (Day 1's rule): about 17 GB on a 24 GB Mac. Write "failed" in Your
+          numbers; the 8-bit row below it is the fix.
+      - problem: "Both 131,072-token rows fail (a 16 GB Mac)."
+        fix: >-
+          That can happen. The 9.13 GB of 8-bit notes plus the 4.9 GB model is about 14 GB, more than the about
+          11 GB a 16 GB Mac gives the model (70%, Day 1). Write "failed" for both; the 32,768-token pair shows
+          the same halving.
+      - problem: "Your rows are exactly half the lesson's, for example 2,048 and 1,088 at 32,768 tokens."
+        fix: >-
+          llama.cpp printed the notes' two halves (keys and values) on the same line, and the script copied only
+          the last number. In `lessons/05-kv-cache`, run `grep -i "kv buffer size" logs/ctx32768_f16.log`, using
+          the log named after the row (its ctx, then f16 or q8_0). The MiB number on that line is the full
+          figure.
+
+wrapup:
+  done: >-
+    Your numbers show two things. First, how many 32,768-token conversations (about 25,000 words each) fit in
+    20 GB before and after storing the model's notes in 8 bits: 4, then 8. (The notes are the KV cache: what the
+    model has noted about each conversation so far, stored in the same chip memory as the model.) Second, how
+    fast each of the three model sizes writes.
+  whiteboards:
+    - video: 02-kv-cache
+      q: >-
+        An 8-billion-number model (Llama 3 8B), stored at 8 bits, runs on one H100 GPU with 80 GB of memory. Each
+        conversation can hold up to 8K tokens (8 x 1,024 = 8,192 tokens, about 6,000 words). How many
+        conversations fit at once? Which two cheap changes give 4 times as many?
+      given: >-
+        The model is a stack of 32 layers (processing stages), and each keeps its own notes on every token. Per
+        token, each layer stores 8 note sets (KV heads) of 128 numbers each (head dim), in two kinds: keys and
+        values. Each note number takes 16 bits (2 bytes), even though the model itself is stored at 8 bits. Plan
+        for the worst case: every conversation fills its full 8K.
+      plain: >-
+        About 60 conversations fit. After the model (8 GB) and some memory kept back, the video leaves about
+        64 GB for notes, and each conversation's notes take about 1 GB. Store the notes in 8 bits and cap
+        conversations at about 4,000 tokens, and about 240 fit on the same GPU.
+      picture: >-
+        The spare memory is a wall of lockers with room for about 60 full-size ones. Each of the two changes
+        halves the locker size, so 4 small lockers fit in the space of 1 big one.
+      steps:
+        - >-
+          Notes per token: 2 (keys and values) x 32 layers x 8 KV heads x 128 numbers x 2 bytes = 131,072 bytes =
+          128 KB.
+        - >-
+          Notes per conversation: 131,072 bytes x about 8,000 tokens = 1.05 GB, about 1 GB (the video's figure;
+          exactly 8,192 tokens gives 1.07 GB, and the answer is the same).
+        - >-
+          The model: 8 billion numbers x 1 byte (8-bit) = 8 GB.
+        - >-
+          Memory left: 80 - 8 = 72 GB. The video plans on about 64 GB of that for notes. It does not say why; most
+          likely the other 8 GB is a safety margin for the server program itself.
+        - >-
+          Conversations at once: 64 ÷ 1.05 = 61, so about 60.
+        - >-
+          Cheap change 1, store the notes in 8 bits: 1.05 ÷ 2 = 0.525 GB each, about half a GB. 64 ÷ 0.525 = 122,
+          about 120 (twice 60).
+        - >-
+          Cheap change 2, cap conversations at 4,096 tokens: half again, 0.525 ÷ 2 = 0.26 GB each.
+        - >-
+          64 ÷ 0.26 = 246, about 240: 4 times 60. Same GPU, no new hardware.
+      note: >-
+        Before you cap: ask whether the 8K limit is a real product need or a default nobody questioned (the KV
+        Cache video).
+      kit_q: >-
+        Worked example · Llama 3 8B · 32 layers · 8 KV heads · head dim 128 · FP16. Here is the calculation that
+        decides how many users fit. Two cheap changes move that number a long way.
+      kit_a: >-
+        KV per token: 2 × 32 × 8 × 128 × 2 = 128 KB. 8K context: 1.05 GB per request. Weights (FP8): 8 GB. H100
+        memory: 80 GB. Memory left for KV: ≈ 64 GB. Capacity: About 60 concurrent 8K sessions — then you are
+        full. Two changes, four times the users. FP16 KV · 8K: KV per request: 1.05 GB. Concurrent sessions:
+        ≈ 60. FP8 KV · 4K: KV per request: 0.26 GB. Concurrent sessions: ≈ 240. Extra hardware: none. Quantising
+        the cache to eight bits halves it. Capping context at four thousand tokens halves it again.
+      more: >-
+        1.05 GB equals 8,000 tokens x 131,072 bytes; with exactly 8,192 tokens `kv_calc.py` gives 1.07 GB, and
+        64 ÷ 1.07 = 59.6, still about 60. The video does not derive the 64 GB: it is 80 - 8 = 72 GB less about
+        8 GB, plausibly runtime working memory, which a server such as vLLM sets with `--gpu-memory-utilization`
+        (the Serving With vLLM video, Day 2). FP8 KV is exactly half; llama.cpp's q8_0 is 53%.
+      words:
+        - term: "Notes (KV cache)"
+          def: >-
+            The model's memory of each conversation so far. Example: 128 KB per token here.
+        - term: "Layer"
+          def: >-
+            One of the stacked processing stages each token passes through; each keeps its own notes. Example: 32
+            in Llama 3 8B.
+        - term: "FP8"
+          def: >-
+            An 8-bit number format, 1 byte per number. Example: 8B model = 8 GB.
+        - term: "H100"
+          def: >-
+            NVIDIA's data-center GPU, 80 GB of memory.
+    - video: 04-quantization
+      q: >-
+        You must run one 70-billion-number model on one H100 GPU (80 GB of memory), and each conversation can hold
+        8K tokens (8,192, about 6,000 words). Should you store the model at 16 bits, 8 bits or 4 bits?
+      given: >-
+        Each conversation's notes take about 2.6 GB, whatever size the model is stored at. Plan for the worst
+        case: every conversation fills its full 8K.
+      plain: >-
+        Pick 4-bit if it passes the customer's own quality test, because it fits the most people. At 16 bits the
+        model needs 2 GPUs; at 8 bits about 3 conversations fit, at 4 bits about 14 to 16.
+      picture: >-
+        The 80 GB GPU is a small apartment, and the model is a sofa sold in three sizes. The biggest will not fit
+        through the door. The middle one leaves floor space for about 3 guests; the smallest, for about 14 to 16.
+      steps:
+        - >-
+          Model size = 70 billion numbers x bytes per number: 16-bit 70 x 2 = 140 GB; 8-bit 70 x 1 = 70 GB; 4-bit
+          70 x 0.5 = 35 GB.
+        - >-
+          16-bit: 140 GB is more than 80 GB, so it needs 2 GPUs before anyone connects (140 ÷ 80 = 1.75, round up
+          to 2).
+        - >-
+          Keep about 1.5 GB for the server software itself (the lab book's figure).
+        - >-
+          8-bit: 80 - 70 - 1.5 = 8.5 GB spare. 8.5 ÷ 2.6 = 3.3, so 3 conversations.
+        - >-
+          4-bit: 80 - 35 - 1.5 = 43.5 GB spare. 43.5 ÷ 2.6 = 16.7, so 16. The video plays safe and says about 14.
+        - >-
+          Either way, 4-bit holds about 5 times as many conversations as 8-bit (14 to 16, against 3).
+        - >-
+          Answer: pick the smallest size that passes the customer's own quality test. How many bits you store
+          decides how many people one GPU can serve.
+      kit_q: >-
+        Worked example · one 70B model, three precisions. H100 80GB · 8K context per session.
+      kit_a: >-
+        FP16: 140 GB → 2 GPUs. FP8: 70 GB → 10 GB spare → ~3 sessions. 4-bit: 35 GB → 45 GB spare → ~14
+        sessions. KV per session: ≈ 2.6 GB at 8K. The real reason: Quantization buys concurrency, not just speed.
+      more: >-
+        2.6 GB is 2 x 80 layers x 8 KV heads x 128 x 2 bytes = 320 KiB per token, x 8,000 tokens (at 8,192,
+        `kv_calc.py --model llama-3.1-70b --ctx 8192` gives 2.68 GB). The video's rows mix assumptions: the FP8
+        row reserves nothing (80 - 70 = 10 GB; 10 ÷ 2.6 = 3.8, "about 3"), while "about 14" at 4-bit implies
+        about 8 GB reserved (45 - 8 = 37; 37 ÷ 2.6 = 14.2); with no reserve 4-bit gives 17 (45 ÷ 2.6 = 17.3). The
+        lab book's 1.5 GB framework overhead gives 3 and 16, as in the steps. Real 4-bit files carry per-group
+        scales: the GPU Bandwidth video (Day 3) uses 38 GB for a 70B at 4-bit, giving (80 - 38) ÷ 2.6 = 16. An
+        FP8 KV cache would halve the 2.6 GB and roughly double every session count.
+      words:
+        - term: "Parameters (70B, 8B)"
+          def: >-
+            The model's learned numbers, also called weights. Example: 70B = 70 billion.
+        - term: "16-bit, 8-bit, 4-bit"
+          def: >-
+            How many bits store each number: 2 bytes, 1 byte, half a byte. Example: 70B is 140 GB at 16-bit,
+            35 GB at 4-bit.
+        - term: "Notes (KV cache)"
+          def: >-
+            The model's memory of each conversation so far. Example: about 2.6 GB per 8K conversation here.
+        - term: "H100"
+          def: >-
+            NVIDIA's data-center GPU, 80 GB of memory.
+
+glossary:
+  - term: "4-bit, 8-bit, 16-bit"
+    def: "how many bits store each number; fewer bits, smaller model."
+    example: "an 8B model is 8.5 GB at 8-bit, 4.9 GB at 4-bit."
+  - term: "Attention (the look-back step)"
+    def: "the step where each new token looks back at the notes on earlier tokens."
+    example: "GQA and flash attention both change how it is stored or run."
+  - term: "Attention head (query head)"
+    def: "one of the parallel parts of a layer that looks back over the conversation."
+    example: "Llama 3.1 8B has 32 per layer; with GQA they share 8 note sets."
+  - term: "Bandwidth (memory bandwidth)"
+    def: "how many GB per second memory delivers to the chip."
+    example: "M4 Max 546 GB/s, H100 3,350 GB/s."
+  - term: "Batching"
+    def: "serving several people with one pass over the model."
+    example: "8 people share each fetch of the weights."
+  - term: "Bit"
+    def: "a single 0 or 1; 8 bits make a byte."
+    example: "a 16-bit number is 2 bytes."
+  - term: "Blackwell"
+    def: "the NVIDIA GPU generation after H100, with built-in 4-bit math."
+    example: "the B200 chip, whose memory moves 8,000 GB/s."
+  - term: "Byte"
+    def: "8 bits."
+    example: "one FP16 number takes 2 bytes."
+  - term: "Ceiling (speed limit)"
+    def: "the fastest a model can write: memory speed ÷ model size (for a mixture-of-experts model, only the part it reads per token)."
+    example: "546 ÷ 4.9 = 111 tokens/s."
+  - term: "Chip"
+    def: "the processor that does the model's math."
+    example: "an Apple M4 Max, or an NVIDIA H100 (a GPU)."
+  - term: "Compute-bound"
+    def: "slowed by calculation speed rather than memory."
+    example: "prefill."
+  - term: "Concurrency (people served at once)"
+    def: "how many conversations the server runs at the same moment."
+    example: "8 on the practice server."
+  - term: "Config (settings file)"
+    def: "the file shipped with a model that lists its shape."
+    example: "32 layers, 8 KV heads, head dim 128."
+  - term: "Context length (context, ctx)"
+    def: "the most tokens one conversation may hold."
+    example: "8K = 8,192 tokens."
+  - term: "CSV file"
+    def: "a plain table file: one row per line, commas between the columns."
+    example: "`results/04-quant.csv`."
+  - term: "Decode"
+    def: "the writing phase, one token at a time, fetching the whole model for each (a mixture-of-experts model fetches only the part it uses)."
+    example: "86 tokens/s at 4-bit."
+  - term: "Deployment (production)"
+    def: "a model running as a live service for real users."
+    example: "running out of note memory is the most common production failure."
+  - term: "Efficiency %"
+    def: "measured writing speed ÷ ceiling."
+    example: "86 ÷ 111.4 = 77%."
+  - term: "Engine (inference server)"
+    def: "the program that loads a model and answers requests."
+    example: "llama.cpp, vLLM."
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "50 of the customer's prompts in lesson 09 (Day 7)."
+  - term: "f16 / FP16"
+    def: "a 16-bit number format, 2 bytes per number."
+    example: "the default format for the notes."
+  - term: "Fetch"
+    def: "move data from memory to the chip that does the math."
+    example: "the whole 4.9 GB model is fetched once for every token written."
+  - term: "Flash attention"
+    def: "a faster, memory-saving way to run attention; llama.cpp needs it to store the values in 8 bits."
+    example: "`EXTRA=\"-fa on\"`."
+  - term: "Floating-point"
+    def: "a way of storing numbers with a sign, a size and a precise part, like scientific notation."
+    example: "FP16 and FP8."
+  - term: "FP8"
+    def: "an 8-bit number format, 1 byte per number, with built-in math on H100."
+    example: "a 70B model is 70 GB in FP8."
+  - term: "GB"
+    def: "1,000,000,000 bytes."
+    example: "16,384 MiB = 17.18 GB."
+  - term: "GGUF"
+    def: "llama.cpp's model file format, one file per size."
+    example: "a `Q4_K_M.gguf` file."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "H100; on a Mac it shares memory with everything else."
+  - term: "GQA (grouped-query attention)"
+    def: "groups of attention heads share one set of notes."
+    example: "8 KV heads instead of 32."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "the GPU in the KV Cache, GPU Bandwidth and Quantization videos."
+  - term: "H200"
+    def: "the H100's successor with faster memory."
+    example: "4,800 GB/s against 3,350."
+  - term: "Head dim"
+    def: "how many numbers each note set holds per token."
+    example: "128 in Llama 3.1 8B."
+  - term: "Headroom"
+    def: "spare capacity kept for surprises."
+    example: "plan 18 replicas where 15 are needed."
+  - term: "Held-out prompts"
+    def: "test prompts the model was never trained on."
+    example: "lesson 09's `test.jsonl` (Day 7)."
+  - term: "Integer"
+    def: "a whole number."
+    example: "q8_0 stores notes as 8-bit integers plus a shared scale."
+  - term: "Judge (LLM judge)"
+    def: "a second model that scores answers against a rubric."
+    example: "one column of lesson 09's table (Day 7)."
+  - term: "K (in 8K, 32K, 128K)"
+    def: "1,024 when counting tokens."
+    example: "128K = 131,072 tokens."
+  - term: "KB, KiB"
+    def: "1,024 bytes in this course (the videos write KB, `kv_calc.py` prints KiB)."
+    example: "128 KB = 131,072 bytes."
+  - term: "Keys and values (K and V)"
+    def: "the two kinds of notes the model stores per token, per layer."
+    example: "the 2 in 2 x layers x KV heads x head dim x bytes."
+  - term: "Knee"
+    def: "the point where seats run out and waiting time shoots up."
+    example: "after 8 people on the practice server."
+  - term: "KV cache"
+    def: "the model's notes on the conversation so far (keys and values), so it does not reread everything for each new word."
+    example: "17.18 GB for one 131,072-token conversation."
+  - term: "KV head (note set)"
+    def: "one set of notes kept in each layer."
+    example: "8 per layer in Llama 3.1 8B."
+  - term: "Latency"
+    def: "how long someone waits."
+    example: "time to the first token."
+  - term: "Layer"
+    def: "one of the stacked processing stages each token passes through; each keeps its own notes."
+    example: "32 in an 8B model, 80 in a 70B."
+  - term: "Llama 3.1 8B, Llama 3 70B"
+    def: "the open models used in the lessons and videos, with 8 and 70 billion parameters."
+    example: "4.9 GB at 4-bit for the 8B."
+  - term: "llama.cpp"
+    def: "the open-source engine used on the Mac; `llama-server` answers requests, `llama-bench` times the engine alone."
+    example: "Day 2's server."
+  - term: "M4 Max, M4 Pro"
+    def: "Apple chips whose memory moves 546 and 273 GB/s."
+    example: "the lesson's sample Mac."
+  - term: "Matrix math"
+    def: "multiplying large grids of numbers, the core work of a model."
+    example: "what tensor cores speed up."
+  - term: "MB"
+    def: "1,000,000 bytes."
+    example: "about 0.3 MB of notes per token for Llama 3 70B."
+  - term: "Memory-bound (bandwidth-bound)"
+    def: "slowed by how fast memory delivers data."
+    example: "decode."
+  - term: "MiB"
+    def: "1,048,576 bytes (about a million), the unit llama.cpp prints; 1,000 MiB is about 1 GB."
+    example: "8,704 MiB = 9.13 GB."
+  - term: "ms (millisecond)"
+    def: "a thousandth of a second."
+    example: "500 ms is half a second."
+  - term: "Notes"
+    def: "this course's plain word for the KV cache."
+    example: "128 KB of notes per token for Llama 3.1 8B."
+  - term: "NVFP4"
+    def: "NVIDIA's 4-bit number format with built-in math on Blackwell."
+    example: "named in the second question of Day 4, step 1."
+  - term: "Out of memory"
+    def: "the server cannot get the memory it needs. It fails at startup (weights, or a cache reserved up front) or under load, as many conversations' notes grow."
+    example: "the 131,072 16-bit row on a 16 to 24 GB Mac."
+  - term: "p95"
+    def: "the value 95 out of 100 requests stay under."
+    example: "95 of 100 prompts under 3,000 tokens."
+  - term: "PagedAttention"
+    def: "vLLM's way of handing out note memory in small pages as a conversation grows, instead of reserving the maximum."
+    example: "2 to 4 times more users (the KV Cache video)."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "8B = 8 billion."
+  - term: "Peak traffic"
+    def: "the most people using the service at the same moment."
+    example: "120."
+  - term: "pp512 / tg128"
+    def: "llama-bench's two tests: read a 512-token prompt, write 128 tokens, each in tokens per second."
+    example: "1,050 and 86 at 4-bit."
+  - term: "Practice server (mock)"
+    def: "the kit's stand-in server with realistic behaviour and made-up numbers."
+    example: "it has 8 slots."
+  - term: "Precision"
+    def: "how many bits each stored number gets."
+    example: "16-bit, 8-bit, 4-bit."
+  - term: "Prefill"
+    def: "the reading phase; the model reads the whole prompt at once."
+    example: "`pp512`."
+  - term: "Prefill/decode interference"
+    def: "long prompts being read slow the replies being written for others on the same server."
+    example: "one of the things that moves the knee."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "a 3,000-token support question."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "created on Day 1 in the `03-labs` folder."
+  - term: "q8_0 (cache)"
+    def: "llama.cpp's 8-bit format for the notes, 1.0625 bytes per number."
+    example: "8,704 MiB instead of 16,384."
+  - term: "Q8_0, Q4_K_M, Q3_K_M"
+    def: "llama.cpp's weight formats at about 8.5, 4.8 and 3.9 bits per number."
+    example: "8.5, 4.9 and 4.0 GB for an 8B model."
+  - term: "Quality cliff"
+    def: "the size below which answers suddenly get worse."
+    example: "the 3-bit version (Q3) slips on multi-step and format questions first."
+  - term: "Quantization (quantize)"
+    def: "storing numbers with fewer bits."
+    example: "16 to 8 to 4 bits, like saving a photo at lower quality."
+  - term: "Replica"
+    def: "one complete running copy of the server and model."
+    example: "18 replicas for 120 people."
+  - term: "Request"
+    def: "one message sent to the model for an answer."
+    example: "95 of 100 requests under 3,000 tokens."
+  - term: "Scale"
+    def: "one shared number stored with a small block of numbers so they can be squeezed into fewer bits."
+    example: "why q8_0 is 1.0625 bytes, not 1."
+  - term: "Schema-valid rate"
+    def: "the share of replies that come back as correctly formatted data."
+    example: "99% in the Quantization video's sample."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "llama.cpp's `llama-server`."
+  - term: "Session"
+    def: "one conversation."
+    example: "an 8K session holds up to 8,192 tokens."
+  - term: "SLO (service level objective)"
+    def: "the speed promise."
+    example: "95 of 100 requests get their first token within 500 ms."
+  - term: "Slot"
+    def: "one seat on the server, a conversation it can serve at the same time."
+    example: "`--parallel 8` gives 8."
+  - term: "Tensor cores"
+    def: "the parts of an NVIDIA GPU built for fast matrix math."
+    example: "the H100's tensor cores do math directly on FP8 numbers."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "step 1 uses two: one for the download, one for the other commands."
+  - term: "Throughput"
+    def: "total output across everyone at once."
+    example: "275.1 tokens/s with 8 people."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "1,000 tokens is roughly 750 words."
+  - term: "Tokens per second (tok/s)"
+    def: "how many tokens are written each second."
+    example: "38.9 per person with 8 people."
+  - term: "TTFT (time to first token)"
+    def: "how long until the first token (word piece) of the reply appears."
+    example: "41.4 ms (p95) at 8 people."
+  - term: "vLLM"
+    def: "an open-source engine for NVIDIA GPUs built for many users at once."
+    example: "it uses PagedAttention."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "4.9 GB for Llama 3.1 8B at 4-bit."
+  - term: "Workload"
+    def: "one kind of job a customer runs."
+    example: "a 4K support chat (lesson 05)."

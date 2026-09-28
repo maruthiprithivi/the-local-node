@@ -1,0 +1,1744 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field Engineer Lab Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+:root{
+  --ground:#F1F2EE; --surface:#FFFFFF; --surface2:#E7E9E3; --ink:#161A1F; --muted:#59606A; --rule:#D3D7CE;
+  --accent:#0E7A6B; --accent-soft:#D5ECE6; --copper:#B4531A; --copper-soft:#F6E3D5;
+  --fw:#BF3F0E; --fw-soft:#F8E0D4; --rp:#5140C9; --rp-soft:#E4E1FA;
+  --good:#1E7A3B; --good-soft:#DDF0E2; --warn:#9A6100; --warn-soft:#F7EACC; --bad:#B42318; --bad-soft:#F8DCD8;
+  --shadow:0 1px 2px rgba(22,26,31,.05),0 10px 30px -18px rgba(22,26,31,.28);
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1115; --surface:#161A20; --surface2:#1E232B; --ink:#E6E9E3; --muted:#9BA3AC; --rule:#2B313A;
+    --accent:#3CC4AE; --accent-soft:#123630; --copper:#EC955B; --copper-soft:#3A2517;
+    --fw:#F4834F; --fw-soft:#3B2016; --rp:#A093FF; --rp-soft:#26213F;
+    --good:#52C77F; --good-soft:#143322; --warn:#E6AD3E; --warn-soft:#352A12; --bad:#F37563; --bad-soft:#3A1A16;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -18px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1115; --surface:#161A20; --surface2:#1E232B; --ink:#E6E9E3; --muted:#9BA3AC; --rule:#2B313A;
+  --accent:#3CC4AE; --accent-soft:#123630; --copper:#EC955B; --copper-soft:#3A2517;
+  --fw:#F4834F; --fw-soft:#3B2016; --rp:#A093FF; --rp-soft:#26213F;
+  --good:#52C77F; --good-soft:#143322; --warn:#E6AD3E; --warn-soft:#352A12; --bad:#F37563; --bad-soft:#3A1A16;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -18px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,.card-flip:focus-visible,.tok:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.12;text-wrap:balance;margin:0}
+h2{font-size:clamp(1.7rem,3.4vw,2.45rem);font-weight:700;letter-spacing:-.02em}
+h3{font-size:1.28rem;font-weight:650;letter-spacing:-.01em}
+h4{font-size:1.02rem;font-weight:650}
+p{margin:0}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:1fr;max-width:1320px;margin:0 auto;padding-inline:16px}
+.rail{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--ground);border-bottom:1px solid var(--rule);margin-inline:-16px;padding:8px 16px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.rail .brand{display:none}
+.rail nav{display:flex;gap:4px}
+.rail a{display:inline-block;text-decoration:none;color:var(--muted);font-size:.84rem;padding:6px 10px;border-radius:999px;font-weight:500}
+.rail a:hover{color:var(--ink);background:var(--surface2)}
+.rail a.on{color:var(--ink);background:var(--surface)}
+.rail .grp{display:none}
+main{min-width:0;padding-block:8px 80px}
+@media (min-width:1100px){
+  .shell{grid-template-columns:230px minmax(0,1fr);gap:40px;padding-inline:24px}
+  .rail{top:env(safe-area-inset-top,0px);height:100vh;margin:0;padding:28px 0 28px;border:0;overflow-y:auto;white-space:normal;background:transparent}
+  .rail .brand{display:block;font-family:var(--display);font-weight:750;font-size:1.05rem;letter-spacing:-.01em;margin-bottom:20px;line-height:1.2}
+  .rail .brand small{display:block;font-family:var(--mono);font-weight:400;font-size:.7rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
+  .rail nav{flex-direction:column;gap:1px}
+  .rail a{border-radius:6px;padding:5px 10px;font-size:.88rem}
+  .rail a.on{background:var(--surface);box-shadow:var(--shadow)}
+  .rail .grp{display:block;font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:16px 10px 4px}
+}
+
+/* ---------- sections ---------- */
+section{padding-block:56px 8px;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.eyebrow .step{color:var(--accent);font-weight:600}
+.lede{font-size:1.1rem;color:var(--muted);max-width:66ch;margin-top:12px}
+.prose{max-width:68ch}
+.prose p+p{margin-top:12px}
+.stack{display:flex;flex-direction:column;gap:18px}
+.sec-body{display:flex;flex-direction:column;gap:28px;margin-top:28px}
+
+/* ---------- hero ---------- */
+.hero{display:grid;gap:28px;padding-block:36px 40px;align-items:center}
+@media (min-width:900px){.hero{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+.hero h1{font-size:clamp(2.3rem,5.4vw,4rem);font-weight:780;letter-spacing:-.035em}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .sub{margin-top:16px;font-size:1.12rem;color:var(--muted);max-width:52ch}
+.hero .meta{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.74rem;padding:4px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--rule);color:var(--muted)}
+.chip.fw{color:var(--fw);border-color:color-mix(in srgb,var(--fw) 35%,var(--rule))}
+.chip.rp{color:var(--rp);border-color:color-mix(in srgb,var(--rp) 35%,var(--rule))}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+
+.stage3d{position:relative;background:var(--surface);border:1px solid var(--rule);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.stage3d canvas{display:block;width:100%;height:400px;cursor:grab;touch-action:pan-y}
+.stage3d canvas:active{cursor:grabbing}
+@media (max-width:600px){.stage3d canvas{height:300px}}
+.stage3d .lbl{position:absolute;left:0;top:0;pointer-events:none;font-family:var(--mono);font-size:.7rem;line-height:1.3;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--rule);padding:3px 7px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-120%);color:var(--ink)}
+.stage3d .lbl b{font-weight:600}
+.stage3d .hud{position:absolute;left:12px;top:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;flex-wrap:wrap}
+.stage3d .hud .pill{pointer-events:none}
+.stage-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid var(--rule);background:var(--surface)}
+.stage-foot p{font-size:.88rem;color:var(--muted);max-width:60ch}
+.hint{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+
+/* ---------- controls ---------- */
+.seg{display:inline-flex;background:var(--surface2);border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;color:var(--muted);font:500 .84rem var(--body);padding:6px 12px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.btn{border:1px solid var(--rule);background:var(--surface);color:var(--ink);font:500 .86rem var(--body);padding:7px 14px;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.field label output{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select{font:inherit;font-size:.9rem;padding:7px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);width:100%}
+.check{display:flex;align-items:center;gap:8px;font-size:.88rem;cursor:pointer}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+
+/* ---------- panels ---------- */
+.lab{background:var(--surface);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.lab-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:16px 18px 0}
+.lab-head .t{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.lab-head h3{margin-top:4px}
+.lab-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:16px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.ro{background:var(--surface2);border-radius:8px;padding:10px 12px}
+.ro .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ro .v{font-family:var(--mono);font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.ro .v small{font-size:.75rem;color:var(--muted);font-weight:400}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.pill.cu{background:var(--copper-soft);color:var(--copper)}
+.scroll-x{overflow-x:auto}
+.note{font-size:.82rem;color:var(--muted)}
+
+/* plain-words analogy */
+.plain{position:relative;border:1.5px dashed color-mix(in srgb,var(--copper) 55%,var(--rule));border-radius:12px;padding:18px 18px 16px;background:color-mix(in srgb,var(--copper-soft) 45%,var(--surface))}
+.plain .tag{position:absolute;top:-11px;left:14px;background:var(--copper);color:var(--surface);font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:4px;font-weight:600}
+.plain p{max-width:68ch}
+.plain p+p{margin-top:8px}
+
+/* concept grid */
+.concepts{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.concept{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.concept h4{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.concept .def{font-size:.92rem}
+.concept .an{font-size:.88rem;color:var(--copper);font-style:italic}
+.concept .why{font-size:.84rem;color:var(--muted);border-top:1px solid var(--rule);padding-top:6px;margin-top:auto}
+
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--surface2)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:.86rem}
+.tablewrap{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow-x:auto}
+.tablewrap table{min-width:640px}
+.fwc{color:var(--fw);font-weight:600}
+.rpc{color:var(--rp);font-weight:600}
+
+/* companies */
+.duo{display:grid;gap:16px}
+@media (min-width:820px){.duo{grid-template-columns:1fr 1fr}}
+.co{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;border-top:4px solid var(--c)}
+.co.fw{--c:var(--fw)} .co.rp{--c:var(--rp)}
+.co h3{font-size:1.6rem;color:var(--c)}
+.co .one{font-size:1.02rem;font-weight:500}
+.co dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:.9rem}
+.co dt{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.co dd{margin:0}
+.co ul{margin:0;padding-left:18px;font-size:.92rem}
+.co ul li+li{margin-top:4px}
+
+/* stack diagram */
+.stackgrid{display:grid;grid-template-columns:minmax(150px,1.3fr) repeat(3,minmax(92px,1fr));gap:6px;min-width:560px;padding:16px 18px}
+.stackgrid .h{font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;align-self:end;padding-bottom:4px}
+.stackgrid .h.l{text-align:left}
+.stackgrid .layer{font-size:.88rem;font-weight:500;display:flex;flex-direction:column;justify-content:center;padding:6px 0}
+.stackgrid .layer small{font-weight:400;color:var(--muted);font-size:.76rem}
+.cell{border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.72rem;min-height:44px;text-align:center;padding:4px}
+.cell.them-fw{background:var(--fw);color:var(--surface)}
+.cell.them-rp{background:var(--rp);color:var(--surface)}
+.cell.you{border:1.5px dashed var(--rule);color:var(--muted)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);padding:0 18px 16px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+
+/* loop track */
+.track{display:flex;gap:6px;flex-wrap:wrap;align-items:stretch}
+.track .st{flex:1 1 140px;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;position:relative}
+.track .st b{display:block;font-size:.9rem}
+.track .st span{font-size:.8rem;color:var(--muted)}
+.track .st .i{font-family:var(--mono);font-size:.68rem;color:var(--c);font-weight:600;letter-spacing:.06em}
+.track.fw{--c:var(--fw)} .track.rp{--c:var(--rp)}
+
+/* token player */
+.tokrow{display:flex;flex-wrap:wrap;gap:4px;min-height:30px}
+.tk{width:22px;height:22px;border-radius:4px;background:var(--surface2);border:1px solid var(--rule);transition:background .15s,transform .15s}
+.tk.pf{background:var(--copper);border-color:var(--copper)}
+.tk.out{background:var(--accent);border-color:var(--accent);animation:pop .22s ease-out}
+@keyframes pop{from{transform:scale(.4)}to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.tk.out{animation:none}}
+.timeline{height:30px;display:flex;border-radius:6px;overflow:hidden;background:var(--surface2);font-family:var(--mono);font-size:.7rem}
+.timeline div{display:flex;align-items:center;padding:0 8px;white-space:nowrap;overflow:hidden;color:var(--surface);min-width:0}
+.timeline .a{background:var(--copper)} .timeline .b{background:var(--accent)}
+.phase-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+
+/* attention */
+.sentence{display:flex;flex-wrap:wrap;gap:8px}
+.tok{position:relative;font-family:var(--mono);font-size:.95rem;padding:10px 12px 20px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);cursor:pointer;color:var(--ink);min-width:56px;text-align:center}
+.tok .w{position:absolute;left:6px;right:6px;bottom:5px;height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.tok .w i{display:block;height:100%;background:var(--copper);width:0;transition:width .25s}
+.tok .pct{position:absolute;right:5px;top:2px;font-size:.62rem;color:var(--muted)}
+.tok.q{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}
+.tok.future{opacity:.35}
+.qkv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.qkv div{border-radius:10px;padding:12px;background:var(--surface2)}
+.qkv b{font-family:var(--mono);font-size:1.3rem;display:block;color:var(--accent)}
+
+/* svg charts */
+svg text{font-family:var(--mono)}
+.chart-wrap{overflow-x:auto}
+.chart-wrap svg{display:block;width:100%;min-width:520px;height:auto}
+
+/* paged sim */
+.paged{display:grid;gap:16px}
+@media (min-width:720px){.paged{grid-template-columns:1fr 1fr}}
+.pgrid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.pgrid div{aspect-ratio:1;border-radius:3px;background:var(--surface2);max-width:100%}
+.pgrid div.waste{background:repeating-linear-gradient(45deg,var(--surface2) 0 3px,color-mix(in srgb,var(--bad) 45%,var(--surface2)) 3px 5px)}
+.pcol h4{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px}
+.pstats{display:flex;gap:14px;font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.pstats b{color:var(--ink);font-weight:600}
+
+/* spec decode */
+.specline{display:flex;flex-wrap:wrap;gap:5px;min-height:34px;align-items:center}
+.sw-tok{font-family:var(--mono);font-size:.84rem;padding:4px 8px;border-radius:5px;border:1px solid var(--rule);background:var(--surface)}
+.sw-tok.acc{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.sw-tok.tgt{background:var(--copper-soft);border-color:var(--copper)}
+.sw-tok.rej{text-decoration:line-through;color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.sw-tok.draft{border-style:dashed;color:var(--muted)}
+.rowlbl{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+
+/* engines */
+.engines{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
+.eng{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;transition:border-color .2s,box-shadow .2s}
+.eng.pick{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.eng h4{font-family:var(--mono);font-size:1rem}
+.eng p{font-size:.88rem}
+.eng .tr{font-size:.82rem;color:var(--muted)}
+.eng .ana{font-size:.84rem;color:var(--copper);font-style:italic}
+
+/* calc bar */
+.membar{position:relative;height:44px;border-radius:8px;background:var(--surface2);overflow:hidden;display:flex}
+.membar div{height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.7rem;color:var(--surface);white-space:nowrap;overflow:hidden;transition:width .3s}
+.membar .w{background:var(--accent)} .membar .kv{background:var(--copper)} .membar .o{background:var(--muted)}
+.gpuTicks{position:relative;height:18px;font-family:var(--mono);font-size:.66rem;color:var(--muted)}
+.gpuTicks span{position:absolute;top:0;transform:translateX(-100%);padding-right:3px;border-right:2px solid var(--ink);height:18px;white-space:nowrap}
+.formula{font-family:var(--mono);font-size:.82rem;background:var(--surface2);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;line-height:1.7}
+
+/* scenarios */
+details.case{background:var(--surface);border:1px solid var(--rule);border-radius:12px}
+details.case+details.case{margin-top:10px}
+details.case summary{cursor:pointer;list-style:none;padding:14px 18px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+details.case summary::-webkit-details-marker{display:none}
+details.case summary h4{font-size:1.05rem}
+details.case summary .plus{font-family:var(--mono);color:var(--muted);transition:transform .2s;flex-shrink:0}
+details.case[open] summary .plus{transform:rotate(45deg)}
+.case-body{padding:0 18px 18px;display:grid;gap:14px}
+@media (min-width:760px){.case-body{grid-template-columns:repeat(3,1fr)}}
+.case-body .col h5{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;margin:0 0 6px;color:var(--accent)}
+.case-body .col ul{margin:0;padding-left:18px;font-size:.9rem}
+.case-body .col li+li{margin-top:4px}
+.case-body .say{grid-column:1/-1;background:var(--surface2);border-radius:8px;padding:12px 14px;font-size:.92rem}
+.case-body .say b{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--copper);display:block;margin-bottom:4px}
+
+/* bridge */
+.bridge{display:grid;gap:8px}
+.bridge .row{display:grid;grid-template-columns:1fr 36px 1fr;gap:8px;align-items:stretch}
+.bridge .row>div{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;font-size:.9rem}
+.bridge .row>div b{display:block;font-size:.94rem}
+.bridge .row>div span{color:var(--muted);font-size:.84rem}
+.bridge .arr{display:flex;align-items:center;justify-content:center;font-family:var(--mono);color:var(--accent);border:0!important;background:none!important;padding:0!important}
+.bridge .hd{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:none!important;border:0!important;padding:0 2px!important}
+@media (max-width:560px){.bridge .row{grid-template-columns:1fr}.bridge .arr{transform:rotate(90deg);height:20px}}
+.qs{display:grid;gap:16px}
+@media (min-width:760px){.qs{grid-template-columns:1fr 1fr}}
+.qs ul{margin:8px 0 0;padding-left:18px;font-size:.92rem}
+.qs li+li{margin-top:6px}
+
+/* flashcards */
+.cardbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card-flip{perspective:900px;height:190px;cursor:pointer;background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit}
+.card-in{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}
+.card-flip.flipped .card-in{transform:rotateY(180deg)}
+@media (prefers-reduced-motion:reduce){.card-in{transition:none}}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--rule);overflow:auto}
+.face.front{background:var(--surface)}
+.face.back{background:var(--accent-soft);transform:rotateY(180deg);border-color:var(--accent)}
+.face .c{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.face .qq{font-family:var(--display);font-weight:600;font-size:1.08rem;line-height:1.25}
+.face .aa{font-size:.9rem}
+.face .flip{margin-top:auto;font-family:var(--mono);font-size:.66rem;color:var(--muted)}
+
+/* plan */
+.plan{display:grid;gap:10px}
+.day{display:grid;grid-template-columns:64px 1fr;gap:14px;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;align-items:start}
+.day .d{font-family:var(--display);font-weight:750;font-size:1.6rem;line-height:1;color:var(--accent)}
+.day .d small{display:block;font-family:var(--mono);font-size:.64rem;font-weight:400;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:4px}
+.day h4{margin-bottom:4px}
+.day p{font-size:.9rem;color:var(--muted)}
+.day .check{margin-top:8px}
+.day.done{opacity:.6}
+.progress{height:6px;border-radius:3px;background:var(--surface2);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+
+/* cheat */
+.cheat{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.cheat .cc{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.cheat .cc .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cheat .cc .v{font-family:var(--display);font-weight:700;font-size:1.35rem;margin-top:2px;font-variant-numeric:tabular-nums}
+.cheat .cc p{font-size:.82rem;color:var(--muted);margin-top:2px}
+.sources{columns:2 300px;column-gap:28px;font-size:.86rem;padding-left:18px}
+.sources li{break-inside:avoid;margin-bottom:6px}
+footer{padding-block:40px;color:var(--muted);font-size:.84rem;border-top:1px solid var(--rule);margin-top:48px}
+.caution{background:var(--warn-soft);color:var(--ink);border-radius:10px;padding:12px 14px;font-size:.88rem}
+.caution b{color:var(--warn)}
+
+/* roadmap nav (hero) */
+.roadmap{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:16px 16px 10px;box-shadow:var(--shadow)}
+.rm-h{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px 4px}
+.roadmap a{position:relative;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;padding:8px 6px;border-radius:8px;text-decoration:none;color:var(--ink)}
+.roadmap a:hover{background:var(--surface2)}
+.roadmap a:not(:last-child)::after{content:"";position:absolute;left:22px;top:40px;bottom:-8px;width:2px;background:var(--rule)}
+.roadmap .n{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:.85rem;background:var(--accent-soft);color:var(--accent);position:relative;z-index:1}
+.roadmap a.after .n{background:var(--copper-soft);color:var(--copper)}
+.roadmap b{display:block;font-size:.95rem}
+.roadmap small{display:block;color:var(--muted);font-size:.82rem;line-height:1.35}
+/* narrated 3D stories */
+.stage3d.story canvas{height:430px}
+@media (max-width:600px){.stage3d.story canvas{height:320px}}
+.stage3d .lbl.lo{transform:translate(-50%,10%)}
+.stage3d .lbl.side{transform:translate(0,-50%)}
+.stage3d .lbl.tok{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.story-foot{border-top:1px solid var(--rule);background:var(--surface);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.story-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.ctrls{display:flex;gap:6px}
+.ctrls .btn:disabled{opacity:.4;cursor:default}
+.prog{height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--accent)}
+.cap{font-size:1rem;line-height:1.5;min-height:3em;max-width:80ch}
+.stepno{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-right:10px;vertical-align:1px}
+.meter{display:grid;gap:6px;background:var(--surface2);border-radius:10px;padding:10px 12px}
+.mrow{display:grid;grid-template-columns:120px 1fr 56px;gap:10px;align-items:center;font-size:.84rem}
+.mrow b{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+.mtrack{height:12px;border-radius:6px;background:var(--surface);overflow:hidden}
+.mtrack i{display:block;height:100%;width:0}
+.mtrack .mv{background:var(--copper)} .mtrack .cp{background:var(--accent)}
+.mfoot{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);align-items:baseline}
+.mfoot b{color:var(--ink);font-family:var(--mono)}
+@media (max-width:520px){.mrow{grid-template-columns:92px 1fr 48px}}
+
+/* extra visuals */
+textarea{font:inherit;font-size:.95rem;padding:10px 12px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);width:100%;resize:vertical}
+.tokpills{display:flex;flex-wrap:wrap;gap:4px}
+.tp{display:inline-flex;flex-direction:column;align-items:center;padding:4px 6px 3px;border-radius:6px;font-family:var(--mono);font-size:.88rem;line-height:1.2;white-space:pre;color:var(--ink)}
+.tp small{font-size:.6rem;color:var(--muted)}
+.qbits{display:flex;gap:10px;flex-wrap:wrap}
+.qgrp{display:flex;flex-direction:column;gap:4px}
+.qgrp .cells{display:flex;gap:3px}
+.qgrp .cells i{width:26px;height:34px;border-radius:5px;display:block}
+.qgrp span{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+.q-s .cells i{background:var(--muted)} .q-e .cells i{background:var(--copper)} .q-m .cells i{background:var(--accent)} .q-i .cells i{background:var(--rp)}
+@media (max-width:520px){.qgrp .cells i{width:15px;height:26px}}
+.matrix td{font-size:.86rem}
+.matrix code{font-family:var(--mono);font-size:.78rem;background:var(--surface2);padding:1px 5px;border-radius:4px}
+.sb{display:inline-block;font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;margin-right:4px;white-space:nowrap}
+.sb.ok{background:var(--good-soft);color:var(--good)} .sb.mid{background:var(--warn-soft);color:var(--warn)} .sb.old{background:var(--surface2);color:var(--muted)} .sb.na{background:transparent;color:var(--muted);border:1px dashed var(--rule)}
+.dg-detail{background:var(--surface2);border-radius:8px;padding:10px 12px;font-size:.92rem;min-height:3.2em}
+.fwinfo{display:grid;gap:12px}
+@media (min-width:760px){.fwinfo{grid-template-columns:repeat(3,1fr)}}
+.fwinfo h5{margin:0 0 4px;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.fwinfo p{font-size:.9rem}
+pre.code{margin:0;font-family:var(--mono);font-size:.8rem;line-height:1.6;background:var(--surface2);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre;color:var(--ink)}
+.fwtabs{max-width:100%}
+ol.flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;counter-reset:f}
+ol.flow li{counter-increment:f;position:relative;background:var(--surface2);border-radius:10px;padding:32px 12px 12px;font-size:.84rem;color:var(--muted)}
+ol.flow li::before{content:counter(f);position:absolute;left:12px;top:8px;width:20px;height:20px;border-radius:50%;background:var(--c);color:var(--surface);font-family:var(--mono);font-size:.72rem;font-weight:600;display:flex;align-items:center;justify-content:center}
+ol.flow.rp{--c:var(--rp)} ol.flow.fw{--c:var(--fw)}
+ol.flow li{overflow-wrap:anywhere}
+.lab-body>*,.sec-body>*,.stack>*{min-width:0}
+ol.flow li b{display:block;color:var(--ink);font-size:.9rem;margin-bottom:2px}
+/* ── lab book additions ── */
+.labs{display:flex;flex-direction:column;gap:10px}
+details.lab-item{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+details.lab-item[open]{border-color:color-mix(in srgb,var(--accent) 45%,var(--rule))}
+details.lab-item summary{cursor:pointer;list-style:none;padding:14px 18px;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center}
+details.lab-item summary::-webkit-details-marker{display:none}
+.lab-id{font-family:var(--mono);font-size:.78rem;font-weight:600;letter-spacing:.06em;background:var(--accent-soft);color:var(--accent);padding:4px 9px;border-radius:6px}
+.lab-id.sp{background:var(--copper-soft);color:var(--copper)}
+.lab-id.tr{background:color-mix(in srgb,var(--violet,#6b5bd6) 16%,transparent);color:var(--violet,#6b5bd6)}
+.lab-t{font-family:var(--display);font-weight:650;font-size:1.06rem;line-height:1.2}
+.lab-meta{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.meta-chip{font-family:var(--mono);font-size:.68rem;color:var(--muted);border:1px solid var(--rule);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.meta-chip.cost{color:var(--good);border-color:color-mix(in srgb,var(--good) 40%,var(--rule))}
+.meta-chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--rule))}
+.lab-body2{padding:0 18px 18px;display:grid;gap:14px}
+@media (min-width:860px){.lab-body2{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}}
+.lab-body2 h5{margin:0 0 6px;font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.lab-body2 ul{margin:0;padding-left:18px;font-size:.9rem}
+.lab-body2 li+li{margin-top:5px}
+.lab-body2 .side{display:flex;flex-direction:column;gap:12px}
+.lab-body2 .say{background:var(--surface2);border-radius:8px;padding:12px 14px;font-size:.9rem}
+.lab-body2 .say b{display:block;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--copper);margin-bottom:4px}
+ol.steps{margin:0;padding-left:20px;font-size:.9rem;display:grid;gap:7px}
+ol.steps li{line-height:1.4}
+ol.steps code{font-family:var(--mono);font-size:.82rem;background:var(--surface2);padding:2px 6px;border-radius:5px;display:inline-block;overflow-wrap:anywhere}
+ol.steps em{display:block;color:var(--muted);font-style:normal;font-size:.82rem;margin-top:2px}
+.hbgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.hb{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.hb .n{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.hb b{display:block;font-size:.95rem;margin-top:2px}
+.hb p{font-size:.82rem;color:var(--muted);margin-top:3px}
+.hb .x{font-family:var(--mono);font-size:.7rem;color:var(--copper);margin-top:6px;display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.kpi .k{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-family:var(--display);font-weight:700;font-size:1.5rem;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:.8rem;color:var(--muted)}
+.checkline{display:flex;gap:10px;align-items:flex-start;font-size:.9rem;padding:8px 0;border-bottom:1px solid var(--rule)}
+.checkline input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px;flex-shrink:0}
+.pricegrid{display:grid;gap:14px}
+@media (min-width:820px){.pricegrid{grid-template-columns:1fr 1fr}}
+.rolemap td:first-child{font-weight:500}
+.stackcol{display:grid;gap:6px}
+.stackrow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
+.stackrow .lab-t{font-size:.95rem}
+.layer-box{border-radius:8px;padding:10px 14px;font-size:.88rem;border:1px solid var(--rule);background:var(--surface2)}
+.layer-box.fwrun{background:color-mix(in srgb,var(--fw) 16%,var(--surface));border-color:var(--fw)}
+.layer-box.yourun{background:var(--surface);border-style:dashed}
+.meta-chip.repo{color:var(--copper);border-color:color-mix(in srgb,var(--copper) 45%,var(--rule))}
+.repo-run{margin-bottom:14px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--copper) 35%,var(--rule));border-radius:10px;background:var(--surface2)}
+.repo-run h5{margin-top:0}
+.repo-note{font-size:.85rem;color:var(--muted);margin-top:8px}
+.loop{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:6px 0 18px}
+.loop div{border:1px solid var(--rule);border-radius:12px;padding:14px 16px;background:var(--surface)}
+.loop b{display:block;font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--copper);margin-bottom:4px}
+.loop p{font-size:.9rem;margin:0}
+#lessonTable .dim{color:var(--muted);font-size:.72rem;margin-top:2px}
+#lessonTable a{color:inherit}
+.tree{font-size:.76rem;overflow-x:auto}
+#repo .duo>div{min-width:0}
+#repo pre.code{overflow-x:auto}
+</style>
+
+<div class="shell">
+<aside class="rail" aria-label="Sections">
+  <div class="brand">Field Engineer<br>Lab Book<small>Fireworks AI · DGX Spark · Sept 2026</small></div>
+  <nav id="railnav">
+    <span class="grp">The job</span>
+    <a href="#top">Start</a>
+    <a href="#role">Decode the role</a>
+    <a href="#handbook">Your handbook, mapped</a>
+    <a href="#platform">Fireworks offerings</a>
+    <a href="#cost">Spend control</a>
+    <span class="grp">Hands-on</span>
+    <a href="#repo">Code repo, side by side</a>
+    <a href="#labs-fw">Fireworks labs</a>
+    <a href="#spark">Your DGX Spark</a>
+    <a href="#labs-spark">Spark labs</a>
+    <a href="#labs-train">Training labs</a>
+    <a href="#capstone">Capstone POC</a>
+    <span class="grp">Study</span>
+    <a href="#videos">Video toolkit</a>
+    <a href="#concepts">Concept matrix</a>
+    <a href="#plan">12-day plan</a>
+    <a href="#talk">Talk tracks</a>
+    <a href="#sources">Sources</a>
+  </nav>
+</aside>
+
+<main>
+<section id="top" class="hero">
+  <div>
+    <div class="eyebrow"><span class="step">AI Field Engineer · Enterprise · Fireworks AI</span></div>
+    <h1>Learn it by <em>running</em> it.</h1>
+    <p class="sub">A hands-on guide to AI field engineering: learn how inference platforms work, then run nineteen labs from your Mac — seven against Fireworks for a few dollars, nine locally for nothing, three on how models are trained — and eighteen narrated videos that explain every concept underneath them.</p>
+    <div class="meta">
+      <span class="chip fw"><span class="dot"></span>7 Fireworks labs · ~$6 total</span>
+      <span class="chip"><span class="dot"></span>9 local labs · Mac-first · $0</span>
+      <span class="chip"><span class="dot"></span>18 narrated videos · rendered</span>
+      <span class="chip">Prices &amp; docs checked 23 Sept 2026</span>
+    </div>
+  </div>
+  <nav class="roadmap" aria-label="How to use this">
+    <div class="rm-h">Your route through the labs</div>
+    <a href="#cost"><span class="n">1</span><span><b>Put the guardrails up</b><small>Spend cap, scale-to-zero, delete-after-lab. 15 minutes.</small></span></a>
+    <a href="#repo"><span class="n">↳</span><span><b>Open the code repo beside this page</b><small>19 lessons, commented code, one harness for Mac, Spark and Fireworks. Start with make smoke.</small></span></a>
+    <a href="#labs-fw"><span class="n">2</span><span><b>Run the Fireworks labs</b><small>Latency harness, caching, structured output, a real LoRA fine-tune.</small></span></a>
+    <a href="#labs-spark"><span class="n">3</span><span><b>Run the local labs</b><small>Ollama, llama.cpp and MLX on the Mac; vLLM and SGLang over SSH to the Spark.</small></span></a>
+    <a href="#capstone"><span class="n">4</span><span><b>Build the capstone</b><small>One POC, one benchmark, one sizing memo. Keep these as reusable project artifacts.</small></span></a>
+    <a href="#videos" class="after"><span class="n">→</span><span><b>Narrate the concepts</b><small>Watch the eighteen explainers, then re-record one in your own words.</small></span></a>
+  </nav>
+</section>
+
+<!-- ================= ROLE ================= -->
+<section id="role">
+  <div class="eyebrow">The job</div>
+  <h2>What "AI Field Engineer" actually means here</h2>
+  <p class="lede">Field engineers build proofs of concept, benchmark systems, debug production issues, and explain tradeoffs to customers. Each skill below maps to a lab you can run.</p>
+  <div class="sec-body">
+    <div class="tablewrap">
+      <table class="rolemap">
+        <thead><tr><th>Field engineering task</th><th>What to learn</th><th>Where to practise</th></tr></thead>
+        <tbody>
+          <tr><td>Build end-to-end POCs inside customer codebases</td><td>Can you ship working code under someone else's constraints, fast?</td><td class="mono">Capstone</td></tr>
+          <tr><td>Architect inference foundations and size deployments</td><td>Memory maths, concurrency, GPU shapes, cost per million tokens</td><td class="mono">L3 · L5 · F1</td></tr>
+          <tr><td>Run load tests; set latency, throughput and cost baselines</td><td>Do you benchmark properly — traffic profile, p95, goodput?</td><td class="mono">L3 · F1</td></tr>
+          <tr><td>Deploy new model families on vLLM and SGLang; pick shapes, quantization, serving patterns</td><td>Hands-on-keyboard with the open serving stack</td><td class="mono">L2 · L4 · L9</td></tr>
+          <tr><td>Guide model selection, fine-tuning strategy (SFT, DPO, RFT) and evaluation</td><td>Do you know which method fits which problem — and the cost of each?</td><td class="mono">F5 · F6 · L8 · T1–T3</td></tr>
+          <tr><td>Build and run fine-tuning pipelines with customers</td><td>Dataset format, job launch, deploy, measure, iterate</td><td class="mono">F5 · L8</td></tr>
+          <tr><td>Design evaluation frameworks measuring production quality</td><td>Not MMLU: task accuracy, tool-call success, latency, cost</td><td class="mono">F6</td></tr>
+          <tr><td>Lead discovery; earn trust with ML engineers and VPs in one meeting</td><td>Two registers, one story. Practise both out loud</td><td class="mono">Talk tracks</td></tr>
+          <tr><td>Turn recurring pain into product proposals</td><td>Have you got an opinion about what's missing in the platform?</td><td class="mono">Capstone memo</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="duo">
+      <article class="co fw">
+        <h3 class="fwc">Build a portfolio of evidence</h3>
+        <ul>
+          <li><b>A benchmark you ran</b> on Fireworks and on your own hardware, with the traffic profile written down.</li>
+          <li><b>A fine-tune you shipped</b>: dataset, job, deployment, eval delta, cost.</li>
+          <li><b>A sizing memo</b> with two or three options and the maths visible.</li>
+          <li><b>One product criticism</b>, specific and constructive. Explain the tradeoff and suggest a fix.</li>
+        </ul>
+      </article>
+      <article class="co rp">
+        <h3 class="rpc">Their own writing, worth citing</h3>
+        <ul>
+          <li><b>Frontier RL Is Cheaper Than You Think</b> — over 98% of BF16 weights are bit-identical between consecutive RL checkpoints, so shipping ~2% deltas cut cross-region transfer by roughly 94%.</li>
+          <li><b>The Fine-Tuning Bottleneck Isn't the Algorithm</b> — the blocker is integration friction and iteration speed; the fastest teams run 100+ jobs, one customer ships a checkpoint about every five hours.</li>
+          <li><b>Open-source agents with frontier advisors</b> — an open model doing the work with a frontier model as a sparse advisor beat frontier-only on a legal benchmark at roughly a third of the cost.</li>
+        </ul>
+        <p class="note">Read all three before the loop. Quoting one accurately, then asking a good question about it, is the cheapest credibility you will ever buy.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+
+<!-- ================= PLATFORM ================= -->
+<section id="platform">
+  <div class="eyebrow">The product</div>
+  <h2>Everything Fireworks sells, in one page</h2>
+  <p class="lede">The platform splits into four jobs: <b>serve</b> a model, <b>train</b> a model, <b>evaluate</b> it, and <b>route</b> between models. Underneath all of it sits their own inference engine — the reason the pitch is "specialized intelligence you own", not "cheap GPUs".</p>
+  <div class="sec-body">
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Who runs what</div><h3>The stack, and where the customer stops</h3></div></div>
+      <div class="lab-body">
+        <div class="stackcol">
+          <div class="stackrow"><div class="lab-t">Your app</div><div class="layer-box yourun">prompts, RAG, agents, product logic — <b>the customer</b></div></div>
+          <div class="stackrow"><div class="lab-t">Model + adapters</div><div class="layer-box fwrun">library models, your uploaded weights, LoRA adapters — <b>shared</b></div></div>
+          <div class="stackrow"><div class="lab-t">Serving engine</div><div class="layer-box fwrun">FireAttention kernels, FP8/FP4 quantization, prompt caching — <b>Fireworks</b></div></div>
+          <div class="stackrow"><div class="lab-t">Optimisation</div><div class="layer-box fwrun">FireOptimizer, adaptive speculative decoding, multi-LoRA batching — <b>Fireworks</b></div></div>
+          <div class="stackrow"><div class="lab-t">Capacity</div><div class="layer-box fwrun">serverless · on-demand · batch · reserved · Virtual Cloud / BYOC — <b>Fireworks</b></div></div>
+          <div class="stackrow"><div class="lab-t">Hardware</div><div class="layer-box fwrun">H100 · H200 · B200 · B300 · GB300, multi-region — <b>Fireworks</b></div></div>
+        </div>
+        <p class="note">Contrast to hold in your head: a raw GPU cloud sells you the bottom row and hands you the rest. Fireworks sells everything except your application — and increasingly, the training loop too.</p>
+      </div>
+    </div>
+
+    <div class="concepts">
+      <div class="concept"><h4>Serverless</h4><p class="def">Per-token API, OpenAI-compatible, Standard / Priority / Fast tiers. Billed on input, cached input and output separately.</p><p class="why">Default starting point. No provisioning, no idle cost.</p></div>
+      <div class="concept"><h4>On-demand deployments</h4><p class="def">Private replicas billed per GPU-second, autoscaling, scale-to-zero (1 hour idle by default — shorten it).</p><p class="why">Needed for LoRA serving, custom shapes, speculative-decoding flags.</p></div>
+      <div class="concept"><h4>Batch API</h4><p class="def">JSONL in, JSONL out, <b>50% of serverless price</b>, caching discounts stack. 12–72h windows.</p><p class="why">Where your eval runs and bulk jobs belong.</p></div>
+      <div class="concept"><h4>Reserved capacity</h4><p class="def">Committed GPU capacity, lower hourly price, sold through sales.</p><p class="why">Bills for the whole term whether used or not — never suggest it casually.</p></div>
+      <div class="concept"><h4>Managed Training</h4><p class="def">SFT, DPO, ORPO and RFT as managed jobs via UI, <span class="mono">firectl</span> or REST. Priced per 1M training tokens.</p><p class="why">The "own your weights" story, and the cheapest real fine-tune you can run.</p></div>
+      <div class="concept"><h4>Training API</h4><p class="def">Custom training loops in Python — custom loss, distillation, inference in the loop. Serverless (per token) or dedicated (per GPU-hour) compute.</p><p class="why">GA in Aug 2026. This is what "Fireworks Training" means now.</p></div>
+      <div class="concept"><h4>Eval Protocol</h4><p class="def">Their open-source, trace-first eval framework (<span class="mono">pip install eval-protocol</span>). Rule-based, LLM-judge or hybrid rewards; feeds RFT.</p><p class="why">The bridge from "we think it's better" to a reward function.</p></div>
+      <div class="concept"><h4>Multi-LoRA</h4><p class="def">One base deployment, many adapters (default quota 100). Needs a BF16 shape with <span class="mono">--enable-addons</span>; FP8/FP4 shapes can't host adapters.</p><p class="why">How per-customer fine-tunes stay affordable.</p></div>
+      <div class="concept"><h4>FireAttention</h4><p class="def">Their own kernels. V4 targets B200 with NVFP4 and claims 250+ tokens/sec.</p><p class="why">The answer to "why not just run vLLM ourselves?"</p></div>
+      <div class="concept"><h4>Speculative decoding</h4><p class="def">Default model-based speculation, custom <span class="mono">--draft-model</span>, n-gram, or predicted outputs. Measure with <span class="mono">perf_metrics_in_response</span>.</p><p class="why">Docs warn a bad drafter makes things slower — good nuance to voice.</p></div>
+      <div class="concept"><h4>Structured output</h4><p class="def">JSON mode and JSON-schema mode (2020-12, <span class="mono">$ref</span>/<span class="mono">$defs</span>, no external refs), plus grammar mode.</p><p class="why">Two docs rules: put the schema in the prompt too; for reasoning models omit <span class="mono">response_format</span>.</p></div>
+      <div class="concept"><h4>Virtual Cloud / BYOC</h4><p class="def">The engine runs inside the customer's own VPC, across many clouds and regions.</p><p class="why">The answer to data-residency objections in regulated APAC accounts.</p></div>
+      <div class="concept"><h4>Routing (Nexus · FireRouter)</h4><p class="def">Task-level, cache-aware routing across open and closed models, with centralized cost controls.</p><p class="why">Reframes "which model?" as a portfolio question. Great discovery hook.</p></div>
+    </div>
+
+    <div class="pricegrid">
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Serverless, $ per 1M tokens</th><th class="n">input</th><th class="n">cached</th><th class="n">output</th></tr></thead>
+          <tbody>
+            <tr><td>Nemotron 3.5 Lightning 30B A3B</td><td class="n">0.05</td><td class="n">0.01</td><td class="n">0.20</td></tr>
+            <tr><td>GLM 5.3 Flash</td><td class="n">0.15</td><td class="n">0.03</td><td class="n">0.50</td></tr>
+            <tr><td>gpt-oss 120B</td><td class="n">0.15</td><td class="n">0.015</td><td class="n">0.60</td></tr>
+            <tr><td>DeepSeek V4.1 Flash</td><td class="n">0.30</td><td class="n">0.006</td><td class="n">1.20</td></tr>
+            <tr><td>GLM 5.3</td><td class="n">1.40</td><td class="n">0.26</td><td class="n">4.40</td></tr>
+            <tr><td>Qwen 3.8 Max</td><td class="n">2.00</td><td class="n">0.25</td><td class="n">6.00</td></tr>
+            <tr><td>Kimi K3</td><td class="n">3.00</td><td class="n">0.30</td><td class="n">15.00</td></tr>
+            <tr><td>Size tier &lt;4B / 4–16B / &gt;16B</td><td class="n" colspan="3">0.10 · 0.20 · 0.90 flat</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>On-demand GPUs</th><th class="n">$ / hour</th></tr></thead>
+          <tbody>
+            <tr><td>H100 80GB · H200 141GB</td><td class="n">8.00</td></tr>
+            <tr><td>B200 180GB</td><td class="n">13.00</td></tr>
+            <tr><td>B300 288GB</td><td class="n">15.00</td></tr>
+            <tr><td>GB300 288GB</td><td class="n">20.00</td></tr>
+            <tr><td colspan="2" class="note">Billed per GPU-second, no start-up charge. Region-pinned (US/EU/APAC) costs 1.5×.</td></tr>
+          </tbody>
+        </table>
+        <table>
+          <thead><tr><th>Managed training, $ / 1M training tokens</th><th class="n">LoRA SFT</th><th class="n">LoRA DPO</th><th class="n">Full SFT</th></tr></thead>
+          <tbody>
+            <tr><td>≤16B</td><td class="n">0.50</td><td class="n">1.00</td><td class="n">1.00</td></tr>
+            <tr><td>16–80B</td><td class="n">3.00</td><td class="n">6.00</td><td class="n">6.00</td></tr>
+            <tr><td>80–300B</td><td class="n">6.00</td><td class="n">12.00</td><td class="n">12.00</td></tr>
+            <tr><td>&gt;300B</td><td class="n">10.00</td><td class="n">20.00</td><td class="n">20.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="caution"><b>Prices move weekly.</b> Everything above was read from Fireworks' pricing and docs pages on 23 September 2026, and several models were scheduled for retirement two days later. Re-check before using a price in a sizing decision, and date your estimate.</div>
+  </div>
+</section>
+
+<!-- ================= COST ================= -->
+<section id="cost">
+  <div class="eyebrow">Before you spend a cent</div>
+  <h2>Spend control, and the one trap that costs real money</h2>
+  <p class="lede">You can do every Fireworks lab here for roughly the price of lunch — as long as you understand one asymmetry: <b>per-token endpoints cost cents; a GPU deployment costs dollars per hour, whether or not you use it.</b></p>
+  <div class="sec-body">
+    <div class="caution"><b>The trap:</b> a LoRA fine-tune cannot be served on serverless. Fireworks' docs are explicit that trained LoRA models deploy only to on-demand (dedicated) deployments. So the moment you finish a $2 fine-tune, serving it has an $8/hour floor. Deploy it, run your eval, screenshot the numbers, and <span class="mono">firectl deployment delete</span> it in the same sitting.</div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Checklist · do this first</div><h3>Guardrails, 15 minutes</h3></div><span class="pill acc" id="guardCount">0 / 7</span></div>
+      <div class="lab-body">
+        <div id="guardList"></div>
+        <pre class="code">firectl signin
+firectl whoami
+firectl quota list                          # see GPU + LoRA + spend quotas
+firectl quota update monthly-spend-usd      # hard pause at 100%, warning at 80%
+firectl deployment list                     # should be empty when you finish for the day</pre>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Calculator</div><h3>What will this workload cost?</h3></div><span class="pill" id="costVerdict">–</span></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="cmModel">Model</label><select id="cmModel"></select></div>
+          <div class="field"><label for="cmIn">Input tokens / request <output id="cmInO">4,000</output></label><input type="range" id="cmIn" min="200" max="32000" step="200" value="4000"></div>
+          <div class="field"><label for="cmOut">Output tokens / request <output id="cmOutO">400</output></label><input type="range" id="cmOut" min="50" max="4000" step="50" value="400"></div>
+          <div class="field"><label for="cmReq">Requests / day <output id="cmReqO">20,000</output></label><input type="range" id="cmReq" min="0" max="100" value="55"></div>
+          <div class="field"><label for="cmCache">Prompt-cache hit rate <output id="cmCacheO">60%</output></label><input type="range" id="cmCache" min="0" max="95" step="5" value="60"></div>
+          <label class="check" for="cmBatch"><input type="checkbox" id="cmBatch"> Batch API (50% off)</label>
+        </div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Cost / request</div><div class="v" id="cmReqCost">–</div></div>
+          <div class="ro"><div class="k">Per day</div><div class="v" id="cmDay">–</div></div>
+          <div class="ro"><div class="k">Per month</div><div class="v" id="cmMonth">–</div></div>
+          <div class="ro"><div class="k">Saved by caching</div><div class="v" id="cmSaved">–</div></div>
+          <div class="ro"><div class="k">Dedicated break-even</div><div class="v" id="cmBreak">–</div></div>
+        </div>
+        <div class="formula" id="cmFormula"></div>
+        <p class="note">Break-even compares the monthly serverless bill against one H100 on-demand replica at $8/hour running 24×7 ($5,840/month). Below that line, per-token is almost always the right answer — and it is the honest answer to give a customer.</p>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Calculator</div><h3>What will a fine-tune cost?</h3></div></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="ftSize">Base model size</label><select id="ftSize"><option value="0" selected>≤ 16B</option><option value="1">16–80B</option><option value="2">80–300B</option><option value="3">&gt; 300B</option></select></div>
+          <div class="field"><label for="ftMethod">Method</label><select id="ftMethod"><option value="0" selected>LoRA SFT</option><option value="1">LoRA DPO</option><option value="2">Full-parameter SFT</option><option value="3">Full-parameter DPO</option></select></div>
+          <div class="field"><label for="ftEx">Training examples <output id="ftExO">2,000</output></label><input type="range" id="ftEx" min="100" max="50000" step="100" value="2000"></div>
+          <div class="field"><label for="ftTok">Tokens per example <output id="ftTokO">600</output></label><input type="range" id="ftTok" min="100" max="4000" step="50" value="600"></div>
+          <div class="field"><label for="ftEp">Epochs <output id="ftEpO">2</output></label><input type="range" id="ftEp" min="1" max="6" step="1" value="2"></div>
+          <div class="field"><label for="ftServe">Dedicated serving hours (eval window) <output id="ftServeO">1.0 h</output></label><input type="range" id="ftServe" min="0" max="24" step="0.5" value="1"></div>
+        </div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Training tokens</div><div class="v" id="ftTokens">–</div></div>
+          <div class="ro"><div class="k">Training cost</div><div class="v" id="ftCost">–</div></div>
+          <div class="ro"><div class="k">Serving (1× H100)</div><div class="v" id="ftServeCost">–</div></div>
+          <div class="ro"><div class="k">Total for this experiment</div><div class="v" id="ftTotal">–</div></div>
+        </div>
+        <p class="note">A realistic first fine-tune — 2,000 examples, 600 tokens each, 2 epochs of LoRA SFT on an 8B model — is about 2.4M training tokens, which is roughly $1.20. The serving window is what you actually have to watch.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= REPO ================= -->
+<section id="repo">
+  <div class="eyebrow">Hands-on · the companion code</div>
+  <h2>Page on the left, terminal on the right</h2>
+  <p class="lede">Every lab below has a folder in the <b>field-engineer-labs</b> repo. The page explains what to do and why; the folder holds commented code that you run in order, and every script saves its numbers to <code>results/</code>. The capstone turns those numbers into a customer sizing memo.</p>
+  <div class="sec-body">
+    <div class="loop">
+      <div><b>1 · Watch</b><p>The matching 3-minute video, for the idea in plain words.</p></div>
+      <div><b>2 · Read</b><p>The lab card here: the point of the lab, the steps, the line to say.</p></div>
+      <div><b>3 · Run</b><p><code>cd lessons/NN-…</code>, read its README, run the scripts. Try <code>--target mock</code> first, then the real server.</p></div>
+      <div><b>4 · Keep</b><p>The numbers land in <code>results/*.csv</code>. Lesson 15 builds the memo from them.</p></div>
+    </div>
+    <div class="duo">
+      <div>
+        <h4>Start in ten minutes, with no model download</h4>
+        <pre class="code">cd field-engineer-labs
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt &amp;&amp; pip install -e .
+cp .env.example .env
+
+make mock &amp;      # offline fake LLM that behaves like a real one
+make smoke       # every lesson, end to end, ~2 min
+make setup       # then: Ollama, llama.cpp, MLX on your Mac</pre>
+        <p style="font-size:.9rem;margin-top:10px">Every script takes the same switch, so one harness measures every backend:<br><code>--target mock | ollama | llamacpp | mlx | fireworks | spark</code></p>
+      </div>
+      <div>
+        <h4>What is in the repo</h4>
+        <pre class="code tree">felab/            shared toolkit (targets, timing, results, graders)
+  mock_server.py  offline server: prefill, batching, prefix cache, JSON
+data/             the triage dataset used by lessons 07–11
+lessons/NN-*/     README + commented scripts, in course order
+results/          your measurements → the capstone memo
+scripts/          smoke_test.sh (also runs in CI)
+Makefile          make help</pre>
+      </div>
+    </div>
+    <h4 style="margin-top:22px">The nineteen lessons, in order</h4>
+    <div style="overflow-x:auto;max-width:100%"><table class="rolemap" id="lessonTable" style="min-width:560px">
+      <thead><tr><th>#</th><th>Lesson and folder</th><th>Lab card</th><th>Video</th><th>Cost</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p style="font-size:.88rem;color:var(--muted);margin-top:10px">Only lessons 10, 13 and (optionally) 18 create billed Fireworks deployments. Lesson 10 ends in a teardown script, and lesson 13 deletes its deployment automatically on exit. Run <code>make fw-check</code> at the end of every session.</p>
+  </div>
+</section>
+
+<!-- ================= FIREWORKS LABS ================= -->
+<section id="labs-fw">
+  <div class="eyebrow">Hands-on · cloud</div>
+  <h2>Seven Fireworks labs, about six dollars</h2>
+  <p class="lede">Each lab is scoped to one practical field engineering skill, and ends with something you can show or say. Run them in order, after the guardrails checklist in the previous section.</p>
+  <div class="sec-body">
+    <div class="labs" id="fwLabs"></div>
+  </div>
+</section>
+
+<!-- ================= SPARK ================= -->
+<section id="spark">
+  <div class="eyebrow">Your hardware</div>
+  <h2>Your two machines: the Mac and the Spark</h2>
+  <p class="lede">Use the Mac for iteration and the Spark for the server stack. Both are unified-memory machines, so the same sizing logic applies to each — only the bandwidth changes. The Spark is <b>compute-rich and bandwidth-poor</b>: 128 GB of unified memory at 273 GB/s, with prefill performance far beyond its price class and decode speed that is firmly mid-range. That combination makes it an unusually good teaching machine — the bottleneck is visible in every measurement.</p>
+  <div class="sec-body">
+    <div class="kpis">
+      <div class="kpi"><div class="k">Unified memory</div><div class="v">128 GB</div><div class="s">~115 GB usable for weights + KV</div></div>
+      <div class="kpi"><div class="k">Memory bandwidth</div><div class="v">273 GB/s</div><div class="s">the number that sets decode speed</div></div>
+      <div class="kpi"><div class="k">vs H100</div><div class="v">12× less</div><div class="s">H100 = 3.35 TB/s</div></div>
+      <div class="kpi"><div class="k">Peak</div><div class="v">~1 PFLOP</div><div class="s">FP4, with sparsity · 5th-gen tensor cores</div></div>
+      <div class="kpi"><div class="k">Precisions</div><div class="v">FP8 · FP4</div><div class="s">NVFP4 and MXFP4 both supported</div></div>
+      <div class="kpi"><div class="k">Two boxes</div><div class="v">200 Gb QSFP</div><div class="s">ConnectX-7, RoCE, up to 405B in FP4</div></div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Calculator</div><h3>Decode ceiling: predict before you measure</h3></div><span class="pill cu" id="spVerdict">–</span></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="spModel">Model &amp; quantization</label><select id="spModel"></select></div>
+          <div class="field"><label for="spDev">Device</label><select id="spDev"></select></div>
+        </div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Bytes read / token</div><div class="v" id="spBytes">–</div></div>
+          <div class="ro"><div class="k">Theoretical ceiling</div><div class="v" id="spCeil">–</div></div>
+          <div class="ro"><div class="k">Realistic (×0.65)</div><div class="v" id="spReal">–</div></div>
+          <div class="ro"><div class="k">Published measurement</div><div class="v" id="spMeas">–</div></div>
+        </div>
+        <div class="formula" id="spFormula"></div>
+        <p class="note">Pick your own Mac in the device list — the same arithmetic governs Apple silicon, which is also unified memory. For dense models, measured single-stream decode lands at roughly 60–85% of the ceiling. For mixture-of-experts models the file is much bigger than the bytes actually read per token — which is exactly why gpt-oss-120b (59 GiB on disk) decodes faster on a Spark than a dense 14B model.</p>
+      </div>
+    </div>
+
+    <div class="plain"><span class="tag">The demo that lands</span>
+      <p>Invert the formula on an MoE model and you can <i>discover</i> its active footprint in front of someone: gpt-oss-120b measures about 55 tokens/sec on a Spark, so 273 ÷ 55 ≈ <b>5 GB read per token</b> — out of a 63 GB file. Under 10% of the model is touched per token. That single sum explains MoE better than any diagram.</p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Published DGX Spark measurements</th><th>Backend</th><th class="n">Prefill tok/s</th><th class="n">Decode tok/s</th></tr></thead>
+        <tbody>
+          <tr><td>Llama 3.1 8B · NVFP4</td><td>TensorRT-LLM</td><td class="n">10,257</td><td class="n">38.7</td></tr>
+          <tr><td>Qwen3 14B · NVFP4</td><td>TensorRT-LLM</td><td class="n">5,929</td><td class="n">22.7</td></tr>
+          <tr><td>gpt-oss 20B · MXFP4</td><td>llama.cpp</td><td class="n">3,670</td><td class="n">82.7</td></tr>
+          <tr><td>gpt-oss 120B · MXFP4</td><td>llama.cpp</td><td class="n">1,725</td><td class="n">55.4</td></tr>
+          <tr><td>Llama 3.1 8B · FP8 · batch 1 → 32</td><td>SGLang</td><td class="n">7,991</td><td class="n">20.5 → 368 aggregate</td></tr>
+          <tr><td>Llama 3.1 70B · FP8 · batch 1</td><td>SGLang</td><td class="n">803</td><td class="n">2.7</td></tr>
+          <tr><td>Qwen3 235B · NVFP4 · two Sparks</td><td>TensorRT-LLM</td><td class="n">23,477</td><td class="n">11.7</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Stack hygiene</div><h3>Five rules that save you a weekend</h3></div></div>
+      <div class="lab-body">
+        <div class="concepts">
+          <div class="concept"><h4>Containers, not host pip</h4><p class="def">NVIDIA's own guidance: the host OS, driver and CUDA move together on a fixed cadence; get new features from NGC containers instead.</p><p class="why">The vLLM pip path on arm64 has bitten people (torch/CUDA mismatches, <span class="mono">--enforce-eager</span> costing 20–30%).</p></div>
+          <div class="concept"><h4>nvidia-smi memory is blank</h4><p class="def">Unified memory means the usual memory fields report N/A. Use <span class="mono">free -h</span>, <span class="mono">htop</span>, or the DGX Dashboard on <span class="mono">localhost:11000</span>.</p><p class="why">Don't debug an OOM with the wrong instrument.</p></div>
+          <div class="concept"><h4>Drop caches between big runs</h4><p class="def"><span class="mono">sudo sh -c 'sync; echo 3 &gt; /proc/sys/vm/drop_caches'</span> appears in four of NVIDIA's own playbooks.</p><p class="why">Page-cache pressure in a unified pool shows up as mysterious slowdowns.</p></div>
+          <div class="concept"><h4>bitsandbytes needs a hint</h4><p class="def"><span class="mono">export BNB_CUDA_VERSION=130</span> before QLoRA runs.</p><p class="why">Straight from NVIDIA's fine-tuning guide: CUDA 13.1 isn't supported yet.</p></div>
+          <div class="concept"><h4>Build llama.cpp for sm_121</h4><p class="def"><span class="mono">-DCMAKE_CUDA_ARCHITECTURES=121a-real</span></p><p class="why">GB10 is compute capability 12.1; generic builds miss it.</p></div>
+          <div class="concept"><h4>Start from the playbooks</h4><p class="def">NVIDIA ships ~65 DGX Spark playbooks (vLLM, SGLang, TensorRT-LLM, llama.cpp, Unsloth, PyTorch fine-tune, NVFP4 quantization, two-Spark clustering).</p><p class="why">They pin working container tags — which is most of the battle on arm64.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SPARK LABS ================= -->
+<section id="labs-spark">
+  <div class="eyebrow">Hands-on · local · macOS</div>
+  <h2>Nine local labs, Mac-first, zero dollars</h2>
+  <p class="lede">Everything here runs on an Apple-silicon Mac with Ollama, llama.cpp and MLX. The last lab is the Spark track over SSH, for the parts that need real server software: vLLM, SGLang, NVFP4 and multi-node. Same benchmark script throughout, pointed at different base URLs.</p>
+  <div class="sec-body">
+    <div class="labs" id="spLabs"></div>
+  </div>
+</section>
+
+<!-- ================= TRAINING LABS ================= -->
+<section id="labs-train">
+  <div class="eyebrow">Hands-on · how models are trained</div>
+  <h2>Three training labs, from toy to real</h2>
+  <p class="lede">These pair with the training deep dive, videos 14 to 18. T1 shrinks each algorithm until you can see it working, in numpy, in seconds. T2 runs full fine-tuning, LoRA and DoRA on a real model on your Mac. T3 turns realistic failures into preference pairs and runs DPO locally, and optionally on Fireworks.</p>
+  <div class="sec-body">
+    <div class="labs" id="trLabs"></div>
+  </div>
+</section>
+
+<!-- ================= CAPSTONE ================= -->
+<section id="capstone">
+  <div class="eyebrow">The artifact</div>
+  <h2>Capstone: a POC you can walk someone through</h2>
+  <p class="lede">One workload, taken end to end, is worth more than fifteen disconnected labs. Pick something enterprise-shaped — support-ticket triage, contract clause extraction, a coding agent for an internal SDK — and run the whole arc.</p>
+  <div class="sec-body">
+    <ol class="flow fw">
+      <li><b>Discovery</b>Write the brief: task, volume, latency target, quality bar, data constraints</li>
+      <li><b>Eval set</b>50–100 real examples with graders, before you touch a model</li>
+      <li><b>Baseline</b>A closed frontier model: quality, latency, cost per 1K tasks</li>
+      <li><b>Open model</b>Same eval on 2–3 open models via Fireworks serverless</li>
+      <li><b>Specialise</b>LoRA SFT on your data; re-run the eval; measure the delta</li>
+      <li><b>Local option</b>Same model on the Spark for the data-residency variant</li>
+      <li><b>Sizing memo</b>Two or three deployment options with the maths shown</li>
+      <li><b>Readout</b>Five slides: problem, evidence, recommendation, risks, next step</li>
+    </ol>
+
+    <div class="duo">
+      <article class="co fw">
+        <h3 class="fwc">Sizing memo template</h3>
+        <ul>
+          <li><b>Traffic profile:</b> requests/day, peak concurrency, input/output token distribution.</li>
+          <li><b>Latency targets:</b> p95 TTFT, p95 ITL, and what the product does when they are missed.</li>
+          <li><b>Option A — serverless:</b> $/1M in and out, cache hit rate, monthly total, limits.</li>
+          <li><b>Option B — dedicated:</b> GPU type and count, replicas, utilisation, monthly total, break-even volume.</li>
+          <li><b>Option C — specialised model:</b> smaller fine-tuned model, training cost, quality delta, new unit cost.</li>
+          <li><b>Risks:</b> cold starts, long-context KV pressure, model retirement, eval drift.</li>
+          <li><b>Recommendation</b> in one sentence, with the number that drives it.</li>
+        </ul>
+      </article>
+      <article class="co rp">
+        <h3 class="rpc">Eval harness, minimum viable</h3>
+        <ul>
+          <li>Inputs, expected outputs, and a grader per example (exact match, JSON-schema validity, tool-call success, or an LLM judge with a rubric).</li>
+          <li>Report <b>quality, p50/p95 latency and $ per 1,000 tasks</b> in the same table. Always the three together.</li>
+          <li>Run it through the Batch API at half price when latency isn't what you're measuring.</li>
+          <li>Keep every run's raw traces. Fireworks' Eval Protocol is trace-first for exactly this reason, and traces are what turn an eval into an RFT reward later.</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VIDEOS ================= -->
+<section id="videos">
+  <div class="eyebrow">Watch first, then run</div>
+  <h2>Eighteen narrated explainers</h2>
+  <p class="lede">Every concept in this lab book has a 3–4 minute video: what it is, why it matters, how you will run it, with worked examples. Videos 14–18 are a training deep dive: full fine-tuning, SFT, LoRA and its family, RLHF and DPO. Rendered with Remotion, narrated with Kokoro, subtitled, and delivered as MP4 files in this conversation. Each one opens with what you will learn and closes with a three-point recap and the lab to run next.</p>
+  <div class="sec-body">
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>Video</th><th>What it explains</th><th>Then run</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td class="mono">inference-101</td><td>Prefill vs decode, TTFT, ITL, throughput, goodput</td><td class="mono">F1</td></tr>
+          <tr><td class="n">2</td><td class="mono">kv-cache</td><td>KV maths, PagedAttention, FP8 KV cache</td><td class="mono">L5</td></tr>
+          <tr><td class="n">3</td><td class="mono">gpu-bandwidth</td><td>Roofline, decode ceiling, device comparison</td><td class="mono">L3 · L4</td></tr>
+          <tr><td class="n">4</td><td class="mono">quantization</td><td>FP16 → FP8 → 4-bit, NVFP4, KV quantization</td><td class="mono">L4</td></tr>
+          <tr><td class="n">5</td><td class="mono">batching</td><td>Continuous batching, chunked prefill, speculation</td><td class="mono">L3</td></tr>
+          <tr><td class="n">6</td><td class="mono">training</td><td>SFT, LoRA, DPO, RFT and how to choose</td><td class="mono">F5 · L8</td></tr>
+          <tr><td class="n">7</td><td class="mono">offloading</td><td>Sizing formula, offloading, MoE, TP vs PP</td><td class="mono">L7</td></tr>
+          <tr><td class="n">8</td><td class="mono">platform</td><td>Serving layers, capacity modes, maturity curve</td><td class="mono">Capstone</td></tr>
+          <tr><td class="n">9</td><td class="mono">serving-stack</td><td>What an inference server does; why containers; the five flags</td><td class="mono">L2 · L9</td></tr>
+          <tr><td class="n">10</td><td class="mono">benchmarking</td><td>Traffic profiles, concurrency sweeps, percentiles</td><td class="mono">L3</td></tr>
+          <tr><td class="n">11</td><td class="mono">prefix-caching</td><td>Why agent traffic is mostly repeats, and how to exploit it</td><td class="mono">L6 · F2</td></tr>
+          <tr><td class="n">12</td><td class="mono">qlora</td><td>Frozen 4-bit base + adapter; data and evals decide it</td><td class="mono">L8 · F5</td></tr>
+          <tr><td class="n">13</td><td class="mono">scale-out</td><td>Speculative decoding, acceptance rate, what a second box buys</td><td class="mono">L9</td></tr>
+          <tr><td class="n">14</td><td class="mono">full-finetuning</td><td>The training loop; every weight moves; ≈16 bytes/param; ZeRO, FSDP, checkpointing; when it is worth it</td><td class="mono">T1 · T2</td></tr>
+          <tr><td class="n">15</td><td class="mono">sft</td><td>Data format, loss masking, how much data, the knobs, reading loss curves, what SFT can't do</td><td class="mono">T2 · F5 · L8</td></tr>
+          <tr><td class="n">16</td><td class="mono">peft</td><td>LoRA's B·A, adapter arithmetic, QLoRA, DoRA, adapters, prefix tuning, IA³, multi-LoRA economics</td><td class="mono">T2</td></tr>
+          <tr><td class="n">17</td><td class="mono">rlhf</td><td>Why preferences, reward models (Bradley-Terry), PPO, the KL leash, reward hacking, GRPO and RFT</td><td class="mono">T1</td></tr>
+          <tr><td class="n">18</td><td class="mono">dpo</td><td>The DPO insight and loss, one step with numbers, pairs from your own product, IPO/KTO/ORPO/SimPO</td><td class="mono">T3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Regenerate on your Mac</div><h3>Kokoro through MLX, then render</h3></div></div>
+      <div class="lab-body">
+        <p class="note">The delivered MP4s were rendered on Linux with the ONNX build of Kokoro. On your Mac, <span class="mono">mlx-audio</span> runs the same Kokoro-82M weights on the Apple GPU — faster, and it is the path to use if you want to change the script, the voice or the pacing.</p>
+        <pre class="code">cd fireworks-explainers
+npm install
+npx remotion browser ensure
+
+# narration on Apple silicon (MLX)
+pip install mlx-audio soundfile numpy
+python scripts/tts_mlx.py --voice af_heart --speed 0.96      # all 18
+python scripts/tts_mlx.py --video kv-cache                   # just one
+
+npm run dev                      # Remotion Studio, preview with audio
+npm run render                   # out/&lt;id&gt;.mp4, subtitles burned in</pre>
+        <div class="concepts">
+          <div class="concept"><h4>Edit the script</h4><p class="def"><span class="mono">src/narration.json</span> is the single source of truth: narration text, scene order and the visual each scene uses.</p><p class="why">Re-run TTS, re-render. Subtitles regenerate from the same text.</p></div>
+          <div class="concept"><h4>Pacing and pauses</h4><p class="def">Each scene gets a 0.35s lead-in and a 0.7s tail (1.1s on titles and recaps), and speed is 0.96.</p><p class="why">Change them in <span class="mono">scripts/tts_*.py</span> if you want it brisker.</p></div>
+          <div class="concept"><h4>Subtitles</h4><p class="def">Sentence-level cues in a fixed 200px band below the content area, timed by character count across each scene's audio.</p><p class="why">The band is reserved, so captions can never cover a diagram.</p></div>
+          <div class="concept"><h4>Add a video</h4><p class="def">Add an entry to <span class="mono">narration.json</span>; a composition appears automatically in the Studio.</p><p class="why">New visuals go in <span class="mono">src/components/Visuals.tsx</span> and are referenced by name.</p></div>
+        </div>
+        <div class="caution"><b>Licence note.</b> Remotion is free for individuals and companies of up to three people, including commercial use; beyond that it needs a licence, and rendering in CI counts as an automation. Kokoro-82M is Apache-2.0.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONCEPTS ================= -->
+<section id="concepts">
+  <div class="eyebrow">Coverage</div>
+  <h2>Concept → video → lab → what you say</h2>
+  <div class="sec-body">
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Concept</th><th>Video</th><th>Lab</th><th>The sentence that shows you've run it</th></tr></thead>
+        <tbody>
+          <tr><td>Prefill vs decode</td><td class="mono">inference-101</td><td class="mono">F1</td><td>"TTFT is prefill plus queue; ITL is decode. Which one is the customer complaining about?"</td></tr>
+          <tr><td>KV cache sizing</td><td class="mono">kv-cache</td><td class="mono">L5</td><td>"Weights fit. A single 128K-token request needs ~40 GB of KV on top — that's the real limit."</td></tr>
+          <tr><td>PagedAttention</td><td class="mono">kv-cache</td><td class="mono">L5 · L9</td><td>"Fixed-size blocks and a block table, like OS paging — 2–4× more concurrent requests."</td></tr>
+          <tr><td>Memory bandwidth</td><td class="mono">gpu-bandwidth</td><td class="mono">L4</td><td>"Decode ceiling is bandwidth over bytes per token. On a Spark that's 273 over the model size."</td></tr>
+          <tr><td>Roofline / batching</td><td class="mono">gpu-bandwidth</td><td class="mono">L3</td><td>"Batch 1 is memory-bound; I sweep concurrency and report the curve, not one number."</td></tr>
+          <tr><td>Quantization</td><td class="mono">quantization</td><td class="mono">L4</td><td>"FP8 is close to free on Hopper and Blackwell; 4-bit needs an eval before I'd ship it."</td></tr>
+          <tr><td>Prefix / prompt caching</td><td class="mono">prefix-caching</td><td class="mono">F2 · L6</td><td>"Their system prompt is 6K tokens on every call — caching removes most of the prefill cost."</td></tr>
+          <tr><td>Speculative decoding</td><td class="mono">batching</td><td class="mono">F7</td><td>"Same output distribution, fewer big-model passes — and a mismatched drafter makes it slower."</td></tr>
+          <tr><td>SFT / LoRA</td><td class="mono">training</td><td class="mono">F5 · L8</td><td>"One base deployment, many adapters — a fine-tune per customer at base-model economics."</td></tr>
+          <tr><td>Full fine-tuning</td><td class="mono">full-finetuning</td><td class="mono">T2</td><td>"Sixteen bytes a parameter to train against two to serve. I right-size and try LoRA before I go full."</td></tr>
+          <tr><td>PEFT family</td><td class="mono">peft</td><td class="mono">T1 · T2</td><td>"QLoRA when memory is the limit, DoRA when there's a quality gap, multi-LoRA when there are many tenants."</td></tr>
+          <tr><td>RLHF &amp; reward hacking</td><td class="mono">rlhf</td><td class="mono">T1</td><td>"A reward model is a proxy; the KL leash stops the policy gaming it. Checkable tasks get a grader instead."</td></tr>
+          <tr><td>DPO</td><td class="mono">dpo</td><td class="mono">T3</td><td>"Same pairs as RLHF, two models instead of four, no RL loop. SFT first, then DPO, and I watch accuracy."</td></tr>
+          <tr><td>DPO vs RFT</td><td class="mono">training</td><td class="mono">F6</td><td>"Can you write the answer, compare two, or score one automatically? That picks the method."</td></tr>
+          <tr><td>MoE &amp; active params</td><td class="mono">offloading</td><td class="mono">L7</td><td>"Memory is sized on total parameters; speed on active ones. That's why 120B beats dense 30B here."</td></tr>
+          <tr><td>Offloading</td><td class="mono">offloading</td><td class="mono">L7</td><td>"Offload is the last resort — you're trading a 273 GB/s pipe for a far narrower one."</td></tr>
+          <tr><td>Tensor vs pipeline parallel</td><td class="mono">offloading</td><td class="mono">L9</td><td>"Tensor parallel syncs every layer, so it stays inside a box. Pipeline tolerates slower links."</td></tr>
+          <tr><td>Serving engine internals</td><td class="mono">serving-stack</td><td class="mono">L2 · L9</td><td>"API, scheduler, KV manager, kernels — and containers keep the CUDA stack honest."</td></tr>
+          <tr><td>Benchmark method</td><td class="mono">benchmarking</td><td class="mono">L3</td><td>"Traffic profile first, then a concurrency curve, then where p95 crosses the target."</td></tr>
+          <tr><td>Agent prefix reuse</td><td class="mono">prefix-caching</td><td class="mono">L6 · F2</td><td>"Stable content first, variable last — otherwise there is nothing to cache."</td></tr>
+          <tr><td>QLoRA mechanics</td><td class="mono">qlora</td><td class="mono">L8</td><td>"Frozen four-bit base, small adapter. The dataset and the eval set decide the result."</td></tr>
+          <tr><td>Multi-node reality</td><td class="mono">scale-out</td><td class="mono">L9</td><td>"Two boxes add capacity, not bandwidth. 235B across two decodes at about 12 tok/s."</td></tr>
+          <tr><td>Platform economics</td><td class="mono">platform</td><td class="mono">F3 · capstone</td><td>"Serverless until utilisation justifies dedicated; batch for evals; specialise to cut unit cost."</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PLAN ================= -->
+<section id="plan">
+  <div class="eyebrow">Schedule</div>
+  <h2>Twelve days, about two hours a day</h2>
+  <p class="lede">Days 1–10 cover serving, benchmarking and the capstone. Days 11–12 are the training track (videos 14–18, labs T1–T3), for when you want depth on how models are trained.</p>
+  <div class="sec-body">
+    <div class="progress" aria-hidden="true"><i id="planBar"></i></div>
+    <div class="plan" id="planList"></div>
+  </div>
+</section>
+
+<!-- ================= TALK ================= -->
+<section id="talk">
+  <div class="eyebrow">Say it well</div>
+  <h2>Talk tracks and questions</h2>
+  <div class="sec-body">
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Two registers, same content</div><h3>The VP answer and the engineer answer</h3></div></div>
+      <div class="lab-body">
+        <div class="tablewrap" style="border:0;box-shadow:none">
+          <table>
+            <thead><tr><th>Question</th><th>To a VP</th><th>To an ML engineer</th></tr></thead>
+            <tbody>
+              <tr><td>"Why are we slow?"</td><td>"Two different problems wear the same word. The wait before the answer starts is one fix; the speed it types at is another. Yours is the first, and it's mostly repeated work we can cache."</td><td>"p95 TTFT is 2.8s with a 6K static prefix and no prefix caching. Enable it, add chunked prefill, and re-run the same traffic replay."</td></tr>
+              <tr><td>"Should we fine-tune?"</td><td>"Only if you can measure what 'better' means. Give me 100 examples you'd defend in front of a customer and I'll tell you in a week — with the cost."</td><td>"SFT for format and domain, DPO if you only have preferences, RFT if the grader is programmatic. LoRA first; full-parameter only if three tests say so."</td></tr>
+              <tr><td>"Why not self-host vLLM?"</td><td>"You can, and some teams should. The question is whether serving is a differentiator for you or a tax."</td><td>"vLLM is excellent. You'd own kernel upgrades, quantization tuning, autoscaling, multi-LoRA batching and the on-call. Here's what that cost us in hours last quarter."</td></tr>
+              <tr><td>"Can we keep data in-region?"</td><td>"Yes — the engine can run inside your own cloud account, so data never leaves your environment."</td><td>"BYOC/Virtual Cloud deployment in your VPC; region-pinned dedicated deployments are also possible at a 1.5× rate."</td></tr>
+              <tr><td>"How do we cut cost 3×?"</td><td>"Three levers, in order: stop paying for repeated context, move routine traffic to a smaller model, and specialise that model on your data."</td><td>"Prompt caching, task-level routing, then a LoRA on a 4–16B base. Measure each with the same eval set and report $/1K tasks."</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="qs">
+      <div class="co fw"><h4 class="fwc">Ask them</h4><ul>
+        <li>Where does adaptive speculative decoding pay off most, and where does the drafter mismatch bite?</li>
+        <li>How do field engineers get fixes into the platform — what's the path from a customer pattern to a shipped feature?</li>
+        <li>With Virtual Cloud and the Foundry partnership, how do you decide when an account belongs in BYOC?</li>
+        <li>What constraints matter most when a customer chooses a deployment model?</li>
+        <li>How do you keep evaluation honest when customers want a benchmark number instead of a task metric?</li></ul></div>
+      <div class="co rp"><h4 class="rpc">Prepare for these</h4><ul>
+        <li>"Walk me through what happens between the API call and the first token."</li>
+        <li>"A customer's 70B deployment OOMs under load. Debug it out loud."</li>
+        <li>"Size a deployment for 20 requests/second, 1K in and 300 out, p95 TTFT under one second."</li>
+        <li>"They want to move off a closed model. What's your first week?"</li>
+        <li>"Their fine-tune scored better offline and worse in production. What happened?"</li></ul></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= SOURCES ================= -->
+<section id="sources">
+  <div class="eyebrow">Check the work</div>
+  <h2>Sources &amp; caveats</h2>
+  <p class="lede">Everything here was read on 23 September 2026. Fireworks' catalogue and prices change weekly; NVIDIA's playbooks pin container tags that move. Verify anything you plan to quote.</p>
+  <div class="sec-body">
+    <div class="caution"><b>Known ambiguities, worth knowing before you assert them:</b> the pricing page says fine-tuned models serve "at the same price as base models", while the LoRA docs say trained LoRAs deploy only to on-demand deployments — reconcile those before promising a customer serverless economics for a fine-tune. Published rate limits (a flat 6,000 RPM) also conflict with a recent changelog entry describing adaptive limits. And DGX Spark bandwidth is quoted as 273 GB/s on the datasheet, though NVIDIA's Hot Chips material implies the silicon supports more.</div>
+    <ol class="sources">
+      <li><a href="https://docs.fireworks.ai/getting-started/quickstart">Fireworks docs: quickstart</a></li>
+      <li><a href="https://docs.fireworks.ai/serverless/pricing">Fireworks docs: serverless pricing</a></li>
+      <li><a href="https://fireworks.ai/pricing">Fireworks: pricing (GPU-hour, training)</a></li>
+      <li><a href="https://docs.fireworks.ai/guides/ondemand-deployments">Fireworks docs: on-demand deployments</a></li>
+      <li><a href="https://docs.fireworks.ai/guides/batch-inference">Fireworks docs: Batch API</a></li>
+      <li><a href="https://docs.fireworks.ai/fine-tuning/fine-tuning-models">Fireworks docs: supervised fine-tuning &amp; dataset format</a></li>
+      <li><a href="https://docs.fireworks.ai/fine-tuning/dpo-fine-tuning">Fireworks docs: DPO fine-tuning</a></li>
+      <li><a href="https://docs.fireworks.ai/fine-tuning/reinforcement-fine-tuning-models">Fireworks docs: reinforcement fine-tuning</a></li>
+      <li><a href="https://docs.fireworks.ai/fine-tuning/deploying-loras">Fireworks docs: deploying LoRAs (serverless not supported)</a></li>
+      <li><a href="https://docs.fireworks.ai/guides/prompt-caching">Fireworks docs: prompt caching</a></li>
+      <li><a href="https://docs.fireworks.ai/deployments/speculative-decoding">Fireworks docs: speculative decoding</a></li>
+      <li><a href="https://docs.fireworks.ai/structured-responses/structured-response-formatting">Fireworks docs: structured responses</a></li>
+      <li><a href="https://docs.fireworks.ai/guides/quotas_usage/account-quotas">Fireworks docs: quotas &amp; spend limits</a></li>
+      <li><a href="https://docs.fireworks.ai/tools-sdks/firectl/firectl">Fireworks docs: firectl</a></li>
+      <li><a href="https://fireworks.ai/blog/frontier-rl-is-cheaper-than-you-think">Fireworks blog: Frontier RL is cheaper than you think</a></li>
+      <li><a href="https://fireworks.ai/blog/fine-tuning-bottlenecks">Fireworks blog: the fine-tuning bottleneck isn't the algorithm</a></li>
+      <li><a href="https://fireworks.ai/blog/open-source-agents-frontier-advisors">Fireworks blog: open-source agents with frontier advisors</a></li>
+      <li><a href="https://fireworks.ai/blog/train-past-the-frontier-training-api-now-generally-available">Fireworks blog: Training API GA</a></li>
+      <li><a href="https://fireworks.ai/blog/eval-protocol-rl-on-your-agents">Fireworks blog: Eval Protocol</a></li>
+      <li><a href="https://fireworks.ai/blog/fireattention-v4-fp4-b200">Fireworks blog: FireAttention V4 (NVFP4 on B200)</a></li>
+      <li><a href="https://fireworks.ai/blog/virtual-cloud">Fireworks blog: Virtual Cloud / BYOC</a></li>
+      <li><a href="https://docs.nvidia.com/dgx/dgx-spark/hardware.html">NVIDIA: DGX Spark hardware specs</a></li>
+      <li><a href="https://developer.nvidia.com/blog/how-nvidia-dgx-sparks-performance-enables-intensive-ai-tasks">NVIDIA: DGX Spark performance measurements</a></li>
+      <li><a href="https://github.com/NVIDIA/dgx-spark-playbooks">NVIDIA: DGX Spark playbooks (vLLM, SGLang, TRT-LLM, Unsloth…)</a></li>
+      <li><a href="https://www.lmsys.org/blog/2025-10-13-nvidia-dgx-spark/">LMSYS: SGLang on DGX Spark</a></li>
+      <li><a href="https://github.com/ggml-org/llama.cpp/discussions/16578">llama.cpp: DGX Spark benchmark thread</a></li>
+      <li><a href="https://unsloth.ai/docs/blog/fine-tuning-llms-with-nvidia-dgx-spark-and-unsloth">Unsloth: fine-tuning on DGX Spark</a></li>
+      <li><a href="https://recipes.vllm.ai/browse?panel=open&amp;hw=dgx_spark_gb10">vLLM recipes: DGX Spark GB10</a></li>
+      <li><a href="https://www.remotion.dev/docs/">Remotion docs</a></li>
+      <li><a href="https://huggingface.co/hexgrad/Kokoro-82M">Kokoro-82M (Apache-2.0)</a></li>
+      <li><a href="https://github.com/Blaizzy/mlx-audio">mlx-audio — Kokoro on Apple silicon</a></li>
+      <li><a href="https://github.com/ml-explore/mlx-lm">mlx-lm — local serving and LoRA on Apple silicon</a></li>
+      <li>Use the linked vendor documentation for current specifications and prices.</li>
+    </ol>
+  </div>
+</section>
+
+<footer>Field Engineer Lab Book · compiled 23 September 2026 as an independent learning resource. Not affiliated with Fireworks AI or NVIDIA. Prices, model names and container tags change frequently — verify before quoting.</footer>
+</main>
+</div>
+
+<script>
+/* ---------- labs (terse, copy-paste, Mac-first) ---------- */
+const FW_LABS = [
+  { id:'F1', repo:'01-latency-harness', run:"python bench_ttft.py --target mock\npython bench_ttft.py --target ollama --prompt-tokens 8000\nbash compare_models.sh              # Fireworks, ~1¢", title:'Latency harness — TTFT and ITL, measured by you', where:'Mac → Fireworks', time:'30 min', cost:'~$0.02',
+    goal:'The benchmark script you reuse everywhere. Works unchanged against local servers later.',
+    steps:[
+      ['export FIREWORKS_API_KEY=fw_...','From app.fireworks.ai → API keys'],
+      ['pip install openai','One dependency'],
+      ['python bench_ttft.py --model accounts/fireworks/models/gpt-oss-120b','Prints p50/p95 TTFT and median ITL'],
+      ['…repeat with --model nemotron-3.5-lightning and glm-5.3-flash','Three models, one table'],
+      ['…repeat with an 8,000-token prompt','TTFT moves, ITL stays flat — that is the lesson'],
+    ],
+    code:`cat > bench_ttft.py <<'PY'
+import os, sys, time, statistics as st
+from openai import OpenAI
+m = sys.argv[sys.argv.index("--model")+1] if "--model" in sys.argv else "accounts/fireworks/models/gpt-oss-120b"
+base = os.environ.get("BASE_URL", "https://api.fireworks.ai/inference/v1")
+key  = os.environ.get("FIREWORKS_API_KEY", "local")
+c = OpenAI(base_url=base, api_key=key)
+def once(prompt, n=192):
+    t0=time.perf_counter(); ttft=None; ts=[]
+    for ch in c.chat.completions.create(model=m, max_tokens=n, stream=True,
+            messages=[{"role":"user","content":prompt}]):
+        if ch.choices and ch.choices[0].delta.content:
+            now=time.perf_counter(); ttft = ttft or (now-t0); ts.append(now)
+    itl=[(b-a)*1000 for a,b in zip(ts,ts[1:])]
+    return ttft*1000, st.median(itl) if itl else 0
+r=[once("Explain KV caching to a CFO in 120 words.") for _ in range(10)]
+t=sorted(x[0] for x in r); i=st.median([x[1] for x in r])
+print(f"{m}\\n  TTFT p50 {t[5]:6.0f} ms  p95 {t[-1]:6.0f} ms\\n  ITL {i:5.1f} ms → {1000/i:5.1f} tok/s")
+PY
+python bench_ttft.py --model accounts/fireworks/models/gpt-oss-120b`,
+    say:'"I measure TTFT and ITL separately at p50 and p95, on the customer\'s own prompt shape."' },
+
+  { id:'F2', repo:'06-prefix-caching', run:"python prefix_bench.py --target mock\npython prefix_bench.py --target fireworks --usage", title:'Prompt caching — prove the discount', where:'Mac → Fireworks', time:'20 min', cost:'~$0.05',
+    goal:'Show how much of an agent workload is repeated context, and what caching does to TTFT and the bill.',
+    steps:[
+      ['Build a ~4,000-token system prompt (docs + tool defs)','Stable content first, variable last'],
+      ['Send 20 different questions against it','Call 1 is cold; calls 2–20 should be much faster'],
+      ['Compare TTFT of call 1 vs calls 2–20','That gap is the cached prefill'],
+      ['Price it on DeepSeek V4.1 Flash','$0.30 input vs $0.006 cached — a 98% discount on the repeat'],
+      ['Set "user":"session-x" on every call','Session affinity keeps you on the replica holding the cache'],
+    ],
+    code:`BASE_URL=https://api.fireworks.ai/inference/v1 \\
+python bench_ttft.py --model accounts/fireworks/models/deepseek-v4p1-flash
+
+# proof on a dedicated deployment (headers)
+curl -si $BASE_URL/chat/completions -H "Authorization: Bearer $FIREWORKS_API_KEY" \\
+  -H 'Content-Type: application/json' \\
+  -d '{"model":"...#<DEPLOYMENT>","user":"session-42","messages":[...]}' \\
+  | grep -i 'fireworks-.*prompt-tokens'`,
+    say:'"Their system prompt is identical on every call, so most of the input bill is cacheable."' },
+
+  { id:'F3', repo:'07-structured-output', run:"python ../../data/make_tickets.py\npython structured_output.py --target mock\npython structured_output.py --target fireworks --n 50", title:'Structured output that does not break', where:'Mac → Fireworks', time:'30 min', cost:'~$0.02',
+    goal:'Get a schema-valid JSON rate you can quote, the way an enterprise integration needs.',
+    steps:[
+      ['Write a JSON schema for ticket triage','category / severity / entities / next_action'],
+      ['Pass it in response_format AND paste it in the prompt','Fireworks docs recommend both'],
+      ['Run 50 inputs, count valid parses','That percentage is your reliability metric'],
+      ['Reasoning model? Put the schema in the prompt only','Omitting response_format preserves reasoning output'],
+    ],
+    code:`python - <<'PY'
+import json, os
+from openai import OpenAI
+c = OpenAI(base_url="https://api.fireworks.ai/inference/v1", api_key=os.environ["FIREWORKS_API_KEY"])
+schema = {"type":"object","properties":{
+  "category":{"type":"string","enum":["billing","outage","how-to","abuse"]},
+  "severity":{"type":"integer","minimum":1,"maximum":5},
+  "next_action":{"type":"string"}},
+  "required":["category","severity","next_action"],"additionalProperties":False}
+r = c.chat.completions.create(model="accounts/fireworks/models/gpt-oss-120b",
+  response_format={"type":"json_schema","json_schema":{"name":"triage","schema":schema}},
+  messages=[{"role":"system","content":"Return JSON matching:\\n"+json.dumps(schema)},
+            {"role":"user","content":"Card declined twice, launch is tomorrow."}])
+print(r.choices[0].message.content)
+PY`,
+    say:'"Schema-constrained decoding, then a validity rate on 50 real tickets — not vibes."' },
+
+  { id:'F4', repo:'08-batch-api', run:"python make_batch.py\npython score_batch.py --simulate --target mock\nbash submit_batch.sh", title:'Batch API — evals at half price', where:'Mac → Fireworks', time:'20 min', cost:'50% off',
+    goal:'Move bulk evaluation off the interactive path.',
+    steps:[
+      ['Write eval inputs as JSONL with custom_id + body','One line per example'],
+      ['firectl dataset create evalset-v1 ./batch.jsonl','Upload'],
+      ['firectl batch-inference-job create --model … --input-dataset-id …','Poll until COMPLETED'],
+      ['Download the output dataset and score locally','Caching discounts stack on top of batch'],
+    ],
+    code:`echo '{"custom_id":"t-001","body":{"model":"accounts/fireworks/models/gpt-oss-120b","messages":[{"role":"user","content":"..."}]}}' > batch.jsonl
+firectl dataset create evalset-v1 ./batch.jsonl
+firectl batch-inference-job create \\
+  --model accounts/fireworks/models/gpt-oss-120b \\
+  --input-dataset-id accounts/<ACCOUNT_ID>/datasets/evalset-v1
+firectl batch-inference-job list`,
+    say:'"Evaluation is batch work — at half price you can afford to evaluate every change."' },
+
+  { id:'F5', repo:'10-lora-fireworks', run:"bash 1_train.sh && bash 2_wait.sh\nbash 3_deploy.sh        # ⏱ clock starts\nbash 4_eval.sh\nbash 5_teardown.sh      # ⏱ clock stops", title:'A real LoRA fine-tune, start to teardown', where:'Mac → Fireworks', time:'2 h', cost:'~$1–4',
+    goal:'The centrepiece: dataset → job → deployment → eval delta → delete. Same dataset as L8.',
+    steps:[
+      ['Build train.jsonl (chat format, 500–2,000 rows)','Minimum 3; realistically hundreds'],
+      ['firectl dataset create triage-v1 ./train.jsonl',''],
+      ['firectl sftj create --base-model qwen2p5-7b-instruct …','$0.50 per 1M training tokens at ≤16B'],
+      ['firectl sftj get <JOB_ID>','Wait for COMPLETED'],
+      ['firectl deployment create … --wait','⚠ LoRA serves on dedicated only — the clock starts here'],
+      ['Re-run F1 + F3 against the fine-tune','Quality and latency delta vs base'],
+      ['firectl deployment delete <ID> && firectl deployment list','Must print nothing'],
+    ],
+    code:`echo '{"messages":[{"role":"system","content":"You triage support tickets."},{"role":"user","content":"..."},{"role":"assistant","content":"{\\"category\\":\\"billing\\"}"}]}' > train.jsonl
+firectl dataset create triage-v1 ./train.jsonl
+firectl sftj create --base-model accounts/fireworks/models/qwen2p5-7b-instruct \\
+  --dataset accounts/<ACCOUNT_ID>/datasets/triage-v1 --output-model triage-lora
+firectl sftj get <JOB_ID>
+firectl deployment create accounts/<ACCOUNT_ID>/models/triage-lora --deployment-shape default --wait
+# … eval …
+firectl deployment delete <DEPLOYMENT_ID>`,
+    say:'"Training was about a dollar. The thing to plan is serving: a LoRA needs dedicated capacity."' },
+
+  { id:'F6', repo:'09-eval-harness', run:"python evaluate.py mock:mock-8b mock:mock-8b-lora --judge mock\npython evaluate.py ollama \"fireworks:<model>@0.07/0.30\" --judge fireworks", title:'Eval harness — quality, latency, cost in one table', where:'Mac', time:'1 h', cost:'~$0.10',
+    goal:'Turn "seems better" into a decision table. The JD asks for this explicitly.',
+    steps:[
+      ['Pick 3 graders: schema-valid, task-correct, LLM judge with a rubric',''],
+      ['Score base vs fine-tune on the same 50–100 examples',''],
+      ['Report quality + p95 latency + $/1k tasks together','Always the three, never one'],
+      ['pip install eval-protocol and rerun one grader through it','So you can speak about their tooling first-hand'],
+    ],
+    code:`# the only output that matters
+# model                 valid JSON  category acc  p95 TTFT  $/1k tasks
+# gpt-oss-120b base         94%         81%        640 ms     $0.42
+# triage-lora (7B SFT)     100%         89%        310 ms     $0.11`,
+    say:'"Benchmarks are for launches. For a customer: three graders on their data, one table."' },
+
+  { id:'F7', repo:'13-speculative-decoding', run:"python spec_math.py\npython spec_bench.py --target llamacpp --label baseline\nbash fireworks_spec.sh   # deploy → measure → auto-delete", title:'Speculative decoding, measured', where:'Mac → Fireworks', time:'45 min', cost:'~$3',
+    goal:'Watch acceptance rate move, and know when speculation hurts.',
+    steps:[
+      ['Deploy on-demand with an explicit draft model',''],
+      ['Send requests with "perf_metrics_in_response": true',''],
+      ['Read speculation-acceptance and generated tokens',''],
+      ['Compare ITL on structured output vs free prose','Repetitive traffic accepts more'],
+      ['Delete the deployment','Same discipline as F5'],
+    ],
+    code:`firectl deployment create accounts/fireworks/models/<MODEL> --deployment-shape default \\
+  --draft-model accounts/fireworks/models/llama-v3p2-1b-instruct --draft-token-count 4 --wait
+# body: {"perf_metrics_in_response": true, ...}
+firectl deployment delete <DEPLOYMENT_ID>`,
+    say:'"Acceptance rate decides whether speculation pays. A generic drafter on odd traffic is slower."' },
+];
+
+const SP_LABS = [
+  { id:'L1', repo:'00-setup', run:"bash setup_mac.sh\npython check_env.py\nbash fireworks_guardrails.sh", title:'Mac setup — three local servers in ten minutes', where:'Mac (Apple silicon)', time:'15 min', cost:'free',
+    goal:'Ollama for convenience, llama.cpp for control, MLX for Apple-native speed and fine-tuning.',
+    steps:[
+      ['brew install ollama llama.cpp','Metal builds, no CUDA anywhere'],
+      ['pip install mlx-lm openai','MLX is Apple silicon only'],
+      ['ollama serve & ; ollama pull llama3.1:8b','OpenAI-compatible on :11434/v1'],
+      ['sysctl hw.memsize hw.model','Note your RAM — it is your VRAM budget'],
+    ],
+    code:`brew install ollama llama.cpp
+pip install mlx-lm openai
+ollama serve & sleep 2 && ollama pull llama3.1:8b
+sysctl -n hw.model hw.memsize
+curl -s localhost:11434/v1/chat/completions -H 'Content-Type: application/json' \\
+  -d '{"model":"llama3.1:8b","messages":[{"role":"user","content":"hi"}]}' | head -c 300`,
+    say:'"Unified memory means model size competes with everything else on the machine."' },
+
+  { id:'L2', repo:'02-three-local-servers', run:"bash serve_llamacpp.sh & bash serve_mlx.sh &\nbash compare_backends.sh", title:'Serve the same model three ways', where:'Mac', time:'30 min', cost:'free',
+    goal:'Feel the difference between a convenience wrapper, a raw engine, and an Apple-native runtime.',
+    steps:[
+      ['ollama serve → :11434/v1','Zero config, hides every flag'],
+      ['llama-server -hf … --port 8080','Every flag exposed: context, slots, cache type'],
+      ['mlx_lm.server --model mlx-community/… --port 8081','Fastest path on Apple silicon'],
+      ['Point bench_ttft.py at each with BASE_URL','Same script, three backends'],
+    ],
+    code:`llama-server -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M \\
+  --port 8080 -c 8192 -ngl 99 --parallel 4 &
+
+mlx_lm.server --model mlx-community/Meta-Llama-3.1-8B-Instruct-4bit --port 8081 &
+
+BASE_URL=http://localhost:8080/v1 FIREWORKS_API_KEY=x python bench_ttft.py --model local
+BASE_URL=http://localhost:8081/v1 FIREWORKS_API_KEY=x python bench_ttft.py --model local`,
+    say:'"Ollama is llama.cpp with the flags hidden. For a customer I want the flags."' },
+
+  { id:'L3', repo:'03-concurrency-sweep', run:"python sweep.py --target mock --slo-ms 500\npython sweep.py --target llamacpp\npython plot_sweep.py", title:'Concurrency sweep on your laptop', where:'Mac', time:'45 min', cost:'free',
+    goal:'Produce the curve: throughput up, TTFT up, and the crossing point that sizes a deployment.',
+    steps:[
+      ['Save sweep.py (async, any OpenAI endpoint)',''],
+      ['Run it at 1, 2, 4, 8, 16 concurrent',''],
+      ['Plot aggregate tok/s and p95 TTFT',''],
+      ['Mark where p95 crosses 1,000 ms','That is your capacity line'],
+    ],
+    code:`cat > sweep.py <<'PY'
+import asyncio, os, statistics as st, sys, time
+from openai import AsyncOpenAI
+c = AsyncOpenAI(base_url=os.environ.get("BASE_URL","http://localhost:8080/v1"), api_key="x")
+MODEL = os.environ.get("MODEL","local")
+async def one(prompt):
+    t0=time.perf_counter(); ttft=None; n=0
+    s = await c.chat.completions.create(model=MODEL, max_tokens=128, stream=True,
+        messages=[{"role":"user","content":prompt}])
+    async for ch in s:
+        if ch.choices and ch.choices[0].delta.content:
+            ttft = ttft or (time.perf_counter()-t0); n+=1
+    return ttft*1000, n, time.perf_counter()-t0
+async def run(c_level, total=24):
+    sem = asyncio.Semaphore(c_level)
+    async def w(i):
+        async with sem: return await one(f"Summarise idea {i} in 80 words.")
+    t0=time.perf_counter(); rs = await asyncio.gather(*[w(i) for i in range(total)])
+    wall=time.perf_counter()-t0; tt=sorted(r[0] for r in rs); toks=sum(r[1] for r in rs)
+    print(f"c={c_level:3d}  agg {toks/wall:7.1f} tok/s   TTFT p50 {tt[len(tt)//2]:6.0f} ms  p95 {tt[int(len(tt)*0.95)-1]:6.0f} ms")
+for c_level in [1,2,4,8,16]: asyncio.run(run(c_level))
+PY
+BASE_URL=http://localhost:8080/v1 python sweep.py`,
+    say:'"Single-stream numbers sell hardware; concurrency curves size deployments."' },
+
+  { id:'L4', repo:'04-quantization', run:"python ceiling_check.py --demo\nbash quant_bench.sh\npython quality_check.py --target llamacpp --label Q4_K_M", title:'Quantization — size, speed, quality', where:'Mac', time:'45 min', cost:'free',
+    goal:'Three precisions of one model, measured, then the ceiling maths checked against reality.',
+    steps:[
+      ['Pull Q4_K_M, Q8_0 and an MLX 4-bit of the same model',''],
+      ['llama-bench each','File size, prompt tok/s, generation tok/s'],
+      ['Compute bandwidth ÷ file size','Compare to measured — expect 60–85%'],
+      ['Spot-check 10 answers per quant','Speed without a quality check is meaningless'],
+    ],
+    code:`llama-bench -m ~/.cache/llama.cpp/*Q4_K_M.gguf -p 512 -n 128
+llama-bench -m ~/.cache/llama.cpp/*Q8_0.gguf   -p 512 -n 128
+
+# Apple silicon memory bandwidth (approx): M4 Pro ~273 GB/s · M4 Max ~546 GB/s · M3 Ultra ~819 GB/s
+# ceiling = bandwidth ÷ weights_GB     e.g. 546 ÷ 4.9 (8B Q4) ≈ 111 tok/s`,
+    say:'"Decode speed is bandwidth over bytes per token. The quant level is how you change the denominator."' },
+
+  { id:'L5', repo:'05-kv-cache', run:"python kv_calc.py --ctx 131072 --free-gb 20\nbash context_ladder.sh", title:'KV cache and context length', where:'Mac', time:'45 min', cost:'free',
+    goal:'Break it on purpose, then fix it with KV quantization — the most common production failure.',
+    steps:[
+      ['Serve with -c 4096, then -c 32768, then -c 131072','Watch memory in Activity Monitor'],
+      ['Compute KV/token by hand for the model','2 × layers × KV heads × head dim × bytes'],
+      ['Add --cache-type-k q8_0 --cache-type-v q8_0','Roughly halves cache memory'],
+      ['Re-try the context that OOM\'d','This is the fix you will recommend to customers'],
+    ],
+    code:`llama-server -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M -c 32768 -ngl 99 --port 8080 &
+# then the cheap fix
+llama-server -hf bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q4_K_M -c 131072 -ngl 99 \\
+  --cache-type-k q8_0 --cache-type-v q8_0 --port 8080 &`,
+    say:'"Weights fit; the cache does not. Cap context or quantize the cache — concurrency doubles."' },
+
+  { id:'L6', repo:'06-prefix-caching', run:"python prefix_bench.py --target llamacpp\npython prefix_bench.py --target llamacpp --order variable-first\nbash mlx_prompt_cache.sh", title:'Prefix caching on an agent workload', where:'Mac', time:'30 min', cost:'free',
+    goal:'Reproduce the biggest agent win locally so the hosted pitch is something you measured.',
+    steps:[
+      ['Build a 3,000-token shared prefix + 20 short questions',''],
+      ['Measure TTFT call 1 vs calls 2–20','llama.cpp reuses the cache across slots'],
+      ['Shuffle the prefix to the end and repeat','TTFT collapses back — order matters'],
+      ['MLX: save and reuse a prompt cache file','Same idea, Apple-native'],
+    ],
+    code:`llama-server -hf <repo>:Q4_K_M --port 8080 -c 16384 -ngl 99 --parallel 4 --cache-reuse 256 &
+
+# MLX prompt cache
+mlx_lm.cache_prompt --model mlx-community/Meta-Llama-3.1-8B-Instruct-4bit \\
+  --prompt "$(cat system_prompt.txt)" --prompt-cache-file sys.safetensors
+mlx_lm.generate --prompt-cache-file sys.safetensors --prompt "question 7"`,
+    say:'"Stable content first, variable last — otherwise there is no prefix to cache."' },
+
+  { id:'L7', repo:'12-moe-vs-dense', run:"python moe_probe.py --demo\npython moe_probe.py llama3.1:8b gpt-oss:20b", title:'MoE vs dense on the bandwidth wall', where:'Mac', time:'30 min', cost:'free',
+    goal:'The demo that makes MoE obvious, and proves you can reason from measurement back to architecture.',
+    steps:[
+      ['Run a dense 8B and an MoE (e.g. gpt-oss-20b / Qwen3-30B-A3B) at similar file size',''],
+      ['Record decode tok/s for each',''],
+      ['Invert: bandwidth ÷ measured = bytes actually read per token',''],
+      ['Compare that to the file size','The ratio is the active fraction'],
+    ],
+    code:`ollama pull gpt-oss:20b && ollama run gpt-oss:20b --verbose "Write 100 words about caching."
+# note eval rate (tok/s), then:
+#   bytes_per_token ≈ bandwidth_GBs / tok_s     → compare with the file size on disk`,
+    say:'"I can estimate a model\'s active footprint from its decode speed on known hardware."' },
+
+  { id:'L8', repo:'11-lora-local-mlx', run:"python qlora_memory.py\nbash 1_train_mlx.sh\nbash 2_fuse_and_serve.sh & bash 3_eval_local.sh", title:'LoRA fine-tune on the Mac with MLX', where:'Mac', time:'1–2 h', cost:'free',
+    goal:'Same dataset as F5, trained locally. This pair is your build-vs-buy story.',
+    steps:[
+      ['Split train.jsonl into data/train.jsonl + data/valid.jsonl','MLX expects both'],
+      ['mlx_lm.lora --train --iters 300','Watch loss; stop when validation stops improving'],
+      ['mlx_lm.fuse','Merge the adapter into a servable model'],
+      ['mlx_lm.server on the fused model, re-run F6 graders','Quality delta, locally'],
+      ['Write the comparison vs F5','Time, privacy, cost, time-to-endpoint'],
+    ],
+    code:`mkdir -p data && cp train.jsonl data/train.jsonl && head -50 train.jsonl > data/valid.jsonl
+mlx_lm.lora --model mlx-community/Qwen2.5-7B-Instruct-4bit \\
+  --train --data ./data --iters 300 --batch-size 1 --num-layers 8
+mlx_lm.fuse --model mlx-community/Qwen2.5-7B-Instruct-4bit --adapter-path adapters \\
+  --save-path ./triage-local
+mlx_lm.server --model ./triage-local --port 8081 &`,
+    say:'"I ran the same LoRA locally and managed. Local is free and private; managed got me to an endpoint in minutes."' },
+
+  { id:'L9', repo:'14-spark-track', run:"bash remote.sh 0_check.sh\nbash remote.sh 1_vllm.sh\nbash 2_bench.sh\nbash remote.sh 3_sglang.sh", title:'The Spark track — vLLM, SGLang, speculation, two boxes', where:'DGX Spark over SSH', time:'2–3 h', cost:'free',
+    goal:'Everything the JD names that cannot run on a Mac: vLLM, SGLang, NVFP4, multi-node.',
+    steps:[
+      ['ssh into the Spark; check DGX OS, driver, CUDA','Containers, never host pip'],
+      ['Run the vLLM NGC container; wait for /health',''],
+      ['vllm bench serve at concurrency 1→32','The same curve as L3, on real server hardware'],
+      ['Swap to SGLang with --enable-cache-report','Compare cache hits on the L6 workload'],
+      ['Add speculation; read acceptance','Then, with two boxes, validate the fabric before TP=2'],
+    ],
+    code:`ssh nvidia@<SPARK_IP>
+docker run -d --gpus all --ipc host -p 8000:8000 -e HF_TOKEN \\
+  -v ~/.cache/huggingface:/root/.cache/huggingface --entrypoint "" \\
+  vllm/vllm-openai:latest vllm serve nvidia/Llama-3.1-8B-Instruct-FP8 \\
+  --max-model-len 8192 --gpu-memory-utilization 0.8 --enable-prefix-caching
+
+# from the Mac, reuse your own harness over the network
+BASE_URL=http://<SPARK_IP>:8000/v1 python sweep.py
+
+# SGLang
+docker run -d --gpus all --ipc host -p 30000:30000 lmsysorg/sglang:latest-cu130 \\
+  sglang serve --model-path Qwen/Qwen3-8B --host 0.0.0.0 --port 30000 \\
+  --mem-fraction-static 0.75 --enable-cache-report`,
+    say:'"Mac for iteration, Spark for the server stack. Same harness pointed at both."' },
+];
+
+/* ---------- training labs (videos 14–18) ---------- */
+const TR_LABS = [
+  { id:'T1', repo:'16-training-toy', title:'Training methods in miniature — full vs LoRA, and RLHF vs DPO', where:'anywhere (numpy)', time:'30 min', cost:'free',
+    run:"python toy_finetune.py\npython toy_alignment.py\npython toy_alignment.py --expert-labels",
+    goal:'See the algorithms, not just their names: LoRA rank as a capacity dial, the optimizer memory bill, a reward model learning its labellers\' blind spot, and reward hacking as the KL leash loosens.',
+    steps:[
+      ['python toy_finetune.py','Full vs LoRA r=1…8 on one layer; watch r below the true rank plateau'],
+      ['python toy_alignment.py','base → SFT → reward model → RLHF β-sweep → DPO on one ticket'],
+      ['Find the β where true value peaks','Below it, E[RM] keeps rising while true value falls: reward hacking'],
+      ['python toy_alignment.py --expert-labels','Better labels fix what a better algorithm cannot'],
+    ],
+    code:`# the exact optimum PPO approximates, one line of numpy
+pi = softmax(np.log(p_sft) + reward / beta)    # π* ∝ π_sft · exp(r/β)
+# the DPO loss for one pair
+loss = -np.log(sigmoid(beta * ((lp_c - ref_c) - (lp_r - ref_r))))`,
+    say:'"A reward model is a proxy. Optimise it hard enough and it stops tracking the goal, so I keep a KL leash, and where correctness is checkable I use a grader instead."' },
+
+  { id:'T2', repo:'17-full-vs-peft-mlx', title:'Full fine-tuning vs LoRA vs DoRA on your Mac', where:'Mac (Apple silicon)', time:'1 h', cost:'free',
+    run:"python sft_data_check.py\npython peft_params.py --model 8b --rank 16\nbash run_variants.sh\npython compare_variants.py",
+    goal:'Test the three claims of videos 14–16 on a real model: full fine-tuning\'s memory bill, LoRA/DoRA landing close to full on a narrow task, and forgetting.',
+    steps:[
+      ['python sft_data_check.py','Check the data first: JSON, roles, duplicates, test leakage, length'],
+      ['python peft_params.py --model 0.5b','Trainable params and training memory, from real model shapes'],
+      ['bash run_variants.sh','mlx_lm.lora --fine-tune-type full | lora | dora, same data and settings'],
+      ['python compare_variants.py','Peak memory, minutes, checkpoint MB, task accuracy, general quiz'],
+    ],
+    code:`mlx_lm.lora --model mlx-community/Qwen2.5-0.5B-Instruct-bf16 --train \\
+  --data ../../data/tickets --fine-tune-type full --num-layers -1 \\
+  --mask-prompt --grad-checkpoint --batch-size 4 --iters 300 --learning-rate 1e-5`,
+    say:'"LoRA got within a couple of points of full fine-tuning at a fraction of the memory, with a 9 MB checkpoint and no dent in general ability. I start with LoRA and go full only when the eval gap is real."' },
+
+  { id:'T3', repo:'18-preference-dpo', title:'Preference tuning with DPO — Mac and Fireworks', where:'Mac → Fireworks', time:'1 h', cost:'free · FW optional',
+    run:"python make_pairs.py\nbash dpo_mlx.sh\npython pref_eval.py --target mlx --label after-dpo\nbash dpo_fireworks.sh      # optional, paid",
+    goal:'Turn realistic failures (chatty wrappers, prose, wrong category, wrong severity) into chosen/rejected pairs, run DPO, and check that taste did not cost correctness.',
+    steps:[
+      ['python make_pairs.py','800 pairs in mlx-lm-lora and Fireworks formats'],
+      ['bash dpo_mlx.sh','SFT first (fuses lesson 17\'s LoRA), then --train-mode dpo --beta 0.1'],
+      ['python pref_eval.py … before / after','valid JSON ↑, chatty ↓, accuracy must not drop'],
+      ['python pref_eval.py --pairwise …','DPO\'s implicit reward: chosen vs rejected log-prob margin'],
+      ['bash dpo_fireworks.sh','firectl dpo-job create --loss-method DPO; deploy with auto-delete'],
+    ],
+    code:`firectl dataset create triage-dpo data/fireworks/train.jsonl
+firectl dpo-job create --loss-method DPO \\
+  --base-model accounts/fireworks/models/<DPO-enabled-model> \\
+  --dataset accounts/<ACCOUNT_ID>/datasets/triage-dpo --output-model triage-dpo`,
+    say:'"Their agents already edit the model\'s drafts, and every edit is a preference pair. DPO on an SFT\'d model removes the formatting failures. I watch accuracy so taste does not cost correctness."' },
+];
+
+/* ---------- the companion repo: lessons in course order ---------- */
+const LESSONS = [
+  ['00','setup','Setup and guardrails','L1','serving-stack','free'],
+  ['01','latency-harness','Latency harness: TTFT and ITL','F1','inference-101','~$0.02'],
+  ['02','three-local-servers','Three local servers','L2','serving-stack','free'],
+  ['03','concurrency-sweep','Concurrency sweep','L3','benchmarking','free'],
+  ['04','quantization','Quantization: size, speed, quality','L4','quantization','free'],
+  ['05','kv-cache','KV cache and context length','L5','kv-cache','free'],
+  ['06','prefix-caching','Prefix caching','L6 · F2','prefix-caching','~$0.03'],
+  ['07','structured-output','Structured output','F3','platform','~$0.02'],
+  ['08','batch-api','Batch API','F4','platform','<$0.01'],
+  ['09','eval-harness','Eval harness','F6','training','~$0.10'],
+  ['10','lora-fireworks','LoRA on Fireworks','F5','training · qlora','~1 GPU-h'],
+  ['11','lora-local-mlx','LoRA on the Mac (QLoRA)','L8','qlora','free'],
+  ['12','moe-vs-dense','MoE vs dense','L7','offloading','free'],
+  ['13','speculative-decoding','Speculative decoding','F7','scale-out','~½ GPU-h'],
+  ['14','spark-track','The Spark track','L9','scale-out','free'],
+  ['15','capstone','Capstone: sizing memo','Capstone','platform','free'],
+  ['16','training-toy','Training methods in miniature','T1','full-finetuning · peft · rlhf · dpo','free'],
+  ['17','full-vs-peft-mlx','Full vs LoRA vs DoRA on your Mac','T2','full-finetuning · sft · peft','free'],
+  ['18','preference-dpo','Preference tuning with DPO','T3','rlhf · dpo','free · FW optional'],
+];
+
+(function () {
+"use strict";
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const nf = (x, d = 0) => Number(x).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
+const usd = (n) => n >= 1000 ? '$' + nf(n / 1000, 1) + 'K' : n >= 10 ? '$' + nf(n, 0) : '$' + nf(n, n < 1 ? 3 : 2);
+const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || 'null'); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } };
+
+/* ---------- rail ---------- */
+(function () {
+  const links = $$('#railnav a'); const map = {};
+  links.forEach(a => map[a.getAttribute('href').slice(1)] = a);
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    links.forEach(a => a.classList.remove('on'));
+    const a = map[e.target.id];
+    if (a) { a.classList.add('on'); if (window.innerWidth < 1100) { try { a.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (_) {} } }
+  }), { rootMargin: '-45% 0px -50% 0px' });
+  $$('main section[id]').forEach(s => io.observe(s));
+})();
+
+/* ---------- guardrail checklist ---------- */
+(function () {
+  const items = [
+    'Create the account and API key; note the $1 of free credits and the 10 RPM limit until a payment method is added.',
+    'Install firectl (brew tap fw-ai/firectl, or the Linux gz from Google Storage) and run firectl signin, then firectl whoami.',
+    'Run firectl quota list and read your GPU, LoRA and spend quotas before you deploy anything.',
+    'Set a monthly spend limit with firectl quota update monthly-spend-usd — at 100% the API pauses, which is a real stop, not a warning.',
+    'Buy a small amount of prepaid credit and leave Auto Reload OFF while you are learning.',
+    'Decide your default lab model now (Nemotron 3.5 Lightning or gpt-oss 120B) so you are not experimenting on Kimi K3 by accident.',
+    'Add "firectl deployment list" to the end of every lab session — it should return nothing.',
+  ];
+  const box = $('#guardList'); if (!box) return;
+  let done = store('flb-guard') || [];
+  const paint = () => $('#guardCount').textContent = done.length + ' / ' + items.length;
+  items.forEach((t, i) => {
+    const id = 'g' + i;
+    const row = document.createElement('label');
+    row.className = 'checkline'; row.setAttribute('for', id);
+    row.innerHTML = '<input type="checkbox" id="' + id + '"><span></span>';
+    row.querySelector('span').textContent = t;
+    const cb = row.querySelector('input');
+    cb.checked = done.indexOf(i) >= 0;
+    cb.addEventListener('change', () => {
+      done = cb.checked ? done.concat([i]) : done.filter(x => x !== i);
+      store('flb-guard', done); paint();
+    });
+    box.appendChild(row);
+  });
+  paint();
+})();
+
+/* ---------- serverless cost calculator ---------- */
+const MODELS = [
+  { id: 'nemotron', name: 'Nemotron 3.5 Lightning 30B A3B', in: 0.05, cached: 0.01, out: 0.20 },
+  { id: 'glmflash', name: 'GLM 5.3 Flash', in: 0.15, cached: 0.03, out: 0.50 },
+  { id: 'gptoss120', name: 'gpt-oss 120B', in: 0.15, cached: 0.015, out: 0.60 },
+  { id: 'dsflash', name: 'DeepSeek V4.1 Flash', in: 0.30, cached: 0.006, out: 1.20 },
+  { id: 'minimax', name: 'MiniMax M3', in: 0.30, cached: 0.06, out: 1.20 },
+  { id: 'glm53', name: 'GLM 5.3', in: 1.40, cached: 0.26, out: 4.40 },
+  { id: 'qwenmax', name: 'Qwen 3.8 Max', in: 2.00, cached: 0.25, out: 6.00 },
+  { id: 'kimik3', name: 'Kimi K3', in: 3.00, cached: 0.30, out: 15.00 },
+  { id: 't4', name: 'Size tier · under 4B', in: 0.10, cached: 0.10, out: 0.10 },
+  { id: 't16', name: 'Size tier · 4–16B', in: 0.20, cached: 0.20, out: 0.20 },
+  { id: 't16p', name: 'Size tier · over 16B', in: 0.90, cached: 0.90, out: 0.90 },
+];
+(function () {
+  const sel = $('#cmModel'); if (!sel) return;
+  MODELS.forEach((m, i) => { const o = document.createElement('option'); o.value = i; o.textContent = m.name; if (m.id === 'gptoss120') o.selected = true; sel.appendChild(o); });
+  const reqFrom = (v) => Math.round(Math.pow(10, 2 + (v / 100) * 5) / 100) * 100; // 100 → 10M / day
+  function run() {
+    const m = MODELS[+sel.value];
+    const inTok = +$('#cmIn').value, outTok = +$('#cmOut').value;
+    const req = reqFrom(+$('#cmReq').value), hit = +$('#cmCache').value / 100;
+    const batch = $('#cmBatch').checked ? 0.5 : 1;
+    $('#cmInO').textContent = nf(inTok); $('#cmOutO').textContent = nf(outTok);
+    $('#cmReqO').textContent = nf(req); $('#cmCacheO').textContent = Math.round(hit * 100) + '%';
+    const perReq = ((inTok * (1 - hit) * m.in + inTok * hit * m.cached + outTok * m.out) / 1e6) * batch;
+    const uncached = ((inTok * m.in + outTok * m.out) / 1e6) * batch;
+    const day = perReq * req, month = day * 30.4;
+    $('#cmReqCost').innerHTML = '$' + nf(perReq, 5);
+    $('#cmDay').innerHTML = usd(day);
+    $('#cmMonth').innerHTML = usd(month);
+    $('#cmSaved').innerHTML = nf((1 - perReq / uncached) * 100) + '<small> %</small>';
+    const ded = 8 * 730;
+    $('#cmBreak').innerHTML = usd(ded) + '<small> = 1× H100</small>';
+    const p = $('#costVerdict');
+    if (month < ded) { p.className = 'pill acc'; p.textContent = 'serverless is cheaper'; }
+    else { p.className = 'pill cu'; p.textContent = 'consider dedicated'; }
+    $('#cmFormula').textContent =
+      'per request = (' + nf(inTok) + ' uncached-in × $' + m.in + '  +  cached-in × $' + m.cached + '  +  ' + nf(outTok) + ' out × $' + m.out + ') / 1M' + (batch < 1 ? '  × 0.5 batch' : '') + '\n' +
+      '            = $' + nf(perReq, 5) + '  ×  ' + nf(req) + ' req/day  =  ' + usd(day) + '/day  =  ' + usd(month) + '/month\n' +
+      'one always-on H100 replica = $8.00/hr × 730 h = ' + usd(ded) + '/month';
+  }
+  ['#cmModel', '#cmIn', '#cmOut', '#cmReq', '#cmCache', '#cmBatch'].forEach(s => $(s).addEventListener('input', run));
+  run();
+})();
+
+/* ---------- fine-tune cost calculator ---------- */
+(function () {
+  if (!$('#ftSize')) return;
+  const price = [[0.5, 1, 1, 2], [3, 6, 6, 12], [6, 12, 12, 24], [10, 20, 20, 40]];
+  function run() {
+    const s = +$('#ftSize').value, m = +$('#ftMethod').value;
+    const ex = +$('#ftEx').value, tok = +$('#ftTok').value, ep = +$('#ftEp').value, hrs = +$('#ftServe').value;
+    $('#ftExO').textContent = nf(ex); $('#ftTokO').textContent = nf(tok); $('#ftEpO').textContent = ep; $('#ftServeO').textContent = nf(hrs, 1) + ' h';
+    const tokens = ex * tok * ep;
+    const cost = (tokens / 1e6) * price[s][m];
+    const serve = hrs * 8;
+    $('#ftTokens').innerHTML = nf(tokens / 1e6, 2) + '<small> M</small>';
+    $('#ftCost').innerHTML = usd(cost);
+    $('#ftServeCost').innerHTML = usd(serve);
+    $('#ftTotal').innerHTML = usd(cost + serve);
+  }
+  ['#ftSize', '#ftMethod', '#ftEx', '#ftTok', '#ftEp', '#ftServe'].forEach(x => $(x).addEventListener('input', run));
+  run();
+})();
+
+/* ---------- DGX Spark decode ceiling ---------- */
+(function () {
+  if (!$('#spModel')) return;
+  const models = [
+    { n: 'Llama 3.1 8B · NVFP4', read: 4.5, file: 4.5, meas: { spark: 38.7 } },
+    { n: 'Llama 3.1 8B · FP8', read: 8.0, file: 8.0, meas: { spark: 20.5 } },
+    { n: 'Qwen3 14B · NVFP4', read: 7.5, file: 7.5, meas: { spark: 22.7 } },
+    { n: 'Qwen2.5-Coder 7B · Q8', read: 8.1, file: 8.1, meas: { spark: 29.4 } },
+    { n: 'gpt-oss 20B · MXFP4 (MoE)', read: 3.3, file: 12.1, meas: { spark: 82.7 } },
+    { n: 'gpt-oss 120B · MXFP4 (MoE)', read: 4.9, file: 63.4, meas: { spark: 55.4 } },
+    { n: 'Qwen3-Coder 30B-A3B · Q8 (MoE)', read: 4.6, file: 32.5, meas: { spark: 60.0 } },
+    { n: 'GLM 4.5 Air · Q4 (MoE)', read: 12.1, file: 72.9, meas: { spark: 22.6 } },
+    { n: 'Llama 3.3 70B · NVFP4', read: 38, file: 38, meas: {} },
+    { n: 'Llama 3.1 70B · FP8', read: 70, file: 70, meas: { spark: 2.7 } },
+  ];
+  const devs = [
+    { k: 'spark', n: 'DGX Spark (GB10) · 273 GB/s', bw: 273, mem: 115 },
+    { k: 'm4pro', n: 'Mac · M4 Pro · ~273 GB/s', bw: 273, mem: 40 },
+    { k: 'm4max', n: 'Mac · M4 Max · ~546 GB/s', bw: 546, mem: 100 },
+    { k: 'm3ultra', n: 'Mac · M3 Ultra · ~819 GB/s', bw: 819, mem: 460 },
+    { k: 'h100', n: 'H100 SXM · 3,350 GB/s', bw: 3350, mem: 80 },
+    { k: 'h200', n: 'H200 · 4,800 GB/s', bw: 4800, mem: 141 },
+    { k: 'b200', n: 'B200 · 8,000 GB/s', bw: 8000, mem: 192 },
+    { k: '4090', n: 'RTX 4090 · 1,008 GB/s', bw: 1008, mem: 24 },
+  ];
+  const ms = $('#spModel'), ds = $('#spDev');
+  models.forEach((m, i) => { const o = document.createElement('option'); o.value = i; o.textContent = m.n; if (i === 5) o.selected = true; ms.appendChild(o); });
+  devs.forEach((d, i) => { const o = document.createElement('option'); o.value = i; o.textContent = d.n; ds.appendChild(o); });
+  function run() {
+    const m = models[+ms.value], d = devs[+ds.value];
+    const ceil = d.bw / m.read, real = ceil * 0.65, meas = m.meas[d.k];
+    const fits = m.file <= d.mem;
+    $('#spBytes').innerHTML = nf(m.read, 1) + '<small> GB</small>';
+    $('#spCeil').innerHTML = nf(ceil, ceil < 10 ? 1 : 0) + '<small> tok/s</small>';
+    $('#spReal').innerHTML = nf(real, real < 10 ? 1 : 0) + '<small> tok/s</small>';
+    $('#spMeas').innerHTML = meas ? nf(meas, 1) + '<small> tok/s</small>' : '–<small> not published</small>';
+    const p = $('#spVerdict');
+    if (!fits) { p.className = 'pill bad'; p.textContent = 'does not fit in memory'; }
+    else if (real < 15) { p.className = 'pill warn'; p.textContent = 'too slow for interactive use'; }
+    else { p.className = 'pill good'; p.textContent = 'usable'; }
+    $('#spFormula').textContent =
+      'weights on disk        ' + nf(m.file, 1) + ' GB   ' + (fits ? '(fits in ' + d.mem + ' GB)' : '(needs more than ' + d.mem + ' GB)') + '\n' +
+      'bytes read per token   ' + nf(m.read, 1) + ' GB' + (m.read < m.file ? '   ← MoE: only the active experts' : '') + '\n' +
+      'ceiling                ' + d.bw + ' GB/s ÷ ' + nf(m.read, 1) + ' GB = ' + nf(ceil, 1) + ' tok/s\n' +
+      'realistic (×0.65)      ' + nf(real, 1) + ' tok/s' + (meas ? '   · measured ' + meas + ' tok/s' : '');
+  }
+  [ms, ds].forEach(x => x.addEventListener('input', run));
+  run();
+})();
+
+function renderLabs(el, labs, cls) {
+  const box = $(el); if (!box) return;
+  labs.forEach((L, i) => {
+    const d = document.createElement('details');
+    d.className = 'lab-item';
+    d.id = 'lab-' + L.id;
+    if (i === 0) d.open = true;
+    const costCls = L.cost === 'free' ? 'cost' : (/\$[1-9]/.test(L.cost) ? 'warn' : 'cost');
+    d.innerHTML =
+      '<summary><span class="lab-id ' + cls + '">' + L.id + '</span><span class="lab-t"></span>' +
+      '<span class="lab-meta"><span class="meta-chip">' + L.where + '</span><span class="meta-chip">' + L.time +
+      '</span><span class="meta-chip ' + costCls + '">' + L.cost + '</span>' +
+      (L.repo ? '<span class="meta-chip repo">lessons/' + L.repo + '</span>' : '') + '</span></summary>' +
+      '<div class="lab-body2"><div>' +
+      (L.repo ? '<div class="repo-run"><h5>Run it from the repo</h5><pre class="code run"></pre>' +
+        '<p class="repo-note">Open <code class="rf"></code> — its README has the why, expected output and self-check.</p></div>' : '') +
+      '<h5>Do this</h5><ol class="steps"></ol>' +
+      '<h5 style="margin-top:14px">Standalone snippet (no repo needed)</h5><pre class="code snip"></pre></div>' +
+      '<div class="side"><div><h5>Point of the lab</h5><p style="font-size:.92rem"></p></div>' +
+      '<div class="say"><b>Say this</b><span></span></div></div></div>';
+    d.querySelector('.lab-t').textContent = L.title;
+    const ol = d.querySelector('ol.steps');
+    L.steps.forEach((st) => {
+      const li = document.createElement('li');
+      li.innerHTML = '<code></code><em></em>';
+      li.querySelector('code').textContent = st[0];
+      li.querySelector('em').textContent = st[1] || '';
+      ol.appendChild(li);
+    });
+    d.querySelector('pre.code.snip').textContent = L.code;
+    if (L.repo) {
+      d.querySelector('pre.code.run').textContent = 'cd lessons/' + L.repo + '\n' + L.run;
+      d.querySelector('.rf').textContent = 'lessons/' + L.repo + '/README.md';
+    }
+    d.querySelector('.side p').textContent = L.goal;
+    d.querySelector('.say span').textContent = L.say;
+    box.appendChild(d);
+  });
+}
+renderLabs('#fwLabs', FW_LABS, '');
+renderLabs('#spLabs', SP_LABS, 'sp');
+renderLabs('#trLabs', TR_LABS, 'tr');
+
+/* ---------- 10-day plan ---------- */
+(function () {
+  const D = [
+    ['Guardrails and first calls', 'Repo lessons 00 · 01. Watch inference-101. Account, firectl, spend cap, then lab F1 against three models.', 'A latency table for three models, in your own notes.'],
+    ['Local stack on the Mac', 'Repo lesson 02. Watch serving-stack. Labs L1 and L2: Ollama, llama.cpp and MLX all serving the same model.', 'bench_ttft.py running against three local backends.'],
+    ['Benchmark like a field engineer', 'Repo lesson 03. Watch benchmarking and gpu-bandwidth. Lab L3 concurrency sweep; check it against the ceiling formula.', 'A concurrency curve with the traffic profile written above it.'],
+    ['Memory levers', 'Repo lessons 04 · 05. Watch kv-cache and quantization. Labs L4 and L5 — break context on purpose, then fix it with KV quantization.', 'Concurrency before and after FP8/Q8 KV, with numbers.'],
+    ['Agent workloads', 'Repo lesson 06. Watch prefix-caching. Lab L6 locally, lab F2 on Fireworks for the billing side.', 'TTFT with and without a shared prefix, both places.'],
+    ['Structured output and batch', 'Repo lessons 07 · 08. Labs F3 and F4. Build the 50-example validity check and move it to the Batch API.', 'A schema-validity percentage you would quote.'],
+    ['Training day, managed', 'Repo lessons 09 · 10. Watch training and qlora. Lab F5: dataset, job, deploy, evaluate, delete.', 'A fine-tune with a measured delta and a total cost.'],
+    ['Training day, local', 'Repo lesson 11. Lab L8 with MLX on the Mac — same dataset, fused adapter, served locally.', 'The build-versus-buy comparison, written down.'],
+    ['Scale-out and the Spark', 'Repo lessons 12 · 13 · 14. Watch offloading and scale-out. Lab L9 over SSH: vLLM, SGLang, speculation. Lab L7 for MoE maths.', 'Your own numbers for MoE active bytes per token.'],
+    ['Capstone and rehearsal', 'Repo lesson 15. Watch platform. Assemble the sizing memo and five slides; rehearse the VP and engineer answers.', 'A POC you can present in ten minutes.'],
+    ['Training methods, in miniature', 'Repo lessons 16 · 17. Watch full-finetuning, sft and peft. Lab T1 (numpy toys), then lab T2: full vs LoRA vs DoRA on your Mac.', 'A table of memory, checkpoint size, accuracy and forgetting for three methods.'],
+    ['Preference tuning', 'Repo lesson 18. Watch rlhf and dpo. Lab T3: build pairs, run DPO locally, optionally on Fireworks.', 'Before/after numbers for valid JSON, accuracy and the chosen-vs-rejected margin.'],
+  ];
+  const list = $('#planList'); if (!list) return;
+  let done = store('flb-plan') || [];
+  const bar = () => $('#planBar').style.width = (done.length / D.length * 100) + '%';
+  D.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'day' + (done.indexOf(i) >= 0 ? ' done' : '');
+    row.innerHTML = '<div class="d">' + (i + 1) + '<small>day</small></div><div><h4></h4><p></p>' +
+      '<p style="margin-top:6px;color:var(--ink)"><b>Done when:</b> <span class="dl"></span></p>' +
+      '<label class="check" for="p' + i + '"><input type="checkbox" id="p' + i + '"' + (done.indexOf(i) >= 0 ? ' checked' : '') + '> Complete</label></div>';
+    row.querySelector('h4').textContent = d[0];
+    row.querySelector('p').textContent = d[1];
+    row.querySelector('.dl').textContent = d[2];
+    row.querySelector('input').addEventListener('change', (e) => {
+      done = e.target.checked ? done.concat([i]) : done.filter(x => x !== i);
+      row.classList.toggle('done', e.target.checked);
+      store('flb-plan', done); bar();
+    });
+    list.appendChild(row);
+  });
+  bar();
+})();
+})();
+
+/* ---------- repo lesson table ---------- */
+(function () {
+  const tb = document.querySelector('#lessonTable tbody'); if (!tb || typeof LESSONS === 'undefined') return;
+  LESSONS.forEach(([n, slug, title, lab, video, cost]) => {
+    const tr = document.createElement('tr');
+    const labLinks = lab.split(' · ').map(id => /^[FLT]\d$/.test(id) ? '<a href="#lab-' + id + '">' + id + '</a>' : '<a href="#capstone">' + id + '</a>').join(' · ');
+    tr.innerHTML = '<td class="mono">' + n + '</td><td><b></b><div class="mono dim"></div></td><td class="mono">' + labLinks +
+      '</td><td class="mono"></td><td class="mono"></td>';
+    tr.querySelector('b').textContent = title;
+    tr.querySelector('.dim').textContent = 'lessons/' + n + '-' + slug + '/';
+    tr.children[3].textContent = video;
+    tr.children[4].textContent = cost;
+    tb.appendChild(tr);
+  });
+})();
+/* open a lab card when its anchor is followed */
+function openLabFromHash() {
+  const m = location.hash.match(/^#lab-([FLT]\d)$/); if (!m) return;
+  const d = document.getElementById('lab-' + m[1]); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); }
+}
+window.addEventListener('hashchange', openLabFromHash); openLabFromHash();
+
+</script>

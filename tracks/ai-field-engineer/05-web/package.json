@@ -1,0 +1,21 @@
+{
+  "name": "fw-kit-web",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web app over the Fireworks Field Engineer Kit: videos, lab book, lessons with highlighted code, full-text search.",
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "build": "node scripts/sync.mjs && astro build && node scripts/search-index.mjs && node scripts/check-links.mjs",
+    "dev": "node scripts/sync.mjs && astro dev"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.42.4",
+    "@expressive-code/plugin-line-numbers": "^0.44.2",
+    "astro": "^7.3.5",
+    "fflate": "^0.8.3",
+    "pagefind": "^1.5.2",
+    "sharp": "^0.35.3",
+    "yaml": "^2.9.1"
+  }
+}

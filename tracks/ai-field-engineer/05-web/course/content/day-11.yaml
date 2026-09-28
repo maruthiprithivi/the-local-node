@@ -1,0 +1,1115 @@
+# Day 11 · Training methods in miniature. Plain-language content for the guided course (course-spec.md section 3).
+# Two steps: d11-s1 is lesson 16 part 1 (toy_finetune.py, Check yourself item 1, the first two Run commands);
+# lesson 16 part 2 (toy_alignment.py, items 2 to 4) is Day 12 step 1. d11-s2 is lesson 17.
+# Lesson 16's one explain-it line is about reward models (part 2); the validator needs a say block on every step
+# built on the lesson, so d11-s1 decodes it too, as a preview of Day 12.
+# Every number traces to a kit file: lesson 16 and 17 READMEs and scripts (peft_params.py outputs worked by hand:
+# 0.5b 2,162,688 / 0.441% / 7.8 GB / 1.0 GB; 8b 13,631,488 / 0.170% / 128.0 / 16.2 / 4.7 GB / 27 MB;
+# 70b --rank 64 --mlp 828,375,040 / 1129.6 / 154.5 / 53.0 GB), toy_finetune.py (12 bytes per trainable number,
+# 500 test inputs, seed 0), run_variants.sh (300 iterations, batch 4, lr 1e-4 and 1e-5), compare_variants.py,
+# data/make_tickets.py (800 / 100 / 100, 30 unseen phrasings), narration.json (full-finetuning, sft, peft,
+# rlhf scenes) and the lab book plan for day 11. `toy_finetune.py` was rerun in python:3.12-slim on optimus
+# (numpy 2.5.3, seed 0): the default run matches the README table; `--true-rank 16` gives full 0.0002 and
+# rank 8 0.0825 at n=200. Checkpoint and trainable-% caveats come from reading mlx-lm 0.31.3 (save_every 100
+# writes numbered copies that compare_variants.py's dir_mb() counts; full leaves the embedding frozen):
+# not confirmed by a run on a Mac.
+day: 11
+tile: "Train a whole model, then small add-ons, and compare the costs"
+
+overview:
+  today: >-
+    Compare two ways to train a model on your own examples. Change every number in it (full fine-tuning), or
+    freeze it and train a small add-on beside it (LoRA). First on a tiny practice model you can see in full.
+    Then on a real small model on your Mac, measuring what each costs, gains and breaks.
+  example: >-
+    Imagine teaching a support bot to use your company's ticket labels. One route rewrites every learned number
+    in the model; another leaves the model alone and trains a small add-on. For a large model, the first route
+    needs far more memory than a regular Mac has. Today you will try both routes on a smaller model and see
+    how much memory they use and whether either forgets what it knew before.
+  deliverable: >-
+    One table comparing full fine-tuning, LoRA and DoRA on the same model and the same data: memory, saved file
+    size, task accuracy and forgetting.
+  expected: >-
+    The lesson expects full fine-tuning to peak at about 8 to 10 GB of memory and save a file of about 990 MB.
+    LoRA peaks at about 2 to 3 GB and saves about 9 MB, with task accuracy close to full.
+  before:
+    - title: "An Apple-silicon Mac, with Day 1's Python environment."
+      body: >-
+        Step 1's toys run anywhere with Python and numpy (a Python math library), in seconds. Step 2 trains a real
+        model with MLX (Apple's own software for running and training models on Apple chips), so it needs an
+        M-series Mac. Day 1's setup installed both. Turn the environment on from the `03-labs` folder:
+      command: "source .venv/bin/activate"
+      after: >-
+        Every command today runs with it on. Open each new terminal window the same way.
+    - title: "About 5 GB of free disk and 8 to 10 GB of free memory."
+      body: >-
+        Step 2 downloads a small model, Qwen2.5-0.5B-Instruct: 490 million numbers x 2 bytes = about 1 GB. After
+        full training it saves a whole new copy (about 990 MB). The trainer also keeps in-between copies as it
+        goes, so the full run's folder can grow to several GB. Full training peaks at about 8 to 10 GB of memory,
+        so close big apps first. On a tight Mac you can skip the full run; step 2's Stuck? section shows how.
+    - title: "About 45 minutes of steady laptop time."
+      body: >-
+        Step 2's three training runs take 15 to 45 minutes together and keep the chip busy. You start them before
+        that step's video and read on while they run.
+  feeds: >-
+    When a customer asks "full fine-tune or LoRA?", you answer with your own table: the memory, file size,
+    accuracy and forgetting of today's three runs. Day 12 adds the last kind of training, preference tuning:
+    teaching a model which of two answers people prefer.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 1 · Training toys, part 1 (lesson 16-training-toy: toy_finetune.py; Check yourself item 1)
+  # ---------------------------------------------------------------------------------------------------------
+  d11-s1:
+    why: >-
+      Two ways to train, shrunk to one small layer (a single grid of 4,096 numbers) so you see every number and
+      finish in seconds. Change all of them, or train a small add-on (LoRA) beside them, and see when the add-on
+      is too small.
+    why_example: >-
+      Imagine teaching a tiny model a new ticket-label rule. Changing all its numbers works, but you want to
+      see whether a smaller add-on can learn it too. In the lesson's toy, an add-on that changes 256 numbers
+      learns the rule while a smaller one does not. The point is to test whether the add-on has enough room
+      to learn, not to assume the smallest setting always works.
+    videos:
+      14-full-finetuning:
+        in_this_video: >-
+          Why changing every number in a model is the most powerful and the most expensive way to train it, and
+          when it is worth it.
+        key_points:
+          - point: >-
+              Training needs about 16 bytes of memory per number in the model; running it needs about 2.
+            detail: >-
+              Each number brings its gradient (the direction to nudge it), two running averages and a precise
+              master copy. A 7-billion-number model runs in about 14 GB (7 x 2) but needs about 112 GB (7 x 16) to
+              train: 8 times as much.
+          - point: >-
+              Memory, not computing speed, decides whether you can train fully at all.
+            detail: >-
+              An 8-billion-number (8B) model needs about 130 GB (8 x 16 = 128), so two 80 GB H100s (NVIDIA's
+              data-center GPU). A 70B needs about 1.1 TB (terabytes: 70 x 16 = 1,120 GB): sixteen H100s plus
+              software that splits the job across them.
+          - point: >-
+              On a narrow task, LoRA usually lands within 1 to 2 accuracy points of full training, and forgets less
+              of what the model already knew.
+            detail: >-
+              Same 8B model: full training changes 8 billion numbers in about 130 GB and saves a 16 GB file. LoRA
+              trains about 20 million in about 20 GB and saves about 40 MB. Go full for a big shift, such as a new
+              language, with hundreds of thousands of examples.
+      16-peft:
+        in_this_video: >-
+          How LoRA customises a huge model by training two thin grids of numbers beside each frozen one, and when
+          to pick its relatives: QLoRA, DoRA and multi-LoRA.
+        key_points:
+          - point: >-
+              LoRA freezes the model and trains two thin grids, A and B. Multiplied together, they make a full-size
+              correction that is added to the frozen grid.
+            detail: >-
+              For one 4,096 x 4,096 grid (16.8 million numbers) at rank 16 (the add-on's size setting), A and B hold
+              65,536 numbers each: 131,072 in all, 0.8% of that grid.
+          - point: >-
+              The rank is the dial: a higher rank gives the add-on more room to learn, and costs more memory.
+            detail: >-
+              Rank 8 to 16 suits narrow tasks, 32 to 64 harder ones. Across a whole 8B model, adapting the
+              attention grids, the video puts it at 0.2 to 0.5% of all numbers. Step 2's calculator gives 0.17% at
+              rank 16, because two of Llama 3.1 8B's four attention grids are a quarter size (a design called GQA).
+              Four full-size grids would give 0.21%.
+          - point: >-
+              Pick QLoRA when memory is short, DoRA when quality lags, multi-LoRA when you have many customers.
+            detail: >-
+              QLoRA is LoRA on a 4-bit copy of the model; DoRA is a LoRA variant that often scores 1 to 2 points
+              higher. Fifty customers with full fine-tunes need 50 files of 16 GB (800 GB) and 50 deployments. Fifty
+              LoRA add-ons of about 40 MB (2 GB in all) fit on one deployment, the right one applied per request.
+    plain:
+      lead: >-
+        Real training takes minutes to hours. This toy shrinks the model to one small layer of 4,096 numbers and
+        trains it in seconds. You compare changing all of them (full fine-tuning) with training a small add-on
+        beside them (LoRA). Part 2, on Day 12, uses a toy for preference tuning (teaching a model which of two
+        answers people prefer).
+      picture: >-
+        Full fine-tuning re-edits every page of an encyclopedia. LoRA leaves the pages alone and adds sticky
+        notes. The rank is how many notes you may use: if the book needs two different kinds of fix, one note
+        cannot hold both, however many examples you study.
+      numbers_source: "lesson 16's `toy_finetune.py`, the lesson's sample run"
+      numbers:
+        - >-
+          The toy layer: a grid of 64 x 64 = 4,096 numbers. Full fine-tuning trains all 4,096.
+        - >-
+          LoRA at rank 2: two thin grids, 64 x 2 and 2 x 64, so 128 + 128 = 256 trained numbers, 6.2% of the
+          layer.
+        - >-
+          The script counts 12 bytes per trained number: its gradient and the optimizer's two running averages, at
+          4 bytes each in a real trainer. Full: 4,096 x 12 = 49,152 bytes (48 KB, far smaller than one phone
+          photo). Rank 2: 256 x 12 = 3,072 bytes, 16 times less.
+        - >-
+          With 200 examples, rank 2 reaches an error of 0.0000 (0 is perfect), as good as full (0.0002). Rank 1
+          stays at 0.1321. With only 16 examples every method sits near 0.4 (0.36 to 0.40).
+        - >-
+          Scale the toy's bill to an 8-billion-number model: 8 billion x 12 bytes = 96 GB. The Full Fine-Tuning
+          video's fuller count is 16 bytes per number: the number itself (2), its gradient (2, stored smaller than
+          the toy counts it), the two averages (4 + 4) and a precise master copy (4). 8 billion x 16 = 128 GB,
+          8 times a 16 GB Mac.
+      words:
+        - term: "Full fine-tuning"
+          def: >-
+            Training that changes every number in the model. Example: all 4,096 numbers of the toy layer.
+        - term: "LoRA"
+          def: >-
+            Freeze the model and train two thin grids, A and B; multiplied together, they make a correction added
+            to a layer. Example: 256 trained numbers at rank 2.
+        - term: "Rank"
+          def: >-
+            The add-on's size setting, the width of its two thin grids: how many separate kinds of change it can
+            make at once. Example: the toy's task needs 2 kinds; a rank-1 add-on can make only 1.
+        - term: "Adam (the optimizer)"
+          def: >-
+            The usual rule for nudging each trained number; it keeps two running averages for every one. Example:
+            `adam()` in `toy_finetune.py`.
+    run:
+      - cmd: "python toy_finetune.py"
+        note: >-
+          Trains one 64 x 64 layer five ways: full fine-tuning, then LoRA at rank 1, 2, 4 and 8, each on 16, 48
+          and 200 examples. It needs only numpy, no GPU, and takes about 20 seconds. **Look for** rank 1 stuck well
+          above the others in the `n=200` column (0.1321 in the lesson's run), while rank 2 matches full (0.0000
+          against 0.0002).
+      - cmd: "python toy_finetune.py --true-rank 16"
+        note: >-
+          The same test, but the change the task needs now has 16 separate kinds instead of 2. **Look for** every
+          LoRA row, even rank 8, staying above full fine-tuning in the `n=200` column: rank 8 at about 0.08 against
+          full's 0.0002. An add-on smaller than the change the task needs cannot keep up, however much data it gets.
+    see: >-
+      Each row is one way to train the layer. `trainable` is how many numbers it changes; `adam_bytes` is its
+      training memory at 12 bytes each. The `n=` columns are its error on 500 new examples after training on 16,
+      48 or 200 (lower is better, 0 is perfect). Your run also prints rank 4 and rank 8, which match full at 200
+      like rank 2. With only 16 examples every row does badly (0.36 to 0.40): fewer examples than the layer is
+      wide (64) cannot pin the change down.
+    checks:
+      - q: >-
+          In Day 11's toy (one small layer of 4,096 numbers), the rank-1 add-on never catches up with full
+          fine-tuning, even with 200 examples. Why? (The rank is how many separate kinds of change the add-on can
+          make at once.)
+        plain: >-
+          The change this task needs has two separate kinds (two directions), and a rank-1 add-on can make only
+          one. More examples cannot supply the missing one; only a bigger rank can.
+        picture: >-
+          Treasure lies to the north-east, and you may only move along a straight track running east. However
+          many tries you get, you stop at the closest point on the track, never at the treasure. Add a second
+          track running north and you reach it exactly.
+        numbers_source: "lesson 16's `toy_finetune.py`, the lesson's sample run"
+        numbers:
+          - >-
+            The task needs a rank-2 change: two separate kinds of change (the script's `--true-rank` is 2 by
+            default).
+          - >-
+            Rank 1: 64 + 64 = 128 trained numbers, 3.1% of the layer. Error 0.3937, 0.1951 and 0.1321 at 16, 48
+            and 200 examples (0 is perfect).
+          - >-
+            Rank 2: 256 trained numbers, 6.2%. Error at 200 examples: 0.0000, as good as full fine-tuning (0.0002).
+          - >-
+            So rank 1 trains half as many numbers as rank 2 but misses one whole kind of change: at 200 examples
+            its error is still 0.1321, while rank 2's is 0.0000.
+        words:
+          - term: "Rank"
+            def: >-
+              How many separate kinds of change an add-on can make at once. Example: the toy's task needs 2.
+          - term: "Held-out error"
+            def: >-
+              How wrong the trained layer is on new examples it never saw; lower is better. Example: 0.1321 for
+              rank 1 at 200 examples.
+          - term: "Adapter (add-on)"
+            def: >-
+              The small set of extra numbers LoRA trains while the model stays frozen. Example: 128 numbers at rank 1.
+          - term: "Frozen"
+            def: >-
+              Left unchanged during training. Example: the toy's pretrained layer `W0`.
+        more: >-
+          LoRA's update is B·A with B of shape 64 x r and A of shape r x 64, so its rank is at most r. The toy's
+          target shift `dW_true` is built from two random directions, so it has rank 2 (`toy_finetune.py` line
+          38). A rank-1 B·A can capture at best the strongest single direction of `dW_true` (its top singular
+          direction); the remaining direction stays as error however many examples you add. With `--true-rank 16`
+          every rank the script tries (up to 8) falls short the same way.
+    say:
+      ask: "We want to tune our model so a scoring model rates its answers higher. Any risk?"
+      means:
+        - phrase: "A reward model is a proxy for what the customer wants"
+          meaning: >-
+            This line previews Day 12, where you run the reward-model toy. A reward model is a second model trained
+            to score answers the way people would. It is a stand-in (a proxy) for what the customer really wants,
+            not the real thing.
+        - phrase: "Optimise it too hard and it stops tracking the goal"
+          meaning: >-
+            Push the main model to chase that score too hard and it finds answers the scorer likes that are not
+            really better (reward hacking). In the Day 12 toy, as the model is allowed to drift further from where
+            it started, the score rises about 16% (+1.69 to +1.96) while the answer's true value falls about 20%
+            (+4.30 to +3.45).
+        - phrase: "so I keep a KL leash"
+          meaning: >-
+            I charge the model for drifting too far from the model it started as, so it cannot wander off to exploit
+            the scorer. The KL penalty measures that drift (KL, short for Kullback-Leibler divergence, is a
+            standard measure of how far two models' choices differ). A setting called beta (β) sets the leash's
+            length.
+        - phrase: "where correctness can be checked by a program I'd rather use a grader"
+          meaning: >-
+            When a program can check the answer, such as tests passing or the category matching, I score with that
+            program (a grader) instead of a learned scorer. It checks the thing itself, so there is far less to
+            exploit.
+        - phrase: "which is what reinforcement fine-tuning on Fireworks does"
+          meaning: >-
+            Fireworks' reinforcement fine-tuning (RFT) trains a model with exactly that kind of program-based
+            grader.
+    fields:
+      - id: d11-toy-n200
+        label: "Toy error with 200 examples: full / rank 1 / rank 2"
+        hint: >-
+          The `n=200` column of `python toy_finetune.py`, rows `full`, `lora r=1` and `lora r=2`. Write all three,
+          for example "0.0002 / 0.1321 / 0.0000".
+        unit: "error"
+        meaning: >-
+          How close each method gets on new examples (lower is better). Rank 2 matches full with 6% of the trained
+          numbers; rank 1 cannot, because the task needs two kinds of change.
+        example: "0.0002 / 0.1321 / 0.0000 (the lesson's run)"
+      - id: d11-toy-rank16
+        label: "With --true-rank 16, error with 200 examples: full / rank 8"
+        hint: >-
+          The `n=200` column of `python toy_finetune.py --true-rank 16`, rows `full` and `lora r=8`.
+        unit: "error"
+        meaning: >-
+          Now the task needs 16 kinds of change. Even the biggest add-on the script tries (rank 8) stays above full:
+          for a big shift, the rank must grow, or you train fully.
+        example: "0.0002 / 0.0825 (a run of the script with its default seed; the last digits may differ)"
+    done: >-
+      `python toy_finetune.py` has printed its table, and you can say why rank 1 stays stuck at 200 examples
+      (0.1321 in the lesson's run) while rank 2 matches full fine-tuning.
+    stuck:
+      - problem: "`ModuleNotFoundError: No module named 'numpy'`"
+        fix: >-
+          The Python environment is off in this terminal. From the `03-labs` folder run
+          `source .venv/bin/activate` and try again. The toys need nothing else, so on another machine
+          `pip install numpy` is enough.
+      - problem: "Your numbers differ a little from the lesson's."
+        fix: >-
+          The toy draws its random numbers from a fixed starting point (`--seed 0`), so the shape should match:
+          rank 1 stuck, rank 2 and above matching full at 200 examples. Small differences in the last digits do not
+          matter. Run `python toy_finetune.py --seed 1` to see the same shape with other random numbers.
+    replace:
+      - find: "| `toy_finetune.py` |"
+        with: "| `toy_finetune.py` (part 1, today) |"
+      - find: "| `toy_alignment.py` |"
+        with: "| `toy_alignment.py` (part 2, Day 12) |"
+      - find: "That storage is the memory bill from video 14."
+        with: "That storage is the memory bill from the Full Fine-Tuning video in this step."
+      - find: "The DPO loop is the loss from video 18, written out gradient by gradient."
+        with: "The DPO loop is the loss from the Direct Preference Optimization video (Day 12), written out gradient by gradient."
+      - find: |-
+          ```
+          5 · RLHF: where the policy converges as the KL leash loosens
+                 β    E[RM]   E[true]     KL   most likely answer
+              0.50    +1.69     +4.30   0.34   JSON + friendly line, right
+              0.10    +1.96     +3.45   1.81   short friendly JSON, WRONG category    ← reward hacking
+              0.02    +2.11     +2.15   3.90   short friendly JSON, WRONG category
+          ```
+
+          The reward model's score (`E[RM]`) keeps rising as the leash loosens, while true value
+          peaks and then falls. That is Goodhart's law in one table. With `--expert-labels`, every
+          row improves on SFT.
+        with: >-
+          Part 2 of this lesson, `toy_alignment.py`, prints a table of its own. You run it on Day 12, step 1
+          (Training toys, part 2).
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 2 · Full vs LoRA vs DoRA (lesson 17-full-vs-peft-mlx)
+  # ---------------------------------------------------------------------------------------------------------
+  d11-s2:
+    why: >-
+      You train one real model three ways on the same 800 support tickets: change every number, or train a small
+      add-on (LoRA, and its variant DoRA). One table then shows what each cost, what it gained and what it broke.
+    why_example: >-
+      Lesson example: the fully trained model saves a file of about 990 MB; the LoRA add-on saves about 9 MB, 110
+      times smaller, with accuracy close to full.
+    start_first:
+      command: "cd lessons/17-full-vs-peft-mlx && bash run_variants.sh"
+      note: >-
+        Run it from the `03-labs` folder with the Python environment on (`source .venv/bin/activate`). It checks
+        the data, downloads the model the first time (about 1 GB) and trains it three times: 15 to 45 minutes in
+        all. Leave it running while you watch. For the other commands, open a second terminal window, go to
+        `03-labs`, run `source .venv/bin/activate`, then `cd lessons/17-full-vs-peft-mlx`.
+    videos:
+      15-sft:
+        in_this_video: >-
+          What training-by-example data looks like, why only the answer is graded, how much data you need, and how
+          to read the training curves.
+        key_points:
+          - point: >-
+              Supervised fine-tuning (SFT) teaches by example: a prompt in, the ideal answer out, and only the
+              answer is graded.
+            detail: >-
+              Each ticket example holds a system message (the standing instructions), the customer's ticket and the
+              ideal JSON answer. The trainer skips the first two when scoring (masking the prompt); `run_variants.sh`
+              turns this on with `--mask-prompt`.
+          - point: >-
+              A few hundred clean examples beat many noisy ones.
+            detail: >-
+              Typical ranges for ticket triage with LoRA on a 7B model: 50 examples mostly fix the format, 500 add 8
+              to 12 points of accuracy, 2,000 add 12 to 16, then it flattens. 20,000 noisy ones often do worse than
+              2,000 clean. Today's data: 800 training tickets.
+          - point: >-
+              Read the two loss curves together: training loss (how wrong it is on the examples it learns from) and
+              validation loss (how wrong on examples held back).
+            detail: >-
+              Both falling: it is learning. Training falling while validation rises: it is memorising, so stop
+              earlier or add data. Both flat and high: check the data, or raise the learning rate (the size of each
+              nudge). The video's usual starting values: about 0.0001 (written 1e-4) for LoRA, 10 times smaller for
+              full.
+    plain:
+      lead: >-
+        Today you train one small model three ways on the same 800 support tickets. Full fine-tuning changes every
+        number in it. LoRA freezes it and trains a small add-on; DoRA is a LoRA variant. One table then shows what
+        each cost (memory, time, file size), what it gained (accuracy) and what it broke (general knowledge).
+      picture: >-
+        Full fine-tuning reprints the whole textbook with your changes, and while it works it needs about 8 times
+        the book's room for drafts and notes. LoRA sticks a pad of notes on the pages that matter: cheap, easy to
+        swap, and the original text stays readable underneath. With LoRA almost all the weight you carry is the
+        book itself.
+      numbers_source: "Qwen2.5-0.5B-Instruct, lesson 17's calculator and expected table"
+      numbers:
+        - >-
+          The model: 490 million numbers, stored at 2 bytes each (bf16, a 16-bit format): 0.98 GB, about 1 GB.
+        - >-
+          Full fine-tuning: 490 million x 16 bytes = 7.8 GB, 8 times the model. The working numbers for each batch
+          of examples (activations) come on top: the lesson expects a peak of about 8 to 10 GB.
+        - >-
+          LoRA at rank 16 (the add-on's size setting, in the calculator's example): 2,162,688 trained numbers, 0.44%
+          of the model. Memory: the 0.98 GB frozen model plus 2.16 million x 16 bytes (0.03 GB), about 1.0 GB.
+          With activations, about 2 to 3 GB at peak.
+        - >-
+          Saved file, from the lesson's expected table: about 990 MB for full (a whole new model) against about
+          9 MB for LoRA, 110 times smaller. Your own run's sizes are the real figures.
+        - >-
+          The same sums for an 8B model: 128 GB to train fully, 16.2 GB with LoRA, 4.7 GB with QLoRA (LoRA on a
+          4-bit copy of the model).
+      words:
+        - term: "Full fine-tuning"
+          def: >-
+            Training that changes every number in the model. Example: 7.8 GB of training memory for the 0.5B model.
+        - term: "LoRA and DoRA"
+          def: >-
+            Freeze the model and train a small add-on beside it. DoRA also trains one extra number per row of each
+            grid, setting how strong that row is; it often scores 1 to 2 accuracy points higher and trains a bit
+            slower. Example: under 1% of the numbers trained.
+        - term: "Checkpoint"
+          def: >-
+            The file a training run saves: the whole changed model for full fine-tuning, only the add-on for LoRA.
+            Example: about 990 MB against about 9 MB in the lesson's expected table.
+        - term: "Forgetting"
+          def: >-
+            Getting better at the trained task and worse at everything else. Example: a drop in the 12-question
+            general quiz.
+    run:
+      - cmd: "python sft_data_check.py"
+        note: >-
+          Checks the 800 training tickets before any training. It looks for unreadable lines, unknown speakers
+          (each message must be marked as the instructions, the customer, the model or a tool), examples that do
+          not end with the answer, duplicates and over-long examples. It also catches any ticket that also sits in
+          the 100-ticket test set (a leak). **Look for** `rows 800` and `no problems found`.
+      - cmd: "python peft_params.py --model 0.5b"
+        note: >-
+          Works out, from the model's real shape, how many numbers each method trains and how much memory training
+          needs for today's 0.5B model. **Look for** 7.8 GB for full against about 1.0 GB for LoRA, which trains
+          2,162,688 numbers (0.441%). Its LoRA file size says about 4 MB, not the lesson's expected 9 MB: the
+          calculator assumes rank 16 and 2 bytes per saved number, while `run_variants.sh` uses the trainer's own
+          defaults. Your own run's files give the real size.
+      - cmd: "python peft_params.py --model 8b --rank 16"
+        note: >-
+          The same sums for Llama 3.1 8B, a size customers use. **Look for** 128.0 GB for full, 16.2 GB for LoRA and
+          4.7 GB for QLoRA (LoRA on a 4-bit copy of the model); the saved file is 16.0 GB for full against 27 MB for
+          LoRA. The Full Fine-Tuning video's rough figures are about 20 million numbers, 20 GB and 40 MB; the
+          calculator counts rank 16 on the attention grids exactly.
+      - cmd: "python peft_params.py --model 70b --rank 64 --mlp"
+        note: >-
+          A 70B model at a higher rank, also adapting the MLP grids (the other big block in every layer). **Look
+          for** 1129.6 GB for full, about 1.1 TB, against 154.5 GB for LoRA and 53.0 GB for QLoRA.
+      - cmd: "bash run_variants.sh"
+        note: >-
+          Checks the data again, then trains the model three ways, full, LoRA and DoRA, with the same tickets and
+          settings: 300 steps of 4 examples (1,200 examples, 1.5 passes over the 800). Full uses a learning rate
+          (the size of each nudge) 10 times smaller: 0.00001 against 0.0001, printed 1e-5 and 1e-4. Expect 5 to 15
+          minutes per method. If you started it before the video, let that run finish instead of starting a second
+          one. **Look for** `Val loss` (how wrong it is on 100 held-back tickets) falling every 100 steps, and a
+          `Peak mem` figure in each run.
+      - cmd: "python compare_variants.py"
+        note: >-
+          Reads the three training logs, then tests the untrained model and each trained one on two things: the
+          category of 100 held-out tickets (30 in wordings never seen in training), and Day 4's 12 quick general
+          questions. **Look for** task accuracy jumping from about 40% to high for all three, LoRA and DoRA close to
+          full, and any quiz drop in the `full` row.
+    see: >-
+      Each row is one method. `trainable_%` is how much of the model it trained; `peak_mem_GB` the most memory it
+      used; `minutes` how long it took; `val_loss` how wrong it still was on held-back tickets. `ckpt_MB` adds up
+      everything in the run's folder, including the trainer's in-between copies, so it can read several times
+      the saved file. `task_acc_%` is the share of test tickets sorted correctly, and `general_quiz` the
+      12-question check for forgetting. The lesson's table is the expected shape, not exact figures, and your
+      trainer version may count a little differently. Yours lists the untrained model first, then dora, full,
+      lora (alphabetical). Read across a row: what it cost, what it bought, what it broke.
+    checks:
+      - q: >-
+          Day 11's real training run starts from a model stored at 16 bits per number (bf16). On Day 8 you trained
+          an add-on for a 7-billion-number model stored at 4 bits. Why must this comparison of full fine-tuning and
+          LoRA use a 16-bit model, not a 4-bit one?
+        plain: >-
+          Full fine-tuning changes every stored number, and 4-bit numbers are too coarse to take the tiny nudges
+          training makes. Day 8's QLoRA worked only because it never changed the 4-bit numbers: it trained a
+          separate add-on instead.
+        picture: >-
+          A 4-bit number is like a ruler marked only in whole centimetres. Training wants to move each mark by a
+          hair's width, and on that ruler the nudge rounds away to nothing. QLoRA leaves the coarse ruler alone and
+          writes the fine corrections on a separate note.
+        numbers_source: "lesson 17, and Day 8's lesson 11"
+        numbers:
+          - >-
+            4 bits can hold only 2 x 2 x 2 x 2 = 16 different values; 16 bits can hold 65,536.
+          - >-
+            Day 11's model (Qwen2.5-0.5B-Instruct) at 16 bits: 490 million numbers x 2 bytes = 0.98 GB, small
+            enough to train fully on a 16 GB Mac (about 8 to 10 GB at peak).
+          - >-
+            Day 8's QLoRA: a 7B model frozen at 4 bits plus a small 16-bit add-on, about 6 to 10 GB to train. A full
+            fine-tune of the same model needs about 120 GB (it has 7.6 billion numbers: 7.6 x 16 = 122 GB).
+        words:
+          - term: "bf16"
+            def: >-
+              A 16-bit number format used for training, 2 bytes per number. Example: Day 11's model is 0.98 GB in
+              bf16.
+          - term: "QLoRA"
+            def: >-
+              LoRA on a model stored in 4 bits: the model stays frozen, only the add-on trains. Example: about 6 to
+              10 GB for a 7B model on Day 8.
+          - term: "Frozen"
+            def: >-
+              Left unchanged during training. Example: the 4-bit model in QLoRA.
+          - term: "Gradient"
+            def: >-
+              The correction worked out for each trainable number at each training step. Example: full
+              fine-tuning keeps one for every number.
+        more: >-
+          Quantized weights sit on a coarse grid, and rounding to that grid gives no useful gradient, so a training
+          step cannot move them reliably. QLoRA keeps the 4-bit base frozen (only read, and turned back into 16-bit
+          numbers for the math) and sends gradients only into the 16-bit adapter. `run_variants.sh` uses the bf16
+          base for all three runs so that full, LoRA and DoRA compare fairly.
+      - q: >-
+          Day 11's memory calculator (`peft_params.py --model 8b`) says LoRA needs about 16 GB to train, but full
+          fine-tuning needs 128 GB. Where do LoRA's 16 GB go?
+        plain: >-
+          Almost all of it is the model itself, frozen and stored at 2 bytes per number. The add-on and its training
+          state are tiny. Store the frozen model in 4 bits instead (QLoRA) and it drops to about 5 GB.
+        picture: >-
+          You hire a moving truck to deliver one small box: nearly all the cost is the truck, not the box. In LoRA
+          the truck is the frozen model and the box is the add-on. QLoRA books a smaller truck: the same model
+          squeezed into 4 bits.
+        numbers_source: "`peft_params.py --model 8b --rank 16`, lesson 17"
+        numbers:
+          - >-
+            Frozen model: 8 billion numbers x 2 bytes = 16 GB.
+          - >-
+            LoRA add-on at rank 16: 13.6 million numbers (0.17% of the model) x 16 bytes = 0.22 GB.
+          - >-
+            Total: 16 + 0.22 = 16.2 GB. Full: 8 billion x 16 bytes = 128 GB, about 8 times as much.
+          - >-
+            QLoRA: the frozen model at 4 bits is half a byte per number, plus a little for shared scale numbers:
+            0.5625 bytes. 8 billion x 0.5625 = 4.5 GB, plus 0.22 = 4.7 GB, about 5 GB.
+        words:
+          - term: "Frozen model"
+            def: >-
+              The original model, kept unchanged and only read during LoRA training. Example: 16 GB for an 8B model
+              at 2 bytes per number.
+          - term: "Adapter (add-on)"
+            def: >-
+              The small set of extra numbers LoRA trains and saves. Example: 13.6 million numbers for an 8B model
+              at rank 16.
+          - term: "Optimizer state"
+            def: >-
+              The running averages the optimizer (Adam) keeps per trained number to size each nudge. Example: 8 of
+              the 16 bytes per number.
+          - term: "QLoRA"
+            def: >-
+              LoRA on a model stored in 4 bits. Example: 4.7 GB for an 8B model instead of 16.2 GB.
+        more: >-
+          `peft_params.py` counts LoRA as 2 B x base parameters (frozen bf16 weights, no gradients or optimizer
+          state) + 16 B x adapter parameters (bf16 weight and gradient, fp32 Adam m and v, fp32 master copy). QLoRA's
+          0.5625 B per base weight is 4 bits plus the shared scales of each small block. Activations come on top of
+          every figure and grow with batch x sequence length; `--grad-checkpoint` trims them.
+      - q: >-
+          In today's runs, full fine-tuning makes nudges 10 times smaller than LoRA's (a learning rate of 0.00001
+          against 0.0001). Why?
+        plain: >-
+          Full fine-tuning moves every number in the model, including the ones that hold its general skills. Big
+          steps across all of them would damage what the model already knows.
+        picture: >-
+          Restoring a painting: if you may touch every inch, you use a fine brush and light strokes, or you ruin the
+          parts that were already right. Painting on a clear sheet laid over it (LoRA), bolder strokes are safe,
+          because the original underneath is untouched.
+        numbers_source: "`run_variants.sh` and the Supervised Fine-Tuning video"
+        numbers:
+          - >-
+            LoRA and DoRA: learning rate 1e-4 (0.0001). Full: 1e-5 (0.00001), 10 times smaller.
+          - >-
+            Full moves all 490 million numbers. LoRA at rank 16 (the calculator's example) moves about 2.2 million
+            (0.44%) and the rest stay frozen. Your training log's `Trainable parameters` line gives today's exact
+            share.
+          - >-
+            The Supervised Fine-Tuning video gives the same pair: about 1e-4 for LoRA, about 10 times smaller for
+            full.
+          - >-
+            The damage would show in the general quiz: the untrained model scores about 9 of 12, and a drop below
+            that is usually in the full row.
+        words:
+          - term: "Learning rate"
+            def: >-
+              How big a nudge each training step gives each number. Example: 1e-4 (0.0001) for LoRA, 1e-5
+              (0.00001) for full.
+          - term: "Forgetting"
+            def: >-
+              Getting better at the trained task and worse at everything else. Example: a lower general quiz score.
+          - term: "General quiz"
+            def: >-
+              Day 4's 12 quick questions (math, facts, format), reused here to spot forgetting. Example: about 9 of
+              12 for the untrained model.
+          - term: "Training step"
+            def: >-
+              One update: the model sees a few examples and adjusts. Example: 300 steps of 4 tickets.
+        more: >-
+          An Adam update moves each weight by roughly the learning rate, so 1e-5 across every weight is still a large
+          total change to the network. Adapter updates are confined to a low-rank correction that starts at zero
+          (B = 0), so a larger rate is safe. Too large a rate in full fine-tuning shows up as a general-quiz drop,
+          the forgetting that claim 3 of the lesson looks for.
+    say:
+      ask: "Should we fine-tune the whole model or use LoRA?"
+      means:
+        - phrase: "I ran full, LoRA and DoRA on the same data"
+          meaning: >-
+            I trained the same model three ways on the same 800 tickets with the same settings, so the comparison is
+            fair. Quote your own table's numbers.
+        - phrase: "LoRA got within a couple of points of full"
+          meaning: >-
+            LoRA's task accuracy landed within about 2 percentage points of full training. The Full Fine-Tuning
+            video says the same: usually within 1 to 2 points on a narrow task.
+        - phrase: "at a fraction of the memory"
+          meaning: >-
+            About 2 to 3 GB at peak for LoRA against about 8 to 10 GB for full, on the 0.5B model. On an 8B model:
+            16.2 GB against 128 GB.
+        - phrase: "with a 9 MB checkpoint instead of a gigabyte"
+          meaning: >-
+            The lesson expects the saved LoRA add-on at about 9 MB, and the fully trained model as a whole new copy
+            of about 990 MB. Say your own `adapters.safetensors` sizes from today's run. Small files are why one
+            server can hold many customers' add-ons.
+        - phrase: "and without denting general ability"
+          meaning: >-
+            The 12-question general quiz stayed about where the untrained model was (about 9 of 12): no forgetting.
+        - phrase: "For a narrow task, I start with LoRA"
+          meaning: >-
+            For one well-defined job, like sorting tickets into 4 categories, LoRA is my first choice.
+        - phrase: "and only go full when the eval gap is real"
+          meaning: >-
+            I switch to full fine-tuning only if tests on the customer's own examples show LoRA falling measurably
+            short.
+    fields:
+      - id: d11-peak-mem
+        label: "Peak memory while training: full / LoRA / DoRA (GB)"
+        hint: >-
+          The `peak_mem_GB` column of `compare_variants.py`. The table lists dora first; write them as full / LoRA /
+          DoRA, separated by slashes.
+        unit: "GB"
+        meaning: >-
+          The most of your Mac's memory each method needed. Full needs several times LoRA's: the 16-bytes-per-number
+          bill.
+        example: "about 8 to 10 / 2 to 3 / 3 (the lesson's expected shape)"
+      - id: d11-ckpt-mb
+        label: "Saved file size: full / LoRA / DoRA (MB)"
+        hint: >-
+          The size of each saved file: run `ls -lh adapters/*/adapters.safetensors` in the lesson folder (M means
+          about a million bytes). The `ckpt_MB` column adds up the whole folder, including the trainer's in-between
+          copies, so it can read several times higher. Write them as full / LoRA / DoRA.
+        unit: "MB"
+        meaning: >-
+          What you store, ship and swap. A LoRA file this small is why one server can hold many customers' add-ons
+          (multi-LoRA).
+        example: "about 990 / 9 / 9 (the lesson's expected files)"
+      - id: d11-task-acc
+        label: "Task accuracy: untrained / full / LoRA / DoRA (%)"
+        hint: >-
+          The `task_acc_%` column: tickets whose category the model got right, out of 100 held-out tickets. The
+          table lists the untrained model, then dora, full, lora; write them in the label's order.
+        unit: "%"
+        meaning: >-
+          What training bought. Expect all three well above the untrained model, with LoRA and DoRA close to full.
+        example: "untrained about 40; the three trained rows high and close together"
+      - id: d11-quiz
+        label: "General quiz: untrained / full / LoRA / DoRA (out of 12)"
+        hint: >-
+          The `general_quiz` column of `compare_variants.py`. The table lists the untrained model, then dora, full,
+          lora; write them in the label's order.
+        unit: "of 12"
+        meaning: >-
+          What training broke, if anything: a drop means forgetting. On 12 questions it is a smoke alarm, not proof.
+        example: "untrained about 9; LoRA and DoRA about the same; full may drop"
+    done: >-
+      `compare_variants.py` has printed one table with rows for the untrained model and for full, LoRA and DoRA,
+      showing peak memory, file size, task accuracy and the general quiz.
+    stuck:
+      - problem: "The full run stops with an out-of-memory error, or the Mac slows to a crawl."
+        fix: >-
+          Full training peaks at about 8 to 10 GB. Close big apps and try again, or skip it. To skip it, first
+          remove what the failed run left behind in the lesson folder, or `compare_variants.py` will try to test
+          it: `rm -rf logs/full.log adapters/full`.
+          Then run `VARIANTS="lora dora" bash run_variants.sh`. Record that full training did not fit on your
+          Mac: it is a useful measured limit for your comparison.
+      - problem: "Training takes too long."
+        fix: >-
+          Run `ITERS=150 bash run_variants.sh`: 150 steps instead of 300, about half the time. Note it next to your
+          numbers.
+      - problem: "`run_variants.sh` stops with `fix the data first`."
+        fix: >-
+          `sft_data_check.py` found a problem in the training file and printed its type with the first line
+          number. If you edited `data/tickets/`, rebuild it from the `03-labs` folder with
+          `python data/make_tickets.py`.
+      - problem: "`compare_variants.py` says `No logs yet: run bash run_variants.sh first.`"
+        fix: >-
+          It reads the `logs/` folder inside `lessons/17-full-vs-peft-mlx`. Run `bash run_variants.sh` there first,
+          then `python compare_variants.py` from the same folder.
+      - problem: "`compare_variants.py` says the model evaluation was skipped."
+        fix: >-
+          The accuracy and quiz columns need mlx-lm on an Apple-silicon Mac. Turn the environment on
+          (`source .venv/bin/activate` from `03-labs`) and run it again. The memory, time and file-size columns
+          come from the logs either way.
+      - problem: "`mlx_lm.lora: command not found`"
+        fix: >-
+          mlx-lm is missing from the environment. From `03-labs`, run `source .venv/bin/activate`, then
+          `pip install -r requirements.txt` (Day 1's setup), then `bash run_variants.sh` again.
+    replace:
+      - find: "Videos 14–16 make three claims."
+        with: "Today's three videos (Full Fine-Tuning, Supervised Fine-Tuning and Parameter-Efficient Fine-Tuning) make three claims."
+
+wrapup:
+  done: >-
+    Your table puts full fine-tuning, LoRA and DoRA side by side on the same model and data: peak memory, saved file
+    size, task accuracy and the general quiz. You can also say why the toy's rank-1 add-on stayed stuck.
+  whiteboards:
+    - video: 14-full-finetuning
+      q: >-
+        How much memory does it take to train a model by changing every number in it (full fine-tuning)? Work it
+        out for a 1-billion, an 8-billion and a 70-billion-number model. Then compare LoRA on the 70B.
+      given: >-
+        Training keeps about 16 bytes for every number in the model: the number itself (2), its gradient, the
+        direction to nudge it (2), the optimizer's two running averages (4 + 4) and a precise master copy (4). The
+        working numbers for each group of examples (activations) come on top. One H100 GPU holds 80 GB.
+      plain: >-
+        About 16 GB, 130 GB and 1.1 TB (terabytes, about 1,100 GB). So a 1B model trains on one big GPU, an 8B
+        needs two, and a 70B needs sixteen plus software that splits the job. LoRA on the 70B needs about 160 GB:
+        2 to 4 GPUs.
+      picture: >-
+        Moving house: the furniture (the model) is only part of the load. For training you also pack a spare copy of
+        every item, a note on where each should move, and two running tallies of past moves. The truck must be
+        about 8 times bigger than for the furniture alone.
+      steps:
+        - >-
+          Bytes per number: 2 (the number, 16-bit) + 2 (its gradient) + 4 + 4 (the optimizer's two running
+          averages, 32-bit) + 4 (the 32-bit master copy) = 16 bytes.
+        - >-
+          1B model: 1 billion x 16 bytes = 16 GB: one large GPU (an 80 GB H100 has room to spare).
+        - >-
+          8B model: 8 x 16 = 128 GB, about 130. One 80 GB H100 is not enough; two give 160 GB.
+        - >-
+          70B model: 70 x 16 = 1,120 GB, about 1.1 TB. 1,120 ÷ 80 = 14 GPUs for that alone. The video plans 16
+          H100s (1,280 GB), which leaves room for the activations on top, with ZeRO or FSDP splitting the weights,
+          gradients and optimizer state across them.
+        - >-
+          LoRA on the same 70B: the frozen model at 2 bytes, 70 x 2 = 140 GB, plus a small add-on and its training
+          state: about 160 GB, 2 to 4 H100s. Step 2's calculator gives 154.5 GB at rank 64 with the MLP grids
+          adapted too (`--mlp`), before activations.
+        - >-
+          Compare serving the 70B: 70 x 2 = 140 GB. Full training needs 8 times that (16 ÷ 2).
+      note: >-
+        Memory, not computing speed, decides whether you can train fully. The first fix is often a smaller model:
+        the video notes that a full fine-tune of an 8B can beat a LoRA on a 70B.
+      kit_q: >-
+        Worked example · what full fine-tuning needs · ≈16 bytes per parameter, plus activations
+      kit_a: >-
+        1B model: ≈ 16 GB · one big GPU. 8B model: ≈ 130 GB · 2× H100 80 GB. 70B model: ≈ 1.1 TB · 16× H100 +
+        sharding. LoRA on the same 70B: ≈ 160 GB · 2–4× H100. Memory, not compute, decides whether you can full
+        fine-tune.
+      more: >-
+        The 16 bytes are mixed-precision Adam: bf16 weights and gradients (2 + 2), Adam's fp32 first and second
+        moments, its two running averages (4 + 4), and an fp32 master copy (4). Lesson 16's toy counts 12 bytes per trainable number (the gradient
+        plus the two moments at 4 bytes each), leaving out the weights. Activations grow with batch x sequence
+        length; gradient checkpointing recomputes them (about 30% slower), and 8-bit optimizers cut the bill to
+        about 10 bytes per parameter. ZeRO and FSDP shard weights, gradients and optimizer state, so each GPU holds
+        the total ÷ N.
+      words:
+        - term: "Gradient"
+          def: >-
+            The correction worked out for each trainable number at each training step. Example: 2 of the 16 bytes.
+        - term: "Optimizer (Adam)"
+          def: >-
+            The rule that nudges each number; Adam keeps two running averages per number. Example: 8 of the 16
+            bytes.
+        - term: "Activations"
+          def: >-
+            The working numbers computed for each example during training, kept for the correction step. Example:
+            they come on top of the 16 bytes.
+        - term: "Sharding (ZeRO, FSDP)"
+          def: >-
+            Splitting the weights, gradients and optimizer state across several GPUs. Example: a 70B full
+            fine-tune over 16 H100s.
+    - video: 16-peft
+      q: >-
+        One grid of numbers inside a model (a projection) is 4,096 by 4,096. You add a LoRA add-on of rank 16 beside
+        it. How many numbers does the add-on train, and what share of the grid is that? And across a whole 8B model?
+      given: >-
+        LoRA freezes the grid W and trains two thin grids beside it: A, 16 rows by 4,096, and B, 4,096 by 16 (16 is
+        the rank). Multiplying B by A gives a full 4,096 by 4,096 grid of corrections, which is added to W.
+      plain: >-
+        The add-on trains 131,072 numbers, under 1% of the grid's 16.8 million. Across a whole 8B model, adapting
+        the attention grids, that is a fraction of 1% of all its numbers.
+      picture: >-
+        The grid is a spreadsheet with 16.8 million cells. Instead of editing cells, you write one 16-column list
+        and one 16-row list; multiplying them fills in a correction for every cell at once. Two thin lists, one big
+        effect.
+      steps:
+        - >-
+          The full grid: 4,096 x 4,096 = 16,777,216 numbers, about 16.8 million.
+        - >-
+          A: 16 x 4,096 = 65,536 numbers. B: 4,096 x 16 = 65,536.
+        - >-
+          The add-on: 65,536 + 65,536 = 131,072 numbers.
+        - >-
+          Share of the grid: 131,072 ÷ 16,777,216 = 0.78%, about 0.8%.
+        - >-
+          Whole 8B model, attention only: the video estimates 0.2 to 0.5% of all numbers. Step 2's calculator, at
+          rank 16 on the four attention grids of all 32 layers, gives 13,631,488 numbers: 0.17%. It comes in lower
+          because two of those grids (k and v) are 4,096 by 1,024, a quarter the size (GQA). Four full-size grids
+          would give 4 x 131,072 x 32 = 16,777,216 numbers, 0.21%.
+        - >-
+          The rank is the dial: at rank 32, A and B double (262,144 numbers, 1.6% of the grid). More room to learn,
+          more memory.
+      note: >-
+        Why it pays: 50 customers with full fine-tunes need 50 files of 16 GB and 50 deployments. 50 LoRA add-ons
+        of about 40 MB each fit on one deployment (the video's second worked example).
+      kit_q: >-
+        Worked example · the size of one adapter · one 4096 × 4096 projection · rank r = 16
+      kit_a: >-
+        full matrix W: 16.8 M. LoRA A (r × 4096): 65,536. LoRA B (4096 × r): 65,536. trainable share: 0.8% of this
+        matrix. whole 8B model, attention only: ≈ 0.2–0.5% of weights. Rank r is the dial: bigger r, more capacity,
+        more memory.
+      more: >-
+        LoRA adds r·(in + out) parameters per adapted matrix (`peft_params.py` line 5); the layer computes
+        W·x + (α / r)·B·A·x with W frozen. B starts at zero, so training starts exactly at the pretrained model
+        (lesson 16's `train_lora()`). After training, B·A can be merged into W for zero extra latency, or kept as a
+        separate file for multi-LoRA serving. At 2 bytes per number, the Full Fine-Tuning video's roughly 20 million
+        adapter numbers for an 8B model make its roughly 40 MB file.
+      words:
+        - term: "Rank (LoRA rank)"
+          def: >-
+            The add-on's size setting, the width of its thin grids: how many separate kinds of change it can make at
+            once. Example: 16 here.
+        - term: "Projection (weight grid)"
+          def: >-
+            One grid of learned numbers that a layer multiplies its input by. Example: 4,096 x 4,096 in an 8B
+            model's attention.
+        - term: "Adapter (add-on)"
+          def: >-
+            The small set of extra numbers LoRA trains and saves. Example: 131,072 for this one grid.
+        - term: "Multi-LoRA"
+          def: >-
+            One server holds one model and many add-ons, applying the right one to each request. Example: 50
+            customers on one deployment.
+
+glossary:
+  # Shared with earlier days: the earliest day's definition, word for word (Days 1, 2, 3, 6, 7, 8 and 10;
+  # Day 4's terms in the site's lowercase-first form)
+  - term: "4-bit, 8-bit, 16-bit"
+    def: "how many bits store each number; fewer bits, smaller model."
+    example: "today's model is trained at 16 bits; Day 8's base was frozen at 4 bits."
+  - term: "Accuracy (category accuracy)"
+    def: "the share of replies with the right answer, checked against each test example's known label."
+    example: "`task_acc_%`: about 40% for the untrained model in lesson 17's expected table."
+  - term: "Adam"
+    def: "the usual training method for adjusting a model's numbers; it keeps two running averages per trainable number."
+    example: "`adam()` in `toy_finetune.py` stores them for every trained number."
+  - term: "Adapter (LoRA adapter)"
+    def: "the small set of extra numbers LoRA trains and saves; the base model stays unchanged."
+    example: "about 9 MB in lesson 17's expected table."
+  - term: "Attention (the look-back step)"
+    def: "the step where each new token looks back at the notes on earlier tokens."
+    example: "LoRA usually adapts its four grids (q, k, v and o)."
+  - term: "Base model"
+    def: "the model a fine-tune starts from and leaves unchanged."
+    example: "the `base (no training)` row; a full fine-tune writes a changed copy of about 990 MB."
+  - term: "Batch size (training)"
+    def: "how many examples the model learns from in one training step."
+    example: "4 in `run_variants.sh`."
+  - term: "Bit"
+    def: "a single 0 or 1; 8 bits make a byte."
+    example: "4 bits can hold 16 different values."
+  - term: "Byte"
+    def: "8 bits."
+    example: "training keeps about 16 bytes per number."
+  - term: "Deployment (production)"
+    def: "a model running as a live service for real users."
+    example: "50 full fine-tunes need 50 of them; 50 LoRA adapters fit on one."
+  - term: "Epoch"
+    def: "one full pass through all the training examples."
+    example: "300 steps x 4 tickets = 1,200, one and a half passes over 800."
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "`compare_variants.py` tests each variant on 100 held-out tickets."
+  - term: "Fine-tune"
+    def: "further training of an existing model on your own examples."
+    example: "three kinds today: full, LoRA and DoRA."
+  - term: "Frozen"
+    def: "left unchanged during training."
+    example: "`W0` in the toy; the whole model in LoRA."
+  - term: "Full fine-tune"
+    def: "fine-tuning that changes every number in the model."
+    example: "128 GB of training memory for an 8B model, by lesson 17's calculator."
+  - term: "GB"
+    def: "1,000,000,000 bytes."
+    example: "0.98 GB for the 0.5B model at 2 bytes per number."
+  - term: "Generalise"
+    def: "do well on new examples, not only the ones trained on."
+    example: "30 of the 100 test tickets use wordings never seen in training."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "an 80 GB H100."
+  - term: "Gradient"
+    def: "the correction worked out for each trainable number at each training step."
+    example: "full fine-tuning keeps one for every number: 2 of the 16 bytes."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "a full fine-tune of an 8B model (about 130 GB) needs two."
+  - term: "Held-out examples"
+    def: "examples set aside before training and never trained on."
+    example: "`test.jsonl`, 100 tickets; the toy tests on 500 new inputs."
+  - term: "Iteration (training step)"
+    def: "one update: the model sees a small batch of examples and adjusts."
+    example: "300 iterations of 4 tickets in `run_variants.sh`."
+  - term: "JSON"
+    def: "a plain-text format for data that programs can read: named fields inside curly brackets."
+    example: "the ideal answer in every training ticket."
+  - term: "JSONL"
+    def: "a file with one JSON record per line."
+    example: "`train.jsonl` holds 800 tickets."
+  - term: "Layer"
+    def: "one of the stacked processing stages each token passes through; each keeps its own notes."
+    example: "24 in Qwen2.5-0.5B, 32 in Llama 3.1 8B."
+  - term: "Leak (data leakage)"
+    def: "data used to judge a model has also shaped it, so the score looks better than it is."
+    example: "301 training tickets identical to test tickets, caught by `sft_data_check.py` while the kit was built."
+  - term: "LoRA"
+    def: "a cheap way to customise a model: train a small add-on instead of changing the whole model."
+    example: "256 trained numbers instead of 4,096 in the toy."
+  - term: "Loss (training loss)"
+    def: "a score of how wrong the model's guesses are on the examples it trains on; lower is better."
+    example: "`Train loss` in each training log."
+  - term: "MB"
+    def: "1,000,000 bytes."
+    example: "about 9 MB for the LoRA adapter in lesson 17's expected table."
+  - term: "MLX"
+    def: "Apple's own software for running and training models on Apple chips; `mlx_lm.server` is its model server."
+    example: "`mlx_lm.lora --fine-tune-type full`, `lora` or `dora`."
+  - term: "Multi-LoRA"
+    def: "one server keeps one base model and many adapters, applying the right adapter to each request."
+    example: "50 customers' adapters of about 40 MB each on one deployment."
+  - term: "Optimizer state"
+    def: "the running averages the training method (Adam) keeps per trainable number to size each correction."
+    example: "8 of the 16 bytes per number in a full fine-tune."
+  - term: "Overfitting"
+    def: "learning the training examples by heart instead of the task, so new examples go worse."
+    example: "training loss falling while validation loss rises (the Supervised Fine-Tuning video)."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "Qwen2.5-0.5B has 0.49 billion."
+  - term: "Peak memory"
+    def: "the most memory a job uses at any moment."
+    example: "`peak_mem_GB`: about 8 to 10 for full, 2 to 3 for LoRA."
+  - term: "Precision"
+    def: "how many bits each stored number gets."
+    example: "bf16 (16 bits) for today's training."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "a support ticket plus the triage instructions."
+  - term: "QLoRA"
+    def: "LoRA on a base model stored in 4 bits, so training fits in far less memory."
+    example: "4.7 GB for an 8B model, against 16.2 GB for LoRA."
+  - term: "Quantization (quantize)"
+    def: "storing numbers with fewer bits."
+    example: "QLoRA's 4-bit frozen model."
+  - term: "Rank (LoRA rank)"
+    def: "how wide the adapter's small grids are; a higher rank means more capacity and a bigger file."
+    example: "the toy's task needs rank 2; rank 1 stays stuck."
+  - term: "Scale"
+    def: "one shared number stored with a small block of numbers so they can be squeezed into fewer bits."
+    example: "why QLoRA's 4-bit model takes 0.5625 bytes per number, not 0.5."
+  - term: "Synthetic data"
+    def: "examples made by a program or a model instead of collected from real users."
+    example: "the kit's 1,000 tickets from `data/make_tickets.py`."
+  - term: "Tenant"
+    def: "one customer, or business unit, sharing a platform with others."
+    example: "50 tenants in the Parameter-Efficient Fine-Tuning video's worked example."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "step 2 uses two: one trains, one runs the calculators."
+  - term: "Test set (held-out set)"
+    def: "examples kept out of training and out of every decision, used only for the final score."
+    example: "`test.jsonl`, 100 tickets."
+  - term: "Ticket triage"
+    def: "sorting incoming support tickets by type and urgency."
+    example: "billing, outage, how-to or abuse, with a severity from 1 to 5."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "`sft_data_check.py` estimates about 4 characters per token."
+  - term: "Training set"
+    def: "the examples the model learns from."
+    example: "`train.jsonl`, 800 tickets."
+  - term: "Validation loss"
+    def: "a score of how wrong the model still is on the validation set; lower is better."
+    example: "`val_loss`: the lesson expects the lowest for full."
+  - term: "Validation set"
+    def: "examples kept out of training and checked during it, to decide when to stop."
+    example: "`valid.jsonl`, 100 tickets."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "mlx-lm and numpy live inside it."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "4,096 of them in the toy layer."
+  - term: "Chip"
+    def: "the processor that does the model's math."
+    example: "an Apple M-series chip trains today's model."
+  - term: "Fireworks"
+    def: "a cloud service that runs AI models and charges per use; one platform used in this course."
+    example: "its reinforcement fine-tuning (RFT) scores answers with a grader."
+  - term: "Latency"
+    def: "how long someone waits."
+    example: "a merged LoRA adapter adds none."
+  - term: "Llama 3.1 8B, Llama 3 70B"
+    def: "the open models used in the lessons and videos, with 8 and 70 billion parameters."
+    example: "128 GB to fully fine-tune the 8B, by lesson 17's calculator."
+  - term: "NVIDIA"
+    def: "the company whose GPUs run most data-center AI."
+    example: "it makes the H100."
+  - term: "Request"
+    def: "one message sent to the model for an answer."
+    example: "multi-LoRA applies the right adapter to each one."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "one server can hold many customers' LoRA adapters."
+  - term: "DPO (direct preference optimization)"
+    def: "training from pairs of answers where one is marked better, to teach taste or judgement."
+    example: "the last stage of lesson 16's toy, run on Day 12."
+  - term: "Instruct model"
+    def: "a model already trained to follow instructions and chat."
+    example: "Qwen2.5-0.5B-Instruct, trained three more ways today."
+  - term: "Proxy"
+    def: "a stand-in measure used because the real goal is hard to measure directly."
+    example: "a reward model is a proxy for what the customer wants."
+  - term: "GQA (grouped-query attention)"
+    def: "groups of attention heads share one set of notes."
+    example: "why Llama 3.1 8B's k and v grids are 4,096 x 1,024, a quarter the size of q and o."
+  - term: "KL (Kullback-Leibler divergence)"
+    def: "a measure of how far one model's choices have drifted from another's; 0 means identical."
+    example: "the KL leash charges the model for that drift (previewed on Day 11, run on Day 12)."
+  - term: "Preference tuning"
+    def: "training a model on which answers people prefer, rather than on single correct answers."
+    example: "Day 12's DPO step."
+  - term: "System prompt"
+    def: "the fixed instructions at the start of every request that set how the model behaves."
+    example: "the system message at the start of every training ticket."
+  - term: "TB"
+    def: "1,000,000,000,000 bytes, or 1,000 GB."
+    example: "about 1.1 TB to fully fine-tune a 70B model."
+  - term: "β (beta)"
+    def: "the leash in RLHF and DPO: how far training may pull the model from its starting copy; smaller means a longer leash."
+    example: "lesson 16's toy loosens it from 0.50 to 0.02."
+  # New on Day 11 (where Day 7 or Day 12 defines the same term, its text is used word for word)
+  - term: "Activations"
+    def: "the working numbers a model computes for each example during training, kept for the correction step; they grow with batch size and example length."
+    example: "they come on top of the 16 bytes per number."
+  - term: "bf16 (bfloat16)"
+    def: "a 16-bit number format used for training, 2 bytes per number."
+    example: "`Qwen2.5-0.5B-Instruct-bf16`: 0.49 billion numbers, 0.98 GB."
+  - term: "Checkpoint (saved model file)"
+    def: "the file a training run saves: the whole changed model for a full fine-tune, only the adapter for LoRA."
+    example: "about 990 MB against about 9 MB in lesson 17's expected table."
+  - term: "DoRA"
+    def: "a LoRA variant that splits each weight into a size (magnitude) and a direction, and trains LoRA on the direction."
+    example: "often 1 to 2 points above LoRA, a little slower (the Parameter-Efficient Fine-Tuning video)."
+  - term: "Forgetting"
+    def: "getting better at the trained task and worse at everything else."
+    example: "a drop in the 12-question general quiz, usually in the full row."
+  - term: "fp32"
+    def: "a 32-bit number format, 4 bytes per number; training keeps the optimizer's averages and the master copy in it."
+    example: "12 of the 16 bytes per number in a full fine-tune."
+  - term: "General quiz"
+    def: "Day 4's 12 quick questions (math, facts, format), reused in lesson 17 to spot forgetting."
+    example: "about 9 of 12 for the untrained model."
+  - term: "Gradient checkpointing (`--grad-checkpoint`)"
+    def: "recomputing activations during training instead of storing them: less memory, somewhat slower."
+    example: "about 30% slower (the Full Fine-Tuning video)."
+  - term: "Grader"
+    def: "anything that scores a model's reply: a code check, a judge model or a person."
+    example: "Fireworks' reinforcement fine-tuning (RFT) trains with one."
+  - term: "Held-out error"
+    def: "how wrong a trained model is on new examples it never saw; lower is better."
+    example: "0.1321 for the toy's rank-1 add-on at 200 examples."
+  - term: "KL leash (KL penalty)"
+    def: "a charge for drifting from the starting model, added to the reward so training cannot run off after loopholes."
+    example: "lesson 16's toy loosens it from β 0.50 to 0.02."
+  - term: "Learning rate"
+    def: "how big a nudge each training step gives each number."
+    example: "1e-4 (0.0001) for LoRA, 1e-5 for full."
+  - term: "Master copy"
+    def: "a 32-bit copy of every weight kept during training, so many tiny nudges add up accurately."
+    example: "4 of the 16 bytes per number."
+  - term: "Mixed precision"
+    def: "training that does its math with 16-bit numbers while keeping 32-bit copies where accuracy matters."
+    example: "bf16 math with an fp32 master copy and fp32 optimizer averages: about 16 bytes per number."
+  - term: "MLP (feed-forward block)"
+    def: "the other big part of each layer besides attention, made of three large weight grids (gate, up, down)."
+    example: "`peft_params.py --mlp` adds them to what LoRA adapts."
+  - term: "numpy"
+    def: "a Python library for fast math on lists of numbers."
+    example: "the lesson 16 toys need nothing else."
+  - term: "PEFT (parameter-efficient fine-tuning)"
+    def: "the family of methods that customise a model by training a tiny fraction of it."
+    example: "LoRA, QLoRA, DoRA, adapter layers, prompt tuning and IA3."
+  - term: "Projection (weight grid)"
+    def: "one grid of learned numbers that a layer multiplies its input by."
+    example: "4,096 x 4,096 = 16.8 million numbers in an 8B model's attention."
+  - term: "Prompt masking (`--mask-prompt`)"
+    def: "counting the training error only on the answer, not on the system message or the customer's text."
+    example: "`run_variants.sh` passes `--mask-prompt`."
+  - term: "Qwen2.5-0.5B-Instruct"
+    def: "a small open instruct model with about half a billion parameters, used in the training lessons."
+    example: "`mlx-community/Qwen2.5-0.5B-Instruct-bf16`, about 1 GB."
+  - term: "Reward hacking"
+    def: "a model raising its score by exploiting the scorer's blind spots instead of getting better."
+    example: "in lesson 16's toy the score rises to +1.96 while true value falls to +3.45."
+  - term: "Reward model"
+    def: "a model trained on people's comparisons to give any answer a single score."
+    example: "in lesson 16's toy it agrees with its labellers 71% of the time."
+  - term: "RFT (reinforcement fine-tuning)"
+    def: "training against a grader that scores each answer from 0 to 1, for tasks where correctness can be checked automatically."
+    example: "tests passing or an exact match as the grade."
+  - term: "RLHF (reinforcement learning from human feedback)"
+    def: "training a model to chase a reward model's score, learned from people's comparisons, on a leash."
+    example: "Day 12's first step runs it on a toy."
+  - term: "SFT (supervised fine-tuning)"
+    def: "training on examples of the right answer, to teach format, tone and domain patterns."
+    example: "today's 800 tickets, each with its ideal JSON answer."
+  - term: "Sequence length"
+    def: "how many tokens one training example holds."
+    example: "activations grow with batch size x sequence length."
+  - term: "Sharding (ZeRO, FSDP)"
+    def: "splitting a model's weights, gradients and optimizer state across several GPUs so each holds a share."
+    example: "a 70B full fine-tune across 16 H100s."
+  - term: "Toy (toy model)"
+    def: "a training problem shrunk until every number fits on one screen, keeping the real algorithm."
+    example: "one 64 x 64 layer in `toy_finetune.py`."

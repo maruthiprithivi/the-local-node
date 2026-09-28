@@ -1,0 +1,14 @@
+{
+  "name": "the-local-node",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "posters": "node scripts/posters.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "dev": "npm run build && wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^4.34.0"
+  }
+}

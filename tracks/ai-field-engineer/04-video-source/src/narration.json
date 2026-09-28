@@ -1,0 +1,2771 @@
+{
+  "inference-101": {
+    "title": "Inference 101",
+    "subtitle": "What actually happens when you call an LLM",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 1 of 18",
+          "headline": "Inference 101",
+          "sub": "Prefill, decode, and the two numbers customers feel",
+          "learn": "the two phases, and the four numbers customers feel"
+        },
+        "text": "Every LLM request has two phases, and almost every performance conversation you will have with a customer is really about one of them."
+      },
+      {
+        "visual": "PrefillDecode",
+        "params": {
+          "phase": "prefill"
+        },
+        "text": "Phase one is prefill. The model reads the entire prompt in parallel, in one big matrix multiply, and builds the key value cache. Prefill is compute heavy, and it ends the moment the first token appears. That moment is time to first token."
+      },
+      {
+        "visual": "PrefillDecode",
+        "params": {
+          "phase": "decode"
+        },
+        "text": "Phase two is decode. The model writes one token at a time, and each step must read every weight again from memory. Decode is memory bandwidth bound, and the gap between tokens is inter token latency."
+      },
+      {
+        "visual": "Metrics",
+        "params": {},
+        "text": "So four numbers matter. Time to first token, inter token latency, total throughput across all users, and goodput: the throughput you can sustain while still meeting the latency target. Agree the target percentile with the customer before you benchmark anything."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Where the time goes",
+          "items": [
+            "Long prompt, short answer → prefill dominates. Fix with prompt caching.",
+            "Short prompt, long answer → decode dominates. Fix with faster memory or speculation.",
+            "Spiky p95 with a fine p50 → queueing or cold starts, not the model."
+          ]
+        },
+        "text": "Diagnosis is simple once you know which phase you are in. Long prompt and short answer means prefill dominates, so prompt caching wins. Short prompt and long answer means decode dominates, so you need faster memory, batching, or speculative decoding. And a fine median with an ugly ninety fifth percentile is almost always queueing or cold starts, not the model."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · support assistant",
+          "scenario": "6,000-token system prompt · 200-token question · 300-token answer",
+          "rows": [
+            [
+              "prompt tokens",
+              "6,200"
+            ],
+            [
+              "prefill rate",
+              "≈ 8,000 tok/s"
+            ],
+            [
+              "TTFT",
+              "0.78 s"
+            ],
+            [
+              "output tokens",
+              "300"
+            ],
+            [
+              "ITL",
+              "22 ms"
+            ],
+            [
+              "decode time",
+              "6.6 s"
+            ]
+          ],
+          "answer": "Total 7.4 s — and 89% of it is decode",
+          "answerLabel": "Where the time goes"
+        },
+        "text": "Let us put numbers on it. A support assistant sends a six thousand token system prompt, a two hundred token question, and gets a three hundred token answer. Prefill runs at roughly eight thousand tokens a second, so six thousand two hundred tokens takes about zero point eight seconds. That is your time to first token. Then decode: three hundred tokens at twenty two milliseconds each is six point six seconds."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Same model, different workload",
+          "scenario": "Code completion · 200 tokens in · 30 tokens out",
+          "rows": [
+            [
+              "prefill",
+              "25 ms"
+            ],
+            [
+              "decode",
+              "0.66 s"
+            ],
+            [
+              "dominant phase",
+              "decode"
+            ],
+            [
+              "what to optimise",
+              "speculation, faster memory"
+            ]
+          ],
+          "answer": "Ask for the token shape before you promise a latency number",
+          "answerLabel": "The lesson"
+        },
+        "text": "Now change the shape. A code completion request: two hundred tokens in, thirty tokens out. Prefill is twenty five milliseconds, decode is under a second. Same model, same GPU, a completely different performance problem, and a completely different fix."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Fix the support assistant",
+          "beforeLabel": "no caching",
+          "afterLabel": "prompt caching",
+          "rows": [
+            [
+              "p95 TTFT",
+              "780 ms",
+              "120 ms"
+            ],
+            [
+              "prefill tokens billed",
+              "6,200",
+              "200"
+            ],
+            [
+              "input cost / 1k calls",
+              "$0.93",
+              "$0.09"
+            ]
+          ],
+          "note": "Same model, same hardware. The only change is not recomputing what you already computed."
+        },
+        "text": "And this is what fixing the first one looks like. The system prompt never changes, so prompt caching removes almost all of the prefill. Time to first token drops from seven hundred and eighty milliseconds to about a hundred and twenty, and the input bill drops with it. Nothing about the model changed."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Prefill is one parallel pass; decode is one token at a time",
+            "TTFT comes from prefill and queueing; ITL comes from decode",
+            "Always agree the percentile and the traffic profile first"
+          ]
+        },
+        "text": "Three things to take away. Prefill is one parallel pass; decode is one token at a time. TTFT comes from prefill and queueing; ITL comes from decode. Always agree the percentile and the traffic profile first."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 01 · Lab F1 — build your own TTFT and ITL harness"
+        },
+        "text": "Next, the key value cache, the thing that makes decode possible and then quietly eats all your GPU memory. And when you are ready to run it: lesson one, lab F1: build your own TTFT and ITL harness."
+      }
+    ]
+  },
+  "kv-cache": {
+    "title": "The KV Cache",
+    "subtitle": "Why memory management is the whole game",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 2 of 18",
+          "headline": "The KV cache",
+          "sub": "Mise en place for transformers",
+          "learn": "why memory, not maths, limits how many users fit"
+        },
+        "text": "The key value cache is the most important data structure in LLM serving, and the reason your customer's GPU runs out of memory at three in the afternoon."
+      },
+      {
+        "visual": "KvGrow",
+        "params": {},
+        "text": "Attention compares the current token against the keys and values of every earlier token. Those keys and values never change, so we store them. Without the cache, generating the thousandth token would mean recomputing the first nine hundred and ninety nine."
+      },
+      {
+        "visual": "KvMath",
+        "params": {},
+        "text": "The size is arithmetic you should be able to do on a whiteboard. Two, for keys and values, times layers, times key value heads, times head dimension, times bytes per number. For Llama three seventy B that is about a third of a megabyte per token, so a single request with a one hundred and twenty eight thousand token context needs around forty gigabytes, just for its cache."
+      },
+      {
+        "visual": "KvBlocks",
+        "params": {
+          "mode": "naive"
+        },
+        "text": "Now the memory management problem. The naive approach reserves the maximum possible length for every request up front. Most requests never use it, so the majority of your expensive memory sits reserved and empty."
+      },
+      {
+        "visual": "KvBlocks",
+        "params": {
+          "mode": "paged"
+        },
+        "text": "Paged attention fixes this by borrowing from operating systems. The cache is cut into fixed size blocks that need not be contiguous, and a block table maps logical positions to physical blocks. Requests grow a block at a time, shared prefixes can share blocks, and the same GPU serves two to four times more users."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "What to say to a customer",
+          "items": [
+            "\"Your weights fit; it's the KV cache that doesn't.\"",
+            "Cap max context, or move the KV cache to FP8, and concurrency roughly doubles.",
+            "Grouped query attention already shrank this 4–8×. Check the model's KV heads."
+          ]
+        },
+        "text": "So when a deployment dies at load, the line is almost always: your weights fit, it is the cache that does not. Cap the maximum context, or move the cache to eight bit, and you roughly double the number of users per GPU."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · Llama 3 8B",
+          "scenario": "32 layers · 8 KV heads · head dim 128 · FP16",
+          "rows": [
+            [
+              "KV per token",
+              "2 × 32 × 8 × 128 × 2 = 128 KB"
+            ],
+            [
+              "8K context",
+              "1.05 GB per request"
+            ],
+            [
+              "weights (FP8)",
+              "8 GB"
+            ],
+            [
+              "H100 memory",
+              "80 GB"
+            ],
+            [
+              "memory left for KV",
+              "≈ 64 GB"
+            ]
+          ],
+          "answer": "About 60 concurrent 8K sessions — then you are full",
+          "answerLabel": "Capacity"
+        },
+        "text": "Here is the calculation that decides how many users fit. Llama three eight B: thirty two layers, eight key value heads, head dimension one twenty eight, two bytes. Two times thirty two times eight times one twenty eight times two is one hundred and twenty eight kilobytes per token. At eight thousand tokens of context that is about one gigabyte per user."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Two changes, four times the users",
+          "beforeLabel": "FP16 KV · 8K",
+          "afterLabel": "FP8 KV · 4K",
+          "rows": [
+            [
+              "KV per request",
+              "1.05 GB",
+              "0.26 GB"
+            ],
+            [
+              "concurrent sessions",
+              "≈ 60",
+              "≈ 240"
+            ],
+            [
+              "extra hardware",
+              "—",
+              "none"
+            ]
+          ],
+          "note": "Check whether the context limit is a product requirement or a default nobody questioned."
+        },
+        "text": "Two cheap changes move that number a long way. Quantising the cache to eight bits halves it. Capping context at four thousand tokens halves it again. Together they take you from sixty concurrent users to two hundred and forty on exactly the same card, which is usually a better answer than buying another G P U."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "KV per token = 2 × layers × KV heads × head dim × bytes",
+            "PagedAttention removes the reservation waste",
+            "FP8 KV roughly doubles how many users fit"
+          ]
+        },
+        "text": "Three things to take away. KV per token = 2 × layers × KV heads × head dim × bytes. PagedAttention removes the reservation waste. FP8 KV roughly doubles how many users fit."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 05 · Lab L5 — push context until it breaks, then fix it"
+        },
+        "text": "Next, the hardware underneath, and why decode speed is really a memory bandwidth number. And when you are ready to run it: lesson five, lab L5: push context until it breaks, then fix it."
+      }
+    ]
+  },
+  "gpu-bandwidth": {
+    "title": "GPU Bandwidth",
+    "subtitle": "The number that predicts decode speed",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 3 of 18",
+          "headline": "Bandwidth, not FLOPS",
+          "sub": "Predicting decode speed on any accelerator",
+          "learn": "how to predict decode speed on any accelerator"
+        },
+        "text": "Here is the single most useful piece of hardware intuition for this job. For single stream decode, the bottleneck is almost never compute. It is memory bandwidth."
+      },
+      {
+        "visual": "BandwidthPipe",
+        "params": {
+          "device": "H100"
+        },
+        "text": "Every decode step reads the whole model out of memory and does only about two floating point operations per parameter. An H100 can do around nine hundred and eighty nine teraflops, but it can only move three point three five terabytes per second. The cores spend most of their time waiting for the pipe."
+      },
+      {
+        "visual": "Ceiling",
+        "params": {},
+        "text": "That gives you a formula worth memorising. Tokens per second, for one user, is at most memory bandwidth divided by the bytes read per token. A seventy billion parameter model in eight bit is seventy gigabytes, so on an H100 the ceiling is about forty eight tokens per second, no matter how many teraflops the datasheet claims."
+      },
+      {
+        "visual": "DeviceTable",
+        "params": {},
+        "text": "Apply it across hardware and the picture gets clearer. H100, three point three five terabytes per second. H200, four point eight. B200, eight. And a DGX Spark on your desk, two hundred and seventy three gigabytes per second, which is over ten times less than an H100, even though its prefill performance is genuinely strong."
+      },
+      {
+        "visual": "Roofline",
+        "params": {},
+        "text": "Batching is how you escape. Load the weights once, and serve many users from that single read. Arithmetic intensity climbs, the workload crosses the ridge point, and you finally start using the compute you paid for. That is why you benchmark at concurrency, never at batch size one."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Sizing heuristics",
+          "items": [
+            "Single-stream ceiling = bandwidth ÷ bytes read per token.",
+            "Real dense models land at roughly 60–85% of that ceiling.",
+            "Prefill is compute-bound; decode is bandwidth-bound. Size them separately."
+          ]
+        },
+        "text": "In practice, dense models land at sixty to eighty five percent of the theoretical ceiling. Use the formula to sanity check any vendor number you are given, including your own."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · turning an SLA into hardware",
+          "scenario": "\"100 tokens/sec per user, on a 70B model\"",
+          "rows": [
+            [
+              "weights at FP8",
+              "70 GB"
+            ],
+            [
+              "required bandwidth",
+              "100 × 70 = 7,000 GB/s"
+            ],
+            [
+              "H100",
+              "3,350 GB/s → 48 tok/s"
+            ],
+            [
+              "H200",
+              "4,800 GB/s → 69 tok/s"
+            ],
+            [
+              "B200",
+              "8,000 GB/s → 114 tok/s"
+            ]
+          ],
+          "answer": "B200 — or quantise to 4-bit and an H100 reaches ~96 tok/s",
+          "answerLabel": "Two ways to say yes"
+        },
+        "text": "A customer says they need one hundred tokens per second per user on a seventy billion parameter model. Turn that into a hardware requirement. One hundred tokens a second times seventy gigabytes of weights is seven terabytes per second of memory bandwidth. An H one hundred has three point three five. So the honest answer is: not on an H one hundred, not at that precision."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "The same maths on a desktop",
+          "scenario": "DGX Spark · 273 GB/s unified memory",
+          "rows": [
+            [
+              "70B FP8",
+              "273 ÷ 70 = 3.9 tok/s"
+            ],
+            [
+              "70B 4-bit",
+              "273 ÷ 38 = 7.2 tok/s"
+            ],
+            [
+              "8B 4-bit",
+              "273 ÷ 4.5 = 61 tok/s"
+            ],
+            [
+              "measured 8B NVFP4",
+              "38.7 tok/s = 64% of ceiling"
+            ]
+          ],
+          "answer": "Predict, then measure. Landing at 60–85% means you understand the system",
+          "answerLabel": "How to use it"
+        },
+        "text": "The same arithmetic works on your own desk, which is why it is worth practising there. A DGX Spark moves two hundred and seventy three gigabytes a second. A seventy billion parameter model in eight bit is seventy gigabytes, so the ceiling is under four tokens a second. In four bit it is about seven. Those numbers are not a disappointment, they are a prediction you can check in five minutes."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Decode ceiling = bandwidth ÷ bytes read per token",
+            "Real dense models land at 60–85% of that ceiling",
+            "Batching is how you buy back idle compute"
+          ]
+        },
+        "text": "Three things to take away. Decode ceiling = bandwidth ÷ bytes read per token. Real dense models land at 60–85% of that ceiling. Batching is how you buy back idle compute."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lessons 03–04 · Labs L3, L4 — sweep, then check the ceiling"
+        },
+        "text": "Next, quantization, which is the cheapest way to buy back bandwidth you do not have. And when you are ready to run it: lessons three and four, labs L3 and L4: run the concurrency sweep, then check it against the ceiling."
+      }
+    ]
+  },
+  "quantization": {
+    "title": "Quantization",
+    "subtitle": "Fewer bits, more tokens",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 4 of 18",
+          "headline": "Quantization",
+          "sub": "FP16 to FP8 to four-bit, and what it costs you",
+          "learn": "what you gain and what you risk at 8 and 4 bits"
+        },
+        "text": "If decode speed is bandwidth divided by bytes, there are only two levers. Get more bandwidth, or move fewer bytes. Quantization is the second lever."
+      },
+      {
+        "visual": "Precision",
+        "params": {
+          "mode": "fp16"
+        },
+        "text": "Sixteen bit floating point is the baseline: one sign bit, five exponent bits, ten mantissa bits. Two bytes per parameter, so a seventy billion parameter model is one hundred and forty gigabytes of weights."
+      },
+      {
+        "visual": "Precision",
+        "params": {
+          "mode": "fp8"
+        },
+        "text": "Eight bit floating point halves that. Hopper and Blackwell have hardware eight bit tensor cores, so you also get roughly double the math throughput. Quality loss on most tasks is small, but you still prove it with the customer's own evaluation set."
+      },
+      {
+        "visual": "Precision",
+        "params": {
+          "mode": "int4"
+        },
+        "text": "Four bit, whether that is A W Q, G P T Q, G G U F, or NVIDIA's N V F P 4 format, quarters it again. Each weight becomes one of sixteen levels with a shared scale per group. This is what makes a seventy billion parameter model fit comfortably on a single desktop box."
+      },
+      {
+        "visual": "KvQuant",
+        "params": {},
+        "text": "Do not forget the cache. Quantizing the key value cache to eight bit is often the higher leverage move, because it directly doubles how many concurrent users fit in the same memory."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "The professional answer",
+          "items": [
+            "Pick precision per workload, then prove quality on the customer's eval set.",
+            "FP8 on H100+ is close to free; four-bit needs measurement.",
+            "Blackwell adds FP4 / NVFP4 — that is what Fireworks' FireAttention V4 targets."
+          ]
+        },
+        "text": "The professional answer when advising a customer is never just use eight bit. It is: pick the precision per workload, measure on the customer's evaluation set, and remember that the cache matters as much as the weights."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · one 70B model, three precisions",
+          "scenario": "H100 80GB · 8K context per session",
+          "rows": [
+            [
+              "FP16",
+              "140 GB → 2 GPUs"
+            ],
+            [
+              "FP8",
+              "70 GB → 10 GB spare → ~3 sessions"
+            ],
+            [
+              "4-bit",
+              "35 GB → 45 GB spare → ~14 sessions"
+            ],
+            [
+              "KV per session",
+              "≈ 2.6 GB at 8K"
+            ]
+          ],
+          "answer": "Quantization buys concurrency, not just speed",
+          "answerLabel": "The real reason"
+        },
+        "text": "Precision is really a capacity decision. Seventy billion parameters at sixteen bits is one hundred and forty gigabytes, so you need two H one hundreds before a single user connects. At eight bits it fits on one card with ten gigabytes spare, which sounds fine until you notice ten gigabytes is only about three long context sessions. At four bits you free forty five gigabytes, and the same card holds fourteen."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Prove it on their data",
+          "beforeLabel": "FP16 baseline",
+          "afterLabel": "FP8",
+          "rows": [
+            [
+              "schema-valid rate",
+              "100%",
+              "99%"
+            ],
+            [
+              "category accuracy",
+              "89%",
+              "88%"
+            ],
+            [
+              "tokens/sec",
+              "24",
+              "46"
+            ],
+            [
+              "sessions per GPU",
+              "3",
+              "7"
+            ]
+          ],
+          "note": "Numbers are illustrative — the point is the shape of the table you bring to the meeting."
+        },
+        "text": "And this is how you prove it is safe. Run the customer's own evaluation at each precision and put quality next to speed. A two point drop in schema validity for double the throughput is usually a good trade. A twenty point drop never is, no matter how fast it got."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "FP8 halves memory and doubles math on H100 and later",
+            "Four-bit quarters it; prove quality on the customer's evals",
+            "Quantizing the KV cache is often the bigger win"
+          ]
+        },
+        "text": "Three things to take away. FP8 halves memory and doubles math on H100 and later. Four-bit quarters it; prove quality on the customer's evals. Quantizing the KV cache is often the bigger win."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 04 · Lab L4 — three precisions, measured"
+        },
+        "text": "Next, how modern servers keep the GPU busy, with batching, scheduling and speculation. And when you are ready to run it: lesson four, lab L4: three precisions of one model, measured."
+      }
+    ]
+  },
+  "batching": {
+    "title": "Batching & Scheduling",
+    "subtitle": "Keeping expensive silicon busy",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 5 of 18",
+          "headline": "Batching & scheduling",
+          "sub": "Continuous batching, chunked prefill, speculation",
+          "learn": "how servers keep expensive silicon busy"
+        },
+        "text": "A GPU that is waiting is a GPU you are paying for. Three techniques keep it working, and all three come up in customer benchmarks."
+      },
+      {
+        "visual": "BatchGantt",
+        "params": {
+          "mode": "static"
+        },
+        "text": "Static batching gathers a group of requests, runs them together, and waits for the longest one to finish before starting the next group. Short requests sit idle in finished slots, and utilisation drops toward forty percent."
+      },
+      {
+        "visual": "BatchGantt",
+        "params": {
+          "mode": "continuous"
+        },
+        "text": "Continuous batching swaps at every decode step. The moment one request completes, a waiting one takes its slot. Same hardware, same requests, far higher utilisation, and this is the default in v L L M and S G Lang."
+      },
+      {
+        "visual": "ChunkedPrefill",
+        "params": {},
+        "text": "Chunked prefill solves the other half. A single hundred thousand token prompt would otherwise block everyone else's streaming, so the server splits that prefill into chunks and interleaves them with decode steps. It trades a little time to first token for a much smoother experience under load."
+      },
+      {
+        "visual": "SpecDecode",
+        "params": {},
+        "text": "Speculative decoding attacks latency directly. A small draft model proposes several tokens, and the big model verifies them all in a single pass. Accepted tokens are free speed, and quality is unchanged because the big model checks every one. Fireworks takes this further by training the drafter on each customer's own traffic."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Benchmark like a field engineer",
+          "items": [
+            "Sweep concurrency: 1, 2, 4, 8, 16, 32. Report the curve, not one number.",
+            "Report p50 and p95 for TTFT and ITL separately.",
+            "State the traffic profile: input length, output length, arrival rate."
+          ]
+        },
+        "text": "When you benchmark, sweep concurrency rather than reporting a single number, separate the two latency metrics, and always state the traffic profile you used. That is the difference between a credible benchmark and a marketing slide."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · 12 requests, 4 slots",
+          "rows": [
+            [
+              "static · all done",
+              "step 24"
+            ],
+            [
+              "static · GPU busy",
+              "61%"
+            ],
+            [
+              "continuous · all done",
+              "step 17"
+            ],
+            [
+              "continuous · GPU busy",
+              "87%"
+            ]
+          ],
+          "answer": "Same hardware, about 30% more work per hour",
+          "answerLabel": "Result"
+        },
+        "text": "Here is the whole argument in one example. Twelve requests of different lengths, four G P U slots. Static batching finishes at step twenty four with the G P U busy sixty one percent of the time. Continuous batching finishes the same work at step seventeen, with the G P U busy eighty seven percent. No new hardware, no quality change, just a scheduler that does not wait."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "A real stack of fixes",
+          "beforeLabel": "before",
+          "afterLabel": "after",
+          "rows": [
+            [
+              "p95 TTFT",
+              "2.8 s",
+              "0.40 s"
+            ],
+            [
+              "p95 ITL",
+              "48 ms",
+              "26 ms"
+            ],
+            [
+              "GPUs",
+              "2",
+              "2"
+            ],
+            [
+              "changes",
+              "—",
+              "caching + chunked prefill + speculation"
+            ]
+          ],
+          "note": "Measure after each change, or you will not know which one paid."
+        },
+        "text": "In a real deployment these stack. A chat product at twenty requests a second had a p ninety five time to first token of two point eight seconds. Prefix caching removed the repeated prompt, chunked prefill stopped one long document blocking everyone, and speculation shortened the tail. It ended at four hundred milliseconds on the same two G P Uz."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Continuous batching keeps every slot working",
+            "Chunked prefill stops one huge prompt blocking everyone",
+            "Speculative decoding cuts latency without changing output"
+          ]
+        },
+        "text": "Three things to take away. Continuous batching keeps every slot working. Chunked prefill stops one huge prompt blocking everyone. Speculative decoding cuts latency without changing output."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lessons 03 & 13 · Labs L3, F7 — sweep, then add speculation"
+        },
+        "text": "Next, the training side. How a base model becomes the customer's model. And when you are ready to run it: lessons three and thirteen, labs L3 and F7: sweep concurrency, then add speculation."
+      }
+    ]
+  },
+  "training": {
+    "title": "Training Techniques",
+    "subtitle": "SFT, LoRA, DPO and reinforcement fine-tuning",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 6 of 18",
+          "headline": "Customising a model",
+          "sub": "Four techniques and when each one is right",
+          "learn": "which customisation method fits which problem"
+        },
+        "text": "Customers rarely need a new model. They need an existing one to behave differently, and there are four standard ways to get there."
+      },
+      {
+        "visual": "TrainingPipeline",
+        "params": {
+          "stage": 0
+        },
+        "text": "Start with what you are given. A base model has been pretrained on a huge corpus, then instruction tuned and aligned by its creator. You are adapting the end of that pipeline, not repeating it."
+      },
+      {
+        "visual": "TrainingPipeline",
+        "params": {
+          "stage": 1
+        },
+        "text": "Supervised fine tuning teaches format, tone and domain patterns from examples of correct behaviour. Prompt and ideal answer pairs, usually a few hundred to a few thousand. This is the right first move when the model can do the task but not the way the customer wants."
+      },
+      {
+        "visual": "LoRA",
+        "params": {},
+        "text": "Low rank adaptation is how that fine tune is usually done. Instead of updating billions of weights, you freeze them and train two small matrices alongside. The result is an adapter of a few tens of megabytes, and one base deployment can serve hundreds of them at once."
+      },
+      {
+        "visual": "TrainingPipeline",
+        "params": {
+          "stage": 2
+        },
+        "text": "Direct preference optimisation is next. Instead of one right answer, you give pairs: this response is preferred over that one. Use it when quality is a matter of taste or judgement that is easier to compare than to write."
+      },
+      {
+        "visual": "TrainingPipeline",
+        "params": {
+          "stage": 3
+        },
+        "text": "Reinforcement fine tuning goes further again. You supply prompts and a grader that scores an answer from zero to one, and the model learns against that reward. Use it when correctness is checkable: tests pass, the schema validates, the tool call succeeds, the number matches."
+      },
+      {
+        "visual": "TrainDecide",
+        "params": {},
+        "text": "The decision rule is simple. Can you write the right answer? Use supervised fine tuning. Can you only compare two answers? Use preference optimisation. Can you score an answer automatically? Use reinforcement fine tuning. And before any of them, try a better prompt and retrieval, because that is free."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · ticket triage",
+          "scenario": "2,000 examples × 600 tokens × 2 epochs = 2.4M training tokens",
+          "rows": [
+            [
+              "base model accuracy",
+              "81%"
+            ],
+            [
+              "after LoRA SFT",
+              "89%"
+            ],
+            [
+              "training cost",
+              "≈ $1.20 at $0.50 / 1M"
+            ],
+            [
+              "adapter size",
+              "≈ 30 MB"
+            ],
+            [
+              "serving",
+              "one base, many adapters"
+            ]
+          ],
+          "answer": "Then stop and ask what the remaining errors actually are",
+          "answerLabel": "Next"
+        },
+        "text": "Make it concrete with a ticket triage model. The base model gets eighty one percent of categories right. Two thousand examples of supervised fine tuning, about two point four million training tokens, costs a little over a dollar on a managed platform and takes the model to eighty nine percent. That is the cheapest eight points you will ever buy."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Pick the method from the failure",
+          "scenario": "What do the remaining errors look like?",
+          "rows": [
+            [
+              "wrong format or domain language",
+              "SFT"
+            ],
+            [
+              "right answer, wrong judgement",
+              "DPO"
+            ],
+            [
+              "checkable correctness",
+              "RFT with a grader"
+            ],
+            [
+              "missing facts",
+              "retrieval, not training"
+            ]
+          ],
+          "answer": "\"Missing facts\" is the one people get wrong — that is RAG, not fine-tuning",
+          "answerLabel": "The common mistake"
+        },
+        "text": "Because the next step depends on what is left. If the answers are right but the tone is wrong, that is preference data and D P O. If the output must satisfy a schema or pass a test, that is a grader, and reinforcement fine tuning optimises against it directly. Same model, three different failure modes, three different methods."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "SFT teaches format, DPO teaches taste, RFT teaches correctness",
+            "LoRA keeps it cheap: one base, many adapters",
+            "Better prompts and retrieval come first — they are free"
+          ]
+        },
+        "text": "Three things to take away. SFT teaches format, DPO teaches taste, RFT teaches correctness. LoRA keeps it cheap: one base, many adapters. Better prompts and retrieval come first — they are free."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lessons 10–11 · Labs F5, L8 — one fine-tune, managed and local"
+        },
+        "text": "Next, making big models fit, with sizing, offloading and mixture of experts. And when you are ready to run it: lessons ten and eleven, labs F5 and L8: the same fine-tune, managed and local. The training deep dives follow in videos fourteen to eighteen."
+      }
+    ]
+  },
+  "offloading": {
+    "title": "Fitting Big Models",
+    "subtitle": "Sizing, offloading, MoE and multi-GPU",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 7 of 18",
+          "headline": "Making it fit",
+          "sub": "Memory maths, offloading and mixture of experts",
+          "learn": "how to answer \"will it fit?\" with a formula"
+        },
+        "text": "Will it fit is the most common question you will be asked, and it deserves a formula rather than a guess."
+      },
+      {
+        "visual": "MemoryStack",
+        "params": {},
+        "text": "Total memory is weights, plus key value cache, plus about ten percent for activations, fragmentation and the runtime. Weights are parameters times bytes per parameter. The cache is per token, times context length, times concurrent requests."
+      },
+      {
+        "visual": "Offload",
+        "params": {},
+        "text": "When it does not fit, you have four options, in order of preference. Quantize further. Add GPUs and shard the model. Cut the context or the concurrency. And only as a last resort, offload layers to CPU memory or disk, which is slower by an order of magnitude because you are now bound by a much narrower pipe."
+      },
+      {
+        "visual": "MoEActive",
+        "params": {},
+        "text": "Mixture of experts changes the arithmetic in a very useful way. A model may hold a hundred and twenty billion parameters, but route each token through only a few billion of them. You pay for the total in memory and for the active portion in speed, which is why a hundred and twenty billion parameter mixture of experts model can outrun a dense thirty billion one."
+      },
+      {
+        "visual": "Parallelism",
+        "params": {},
+        "text": "Across GPUs there are two main splits. Tensor parallelism slices every layer across GPUs and synchronises after each one, so it needs very fast links and usually stays inside a single server. Pipeline parallelism gives each GPU a block of layers, which tolerates slower links but adds latency and idle bubbles."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "On a 128 GB unified-memory desktop",
+          "items": [
+            "Weights + KV + 10% must fit in roughly 115 GB usable.",
+            "MoE in four-bit is the sweet spot: big model, small active read.",
+            "Decode is bandwidth-bound: expect tens of tokens/sec, not hundreds."
+          ]
+        },
+        "text": "On a single desktop class box with a hundred and twenty eight gigabytes of unified memory, the practical sweet spot is a four bit mixture of experts model. Big capability, small active read, and everything stays in one memory pool."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · can we run 405B?",
+          "rows": [
+            [
+              "FP16 weights",
+              "810 GB → no (8×H100 = 640 GB)"
+            ],
+            [
+              "FP8 weights",
+              "405 GB → yes on 8×H100"
+            ],
+            [
+              "4-bit weights",
+              "203 GB → yes on 4×H100"
+            ],
+            [
+              "KV at 8K, 32 users",
+              "≈ 40 GB on top"
+            ]
+          ],
+          "answer": "8×H100 at FP8 — or 4×H100 at 4-bit if quality holds",
+          "answerLabel": "Recommendation"
+        },
+        "text": "Try the question you will actually be asked: can we run a four hundred and five billion parameter model? At sixteen bits the weights alone are eight hundred and ten gigabytes, so eight H one hundreds at eighty gigabytes each cannot hold it. At eight bits it is four hundred and five, which fits on eight cards with room for cache. In four bit it is two hundred and three and fits on four."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Why MoE changes the answer",
+          "scenario": "gpt-oss 120B · MXFP4 · on a 128 GB desktop",
+          "rows": [
+            [
+              "file on disk",
+              "59 GiB"
+            ],
+            [
+              "read per token",
+              "≈ 5 GB"
+            ],
+            [
+              "measured decode",
+              "55 tok/s"
+            ],
+            [
+              "dense 14B for comparison",
+              "23 tok/s"
+            ]
+          ],
+          "answer": "Memory is sized on total parameters; speed on active ones",
+          "answerLabel": "The rule"
+        },
+        "text": "And the mixture of experts version of the same question has a much nicer answer. A hundred and twenty billion parameter model in four bit is about sixty gigabytes on disk, but only around five gigabytes are read per token. It fits in one desktop box and decodes faster than a dense fourteen billion parameter model on the same hardware."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Memory = weights + KV cache + about ten percent",
+            "MoE pays for total parameters, runs at active-parameter speed",
+            "Offloading to CPU or disk is the last resort"
+          ]
+        },
+        "text": "Three things to take away. Memory = weights + KV cache + about ten percent. MoE pays for total parameters, runs at active-parameter speed. Offloading to CPU or disk is the last resort."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 12 · Lab L7 — MoE active bytes from decode speed"
+        },
+        "text": "Next, how all of this maps onto a managed inference platform. And when you are ready to run it: lesson twelve, lab L7: measure MoE active bytes from decode speed."
+      }
+    ]
+  },
+  "platform": {
+    "title": "The Platform Map",
+    "subtitle": "Where managed inference fits",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 8 of 18",
+          "headline": "The platform map",
+          "sub": "Serverless, dedicated, training and evaluation",
+          "learn": "where a managed platform earns its money"
+        },
+        "text": "Everything in these videos is work someone has to do. A managed inference platform is the argument that it should not be the customer's work."
+      },
+      {
+        "visual": "PlatformMap",
+        "params": {
+          "highlight": 0
+        },
+        "text": "At the bottom sit GPUs and data centres. Above them, the serving engine with its kernels, batching and cache management. Above that, autoscaling and routing. Then the model itself, and finally the customer's application."
+      },
+      {
+        "visual": "PlatformMap",
+        "params": {
+          "highlight": 1
+        },
+        "text": "A raw GPU cloud gives you the bottom layer and hands you the rest. A managed platform owns everything up to the model, and charges per token instead of per GPU hour."
+      },
+      {
+        "visual": "Modes",
+        "params": {},
+        "text": "That platform usually offers four capacity modes. Serverless per token for bursty traffic. Dedicated GPUs for steady, high volume or strict latency. Batch, at a discount, for offline work. And reserved capacity for committed scale."
+      },
+      {
+        "visual": "Maturity",
+        "params": {},
+        "text": "The customer journey has a shape too. Rent a closed model to prove the idea. Engineer the prompt and the context. Migrate to open models for cost and control. Then train on your own data, so the improvement belongs to you. Your job as a field engineer is to move customers along that path with evidence, not slideware."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "What a field engineer actually delivers",
+          "items": [
+            "A benchmark on the customer's real traffic profile.",
+            "A sizing and cost memo with two or three options.",
+            "An evaluation set that measures production quality, not benchmarks.",
+            "A path to production, with the failure modes named up front."
+          ]
+        },
+        "text": "And the deliverables are always the same four things. A benchmark on real traffic. A sizing and cost memo with options. An evaluation set that measures production quality. And a path to production with the failure modes named up front."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · 20M tokens a day",
+          "scenario": "16M input · 4M output · gpt-oss-120b pricing",
+          "rows": [
+            [
+              "input",
+              "16M × $0.15 = $2.40"
+            ],
+            [
+              "output",
+              "4M × $0.60 = $2.40"
+            ],
+            [
+              "per day",
+              "$4.80"
+            ],
+            [
+              "per month",
+              "≈ $146"
+            ],
+            [
+              "one dedicated H100",
+              "$8/hr × 730 h = $5,840"
+            ]
+          ],
+          "answer": "Serverless until utilisation justifies the GPU — and say so plainly",
+          "answerLabel": "Recommendation"
+        },
+        "text": "Put money on it. Twenty million tokens a day, four to one input to output, on a mid sized open model at fifteen cents per million in and sixty cents out. That is under five dollars a day, about a hundred and fifty a month. One dedicated H one hundred running all month is five thousand eight hundred and forty. The break even is a long way above where most products start."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Specialise the routine traffic",
+          "beforeLabel": "frontier model",
+          "afterLabel": "fine-tuned 8B",
+          "rows": [
+            [
+              "$ per 1M output",
+              "$6.00",
+              "$0.20"
+            ],
+            [
+              "task accuracy",
+              "87%",
+              "91%"
+            ],
+            [
+              "p95 latency",
+              "1.9 s",
+              "0.6 s"
+            ],
+            [
+              "what it cost",
+              "—",
+              "one afternoon + ~$2"
+            ]
+          ],
+          "note": "Illustrative numbers, but the shape matches the published case studies."
+        },
+        "text": "Specialisation is the other lever, and it compounds with the first. Move the routine ninety percent of traffic to a fine tuned eight billion parameter model and the unit cost falls by roughly thirty times, while quality on that narrow task usually goes up, not down. That is the whole argument for owning your weights, in one table."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Someone has to own each layer of the stack",
+            "Four capacity modes: serverless, dedicated, batch, reserved",
+            "Move customers along the maturity curve with evidence"
+          ]
+        },
+        "text": "Three things to take away. Someone has to own each layer of the stack. Four capacity modes: serverless, dedicated, batch, reserved. Move customers along the maturity curve with evidence."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 15 · Capstone — one POC, one benchmark, one sizing memo"
+        },
+        "text": "That is the whole map. Now go and build it, because the fastest way to sound credible is to have actually run it. When you are ready: lesson fifteen, the capstone. One POC, one benchmark, one sizing memo."
+      }
+    ]
+  },
+  "serving-stack": {
+    "title": "Serving With vLLM",
+    "subtitle": "What an inference server actually does",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 9 of 18 · L2 and L9",
+          "headline": "Serving with vLLM",
+          "sub": "The engine you will run in front of every local model",
+          "learn": "what the server does, and the five flags that matter"
+        },
+        "text": "An inference server is the layer between an HTTP request and a GPU. Let us look at what it does, why you run it in a container, and how to start one."
+      },
+      {
+        "visual": "ServingStack",
+        "params": {
+          "highlight": -1
+        },
+        "text": "A serving engine does four jobs. It speaks an API, usually the OpenAI one. It schedules requests into batches. It manages the key value cache. And it runs the model on the GPU with optimised kernels. Take any one of those away and you have a demo, not a service."
+      },
+      {
+        "visual": "ServingStack",
+        "params": {
+          "highlight": 2
+        },
+        "text": "The reason vLLM became the default is the middle two boxes. PagedAttention manages cache memory like an operating system, and continuous batching swaps requests in and out at every step. Everything else is table stakes."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Why containers",
+          "items": [
+            "The host OS, driver and CUDA move together on a slow cadence",
+            "Prebuilt wheels can expect a different CUDA than the host has",
+            "The documented workaround costs you CUDA graphs and 20–30% throughput"
+          ]
+        },
+        "text": "Why a container, not pip? Because on this class of hardware the host driver, CUDA and the Python wheels have to agree, and they often do not. NVIDIA's own guidance for the Spark is explicit: get new features from their containers, because the host stack moves on a fixed cadence."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Start a server and call it",
+          "lines": [
+            "docker run -d --gpus all --ipc host -p 8000:8000 \\",
+            "  vllm/vllm-openai:latest vllm serve $MODEL \\",
+            "  --max-model-len 8192 --gpu-memory-utilization 0.8",
+            "",
+            "curl -sf localhost:8000/health",
+            "curl localhost:8000/v1/chat/completions -d '{...}'"
+          ]
+        },
+        "text": "Here is the whole thing. Pull the image, serve a model, wait for the health endpoint, then call it with the same OpenAI client you use against a hosted API. That last part matters: your benchmark script does not change when you switch between local and hosted."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "The five flags that matter",
+          "items": [
+            "--max-model-len · the KV cache ceiling per request",
+            "--gpu-memory-utilization · how much memory the engine claims",
+            "--kv-cache-dtype fp8 · roughly doubles concurrency",
+            "--enable-prefix-caching · free wins on shared prompts",
+            "--enable-chunked-prefill · protects streaming under load"
+          ]
+        },
+        "text": "Five flags carry most of the outcome. Maximum model length caps the KV cache per request. GPU memory utilisation decides how much of the card the engine may claim. KV cache dtype halves cache memory. Prefix caching reuses shared prompts. And chunked prefill stops one long prompt from freezing everyone else."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Reading the startup log",
+          "scenario": "vLLM prints this within the first ten seconds",
+          "rows": [
+            [
+              "model weights",
+              "8.4 GB"
+            ],
+            [
+              "# GPU blocks",
+              "8,234"
+            ],
+            [
+              "block size",
+              "16 tokens"
+            ],
+            [
+              "cache capacity",
+              "8,234 × 16 ≈ 131,000 tokens"
+            ],
+            [
+              "at 8K context",
+              "≈ 16 concurrent requests"
+            ]
+          ],
+          "answer": "Too low? Change max-model-len or KV dtype — not the GPU",
+          "answerLabel": "What to do with it"
+        },
+        "text": "When the server starts it tells you the two numbers that matter. It prints how much memory the weights took, and how many key value cache blocks are left. Multiply the blocks by the block size, usually sixteen tokens, and you have your total cache capacity in tokens, which is the real concurrency limit."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Three flags, measured",
+          "beforeLabel": "defaults",
+          "afterLabel": "tuned",
+          "rows": [
+            [
+              "concurrent sessions",
+              "16",
+              "50"
+            ],
+            [
+              "p95 TTFT (shared prefix)",
+              "1.6 s",
+              "0.5 s"
+            ],
+            [
+              "flags",
+              "—",
+              "prefix cache · chunked prefill · FP8 KV"
+            ]
+          ],
+          "note": "Then, and only then, argue about hardware."
+        },
+        "text": "Here is a five minute tuning pass on one model. Turning on prefix caching and chunked prefill, and moving the cache to eight bits, took the same hardware from sixteen concurrent sessions to fifty, and halved time to first token on a shared prompt. Those three flags are the first thing to try in any customer deployment."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Four jobs: API, scheduler, KV manager, kernels",
+            "Run containers, not host pip, on Blackwell-class boxes",
+            "Five flags carry most of the performance"
+          ]
+        },
+        "text": "Three things to take away. A serving engine is API, scheduler, cache manager and kernels. Containers keep the CUDA stack honest. And five flags decide most of your performance."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lessons 02 & 14 · Labs L2, L9 — serve it, then benchmark it"
+        },
+        "text": "Run lesson two, lab L2, to get servers up on your Mac, and lesson fourteen, lab L9, for vLLM and SGLang on the Spark. Then benchmark them in lesson three."
+      }
+    ]
+  },
+  "benchmarking": {
+    "title": "Benchmarking Properly",
+    "subtitle": "The curve, not the number",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 10 of 18 · L3",
+          "headline": "Benchmarking properly",
+          "sub": "Concurrency sweeps, percentiles and traffic profiles",
+          "learn": "how to produce a benchmark a customer can act on"
+        },
+        "text": "Anyone can quote a tokens per second number. A field engineer produces a curve, with the traffic profile written next to it."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Write this down first",
+          "items": [
+            "Input tokens per request, and how much is shared prefix",
+            "Output tokens per request",
+            "Requests per second, average and peak",
+            "The latency target — and at which percentile"
+          ]
+        },
+        "text": "Start by writing down the traffic profile, because without it a benchmark means nothing. Input length, output length, arrival rate, and the latency target with its percentile. Four lines, before you run anything."
+      },
+      {
+        "visual": "SweepCurve",
+        "params": {
+          "phase": "throughput"
+        },
+        "text": "Now sweep concurrency: one, two, four, eight, sixteen, thirty two. Three things move. Aggregate throughput climbs and then flattens. Time to first token climbs as queueing appears. And inter token latency drifts up as batches get fuller."
+      },
+      {
+        "visual": "SweepCurve",
+        "params": {
+          "phase": "latency"
+        },
+        "text": "The number you actually want is where the ninety fifth percentile crosses the customer's latency target. Everything to the left of that line is capacity you can sell. Everything to the right is a support ticket."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "The sweep",
+          "lines": [
+            "for C in 1 2 4 8 16 32; do",
+            "  vllm bench serve --base-url http://127.0.0.1:8000 \\",
+            "    --model $MODEL --dataset-name random \\",
+            "    --num-prompts 200 --random-input-len 1024 \\",
+            "    --random-output-len 256 --max-concurrency $C \\",
+            "    --percentile-metrics ttft,tpot,itl,e2el",
+            "done"
+          ]
+        },
+        "text": "The tooling is one command in a loop. Two hundred prompts per point is enough to get a stable percentile, and asking for the percentile metrics explicitly saves you from averaging things you should not average."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Three ways to get it wrong",
+          "items": [
+            "Means instead of p95 — the tail is the product experience",
+            "Batch-1 numbers presented as throughput",
+            "Two changes at once: now you have an anecdote, not a result"
+          ]
+        },
+        "text": "Three mistakes to avoid. Reporting a mean instead of a percentile. Benchmarking at batch size one and calling it throughput. And changing two variables at once, so you cannot attribute the difference to anything."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · the table you produce",
+          "scenario": "1,024 in / 256 out · 200 prompts per point",
+          "rows": [
+            [
+              "c = 1",
+              "24 tok/s · TTFT p95 210 ms"
+            ],
+            [
+              "c = 4",
+              "78 tok/s · 260 ms"
+            ],
+            [
+              "c = 8",
+              "135 tok/s · 380 ms"
+            ],
+            [
+              "c = 16",
+              "228 tok/s · 720 ms"
+            ],
+            [
+              "c = 32",
+              "264 tok/s · 1,850 ms"
+            ]
+          ],
+          "answer": "Size at concurrency 16: 228 tok/s inside a 1 s p95 budget",
+          "answerLabel": "The sizing answer"
+        },
+        "text": "This is what the output should look like. One row per concurrency level, with aggregate throughput and both percentiles. Read it from the bottom: throughput has flattened by sixteen, and p ninety five time to first token crosses one second somewhere between eight and sixteen. That crossing point is your answer."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Mean versus p95",
+          "beforeLabel": "c = 8",
+          "afterLabel": "c = 32",
+          "rows": [
+            [
+              "mean TTFT",
+              "290 ms",
+              "410 ms"
+            ],
+            [
+              "p95 TTFT",
+              "380 ms",
+              "1,850 ms"
+            ],
+            [
+              "a mean-only report says",
+              "fine",
+              "fine"
+            ],
+            [
+              "users experience",
+              "fine",
+              "broken"
+            ]
+          ],
+          "note": "Report p50 and p95 together, always, with the traffic profile above the table."
+        },
+        "text": "And here is why the percentile matters. The mean latency barely moved between concurrency eight and thirty two, so a mean only report would have said everything was fine. The ninety fifth percentile more than doubled. Your users live in the tail, and so does your support queue."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Traffic profile before tooling",
+            "Sweep concurrency; report a curve",
+            "Size on where p95 crosses the SLA"
+          ]
+        },
+        "text": "Three things to take away. Write the traffic profile first. Sweep concurrency and report the curve. And find where p ninety five crosses the target — that is the sizing answer."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 03 · Lab L3 — the concurrency sweep"
+        },
+        "text": "Run lesson three, lab L3, and keep the output. It becomes the first exhibit in your capstone memo."
+      }
+    ]
+  },
+  "prefix-caching": {
+    "title": "Prefix Caching",
+    "subtitle": "The cheapest win in agent workloads",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 11 of 18 · L6 and F2",
+          "headline": "Prefix caching",
+          "sub": "Reuse the work you already did",
+          "learn": "why agent traffic is mostly repeats, and how to exploit it"
+        },
+        "text": "Agents are repetitive. The same system prompt, the same tool definitions, the same retrieved documents, on every single call. Caching that is the cheapest performance win available."
+      },
+      {
+        "visual": "PrefixTree",
+        "params": {
+          "step": 0
+        },
+        "text": "Picture the prompts as a tree. The system prompt is the trunk, the tool definitions are a branch, and each user question is a leaf. Without caching, every request walks the whole trunk again — and the trunk is usually ninety percent of the tokens."
+      },
+      {
+        "visual": "PrefixTree",
+        "params": {
+          "step": 1
+        },
+        "text": "With prefix caching, the key value cache for the trunk is computed once and reused. Only the leaf is new. In vLLM this is automatic prefix caching; in SGLang it is RadixAttention, which also schedules requests to maximise those hits."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "What improves",
+          "items": [
+            "p95 TTFT drops sharply on shared-prefix traffic",
+            "Cached input tokens are billed at a heavy discount",
+            "GPU capacity frees up for more concurrent users"
+          ]
+        },
+        "text": "The effect is visible in two numbers. Time to first token falls, because prefill is where that time goes. And cost falls, because hosted platforms bill cached input tokens at a steep discount — on some models, a fraction of a cent per million."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Turn it on",
+          "lines": [
+            "# local",
+            "vllm serve $MODEL --enable-prefix-caching --enable-chunked-prefill",
+            "sglang serve --model-path $MODEL --enable-cache-report",
+            "",
+            "# hosted: keep a session on the replica that holds the cache",
+            "{\"user\": \"session-42\", \"messages\": [...]}"
+          ]
+        },
+        "text": "Locally it is a flag. Hosted, it is on by default, and the thing to control is routing: send a conversation back to the replica that already holds its cache, using a session identifier."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Caveats",
+          "items": [
+            "Order the prompt: stable content first, variable last",
+            "Measure the hit rate — an unused cache costs you capacity",
+            "Caches expire; expect the first call after idle to be slow"
+          ]
+        },
+        "text": "Two caveats worth voicing. Put the stable content first and the variable content last, or there is no shared prefix to cache. And a cache that never gets hit is just memory you are not using for concurrency."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · 20-turn agent session",
+          "scenario": "3,500-token prefix · ~100-token questions",
+          "rows": [
+            [
+              "tokens sent",
+              "72,000"
+            ],
+            [
+              "genuinely new",
+              "5,000"
+            ],
+            [
+              "repeated prefix",
+              "67,000"
+            ],
+            [
+              "share that is repeat",
+              "93%"
+            ]
+          ],
+          "answer": "Caching turns 93% of the input bill into a rounding error",
+          "answerLabel": "Why it matters"
+        },
+        "text": "Count the tokens in a typical agent turn. Three thousand five hundred of stable prefix, a hundred token question, twenty turns in the session. That is seventy two thousand tokens sent, but only five thousand of them are new. Ninety three percent of what you are paying to process, you already processed."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "The same session, cached",
+          "beforeLabel": "cold",
+          "afterLabel": "cached prefix",
+          "rows": [
+            [
+              "p95 TTFT",
+              "1.9 s",
+              "0.35 s"
+            ],
+            [
+              "input billed at full rate",
+              "72,000 tok",
+              "5,000 tok"
+            ],
+            [
+              "input cost at $0.30 / $0.006",
+              "$0.0216",
+              "$0.0019"
+            ]
+          ],
+          "note": "Requires prompts ordered stable-first — a code change, not a config flag."
+        },
+        "text": "Measured, it looks like this. Time to first token falls from one point nine seconds to three hundred and fifty milliseconds, and on a platform that discounts cached input heavily, the input cost for the session falls by more than ninety percent. This is the cheapest improvement available to an agent product."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Agent prompts are mostly repeated context",
+            "Caching cuts TTFT and the input bill",
+            "Stable content first, or there is nothing to cache"
+          ]
+        },
+        "text": "Three things to take away. Agent traffic is mostly repeated prefix. Caching it cuts time to first token and cost. And prompt order decides whether caching can work at all."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 06 · Labs L6, F2 — measure it, then price it"
+        },
+        "text": "Lesson six measures this on your own hardware with lab L6, and lab F2 shows the billing side on Fireworks."
+      }
+    ]
+  },
+  "qlora": {
+    "title": "QLoRA On Your Own Box",
+    "subtitle": "Fine-tuning without a cluster",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 12 of 18 · L8 and F5",
+          "headline": "QLoRA on your own box",
+          "sub": "Four-bit base, tiny adapter, real results",
+          "learn": "what QLoRA changes, and how to run one end to end"
+        },
+        "text": "You do not need a cluster to fine-tune a useful model. You need a four-bit base model, a small adapter, and a dataset you actually believe in."
+      },
+      {
+        "visual": "QloraMem",
+        "params": {
+          "mode": "compare"
+        },
+        "text": "Full fine-tuning holds three heavy things in memory: the weights, the gradients and the optimiser state. That is why it needs a cluster. QLoRA keeps the base model frozen and quantised to four bits, and trains only a small adapter on top."
+      },
+      {
+        "visual": "QloraMem",
+        "params": {
+          "mode": "fits"
+        },
+        "text": "The result is that an eight billion parameter fine-tune fits comfortably in a desktop's memory, and even much larger models become possible. You are trading a little quality headroom for an enormous drop in cost."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "What actually matters",
+          "items": [
+            "A few hundred clean examples beat tens of thousands of noisy ones",
+            "Hold out an eval set before training, never after",
+            "Train on the answer, not the prompt — mask what you do not want learned"
+          ]
+        },
+        "text": "The dataset is the part that decides everything. A few hundred examples of exactly the behaviour you want beats tens of thousands of noisy ones, and your evaluation set has to exist before you start training, not after."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "The four steps",
+          "lines": [
+            "# 1. data: JSONL of chat messages",
+            "# 2. train (NVIDIA)",
+            "export BNB_CUDA_VERSION=130",
+            "python Llama3_8B_LoRA_finetuning.py",
+            "# 2b. train (Apple silicon)",
+            "mlx_lm.lora --model <model> --train --data ./data",
+            "# 3. merge  4. serve + evaluate"
+          ]
+        },
+        "text": "The mechanics are four steps: prepare the data, run the trainer, merge or load the adapter, then serve it and evaluate. On Apple silicon the same shape works with M L X; on an NVIDIA box it is Unsloth or T R L, with one environment variable that saves an afternoon."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Local versus managed",
+          "items": [
+            "Local: free, private, slower to a deployed endpoint",
+            "Managed: about a dollar to train a small LoRA, minutes to deploy",
+            "Serving a LoRA on a hosted platform usually needs dedicated capacity"
+          ]
+        },
+        "text": "Then compare honestly against the managed path. Local costs nothing but your time and keeps the data at home. Managed costs a dollar or two of training tokens and hands you a deployed endpoint. Knowing when to recommend each is the actual skill."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · 8B QLoRA on a Mac",
+          "scenario": "mlx_lm.lora · 2,000 examples · 300 iterations",
+          "rows": [
+            [
+              "4-bit base weights",
+              "≈ 5 GB"
+            ],
+            [
+              "LoRA adapter",
+              "≈ 30 MB"
+            ],
+            [
+              "peak memory",
+              "≈ 11 GB"
+            ],
+            [
+              "training time",
+              "30–50 min"
+            ],
+            [
+              "cost",
+              "$0"
+            ]
+          ],
+          "answer": "Then fuse it and serve it locally with mlx_lm.server",
+          "answerLabel": "Next step"
+        },
+        "text": "Concretely, on an Apple silicon laptop: an eight billion parameter model in four bit is about five gigabytes of weights, the adapter adds tens of megabytes, and training on two thousand examples for three hundred iterations takes well under an hour. Peak memory stays around eleven gigabytes, which is why this works on a machine you already own."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Data quality decides it",
+          "beforeLabel": "200 noisy examples",
+          "afterLabel": "2,000 clean examples",
+          "rows": [
+            [
+              "training accuracy",
+              "97%",
+              "93%"
+            ],
+            [
+              "held-out accuracy",
+              "74%",
+              "89%"
+            ],
+            [
+              "what happened",
+              "overfit",
+              "generalised"
+            ]
+          ],
+          "note": "Hold out the eval set before you start; stop when validation loss stops improving."
+        },
+        "text": "What matters is the data, not the hardware. Two hundred examples overfit fast, and the model got worse on anything slightly different. Two thousand cleaner examples, with a held out set to tell you when to stop, gave the improvement. The most common fine tuning failure is not compute, it is training on data nobody checked."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Frozen four-bit base, small trainable adapter",
+            "Data quality and a real eval set decide the result",
+            "Compare local and managed on time, privacy and cost"
+          ]
+        },
+        "text": "Three things to take away. QLoRA freezes a four-bit base and trains a small adapter. The dataset and the eval set decide the outcome. And the local versus managed trade-off is a conversation, not a religion."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lessons 11 & 10 · Labs L8, F5 — run both"
+        },
+        "text": "Lesson eleven, lab L8, runs this locally. Lesson ten, lab F5, runs the same dataset through Fireworks. For the full picture of training methods, see videos fourteen to eighteen."
+      }
+    ]
+  },
+  "scale-out": {
+    "title": "Speculation & Scale-Out",
+    "subtitle": "Going faster, and going bigger",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 13 of 18 · F7 and L9",
+          "headline": "Speculation and scale-out",
+          "sub": "Draft models, and what a second box buys you",
+          "learn": "how speculation wins, and what multi-node really gives you"
+        },
+        "text": "Two last techniques. One makes a single stream faster. The other makes a model fit that otherwise would not."
+      },
+      {
+        "visual": "SpecDecode",
+        "params": {},
+        "text": "Speculative decoding uses a small draft model to guess the next few tokens, and the big model checks all of them in one pass. Correct guesses are free speed. Wrong ones cost you the guess, and nothing else, because the big model still decides."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Acceptance rate is the metric",
+          "items": [
+            "Expected tokens per pass = (1 − α^(k+1)) / (1 − α)",
+            "α of 0.75 with 4 drafted tokens ≈ 3 tokens per big-model pass",
+            "A mismatched drafter can make generation slower, not faster"
+          ]
+        },
+        "text": "The number to watch is the acceptance rate. High acceptance means the drafter understands your traffic; low acceptance means you are paying for guesses nobody uses. This is why hosted platforms train the drafter on a customer's own distribution."
+      },
+      {
+        "visual": "TwoBox",
+        "params": {},
+        "text": "Now scale-out. Two boxes linked by a fast cable give you twice the memory, so a model that did not fit now fits. What they do not give you is twice the memory bandwidth per token, so decode speed stays modest. A two hundred and thirty five billion parameter model across two desktop boxes decodes at around twelve tokens a second."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "What a second box is for",
+          "items": [
+            "Capacity: run a model that does not fit in one box",
+            "Fidelity: test the behaviour of the model the customer will buy",
+            "Not throughput: per-node bandwidth is unchanged"
+          ]
+        },
+        "text": "So be precise about what multi-node is for. It is for capability and for testing big-model behaviour, not for serving high-throughput production traffic from a desk. Say that plainly and people trust the rest of your numbers."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Run it",
+          "lines": [
+            "# speculation (llama.cpp MTP)",
+            "llama-server -hf <repo> --spec-type draft-mtp --spec-draft-n-max 3",
+            "",
+            "# two boxes: validate the fabric first",
+            "sudo apt install perftest && ibdev2netdev",
+            "ib_write_bw -d <device>",
+            "vllm serve $MODEL --tensor-parallel-size 2"
+          ]
+        },
+        "text": "Mechanically it is speculation flags on one side, and a fabric you validate before you trust it on the other."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · speculation maths",
+          "scenario": "α = 0.8 · k = 4 drafted tokens",
+          "rows": [
+            [
+              "formula",
+              "(1 − α^(k+1)) / (1 − α)"
+            ],
+            [
+              "expected tokens per pass",
+              "3.3"
+            ],
+            [
+              "ideal speed-up",
+              "3.3×"
+            ],
+            [
+              "after draft-model cost",
+              "≈ 2×"
+            ],
+            [
+              "at α = 0.4",
+              "1.6× — barely worth it"
+            ]
+          ],
+          "answer": "Acceptance rate is the whole game — measure it, never assume it",
+          "answerLabel": "Takeaway"
+        },
+        "text": "Do the speculation arithmetic. With an acceptance rate of eighty percent and four drafted tokens, expected tokens per big model pass is one minus zero point eight to the fifth, over one minus zero point eight, which is about three point three. So you get three point three tokens for one verification pass plus four cheap draft passes. Call it a two times speed up in practice."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Two boxes, honestly",
+          "scenario": "Qwen3 235B · NVFP4 · two linked desktops",
+          "rows": [
+            [
+              "combined memory",
+              "256 GB"
+            ],
+            [
+              "prefill",
+              "≈ 23,000 tok/s"
+            ],
+            [
+              "decode",
+              "11.7 tok/s"
+            ],
+            [
+              "per-node bandwidth",
+              "unchanged"
+            ]
+          ],
+          "answer": "Capacity and fidelity — not throughput",
+          "answerLabel": "How to position it"
+        },
+        "text": "And the multi node numbers, so you never oversell them. Two desktop boxes linked at two hundred gigabit run a two hundred and thirty five billion parameter model in four bit at about twelve tokens a second, with prefill above twenty thousand. Excellent for testing what that model does. Not something you would put in front of a thousand users."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Speculation: same output, fewer big-model passes",
+            "Acceptance rate decides whether it pays",
+            "Two boxes add memory, not bandwidth"
+          ]
+        },
+        "text": "Three things to take away. Speculation trades cheap guesses for expensive passes, and acceptance rate decides if it pays. A second box adds capacity, not speed. And you should always validate the fabric before blaming the model."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lessons 13–14 · Labs F7, L9 — speculation, then multi-node"
+        },
+        "text": "Lessons thirteen and fourteen close out the serving track. Then come the training deep dives, videos fourteen to eighteen, and the capstone."
+      }
+    ]
+  },
+  "full-finetuning": {
+    "title": "Full Fine-Tuning",
+    "subtitle": "Every weight moves, and what that costs",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 14 of 18 · training deep dive",
+          "headline": "Full fine-tuning",
+          "sub": "Every weight moves, and what that costs",
+          "learn": "what full fine-tuning is, why it needs about 16 bytes per parameter, and when it is worth it"
+        },
+        "text": "This is the first of five deep dives on training. We start with the most direct way to change a model: full fine-tuning, where every single weight is allowed to move. It is the most powerful option and the most expensive, and you should know exactly why."
+      },
+      {
+        "visual": "TrainLoop",
+        "params": {
+          "note": "Full fine-tuning, LoRA, SFT and DPO all run this loop. They differ in which weights move and what the loss rewards."
+        },
+        "text": "Every kind of training runs the same loop. The model reads an example and predicts each next token. The loss measures how surprised it was by the right answer. Backpropagation works out, for every weight, which direction would have reduced that surprise. Then the optimizer nudges each weight a tiny step in that direction, and the loop repeats, thousands of times."
+      },
+      {
+        "visual": "WeightUpdate",
+        "params": {
+          "mode": "full",
+          "note": "A 7B model: 7,000,000,000 trainable numbers, every step."
+        },
+        "text": "In full fine-tuning, that nudge applies to every weight. For a seven billion parameter model, that is seven billion numbers updated on every step. Nothing is frozen. It is like re-editing an entire encyclopedia, where LoRA would add a few sticky notes."
+      },
+      {
+        "visual": "MemoryLedger",
+        "params": {
+          "paramsB": 7,
+          "totalText": "112 GB + activations",
+          "note": "Serving the same model needs about 14 GB. Training needs about 8× that."
+        },
+        "text": "Here is where the cost comes from. Serving a model only needs the weights, about two bytes each. Training needs far more per parameter: the weights, a gradient of the same size, the Adam optimizer's two running averages kept in full precision, and a full precision master copy. That is roughly sixteen bytes per parameter before you count activations. For seven billion parameters, that is over a hundred gigabytes."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · what full fine-tuning needs",
+          "scenario": "≈16 bytes per parameter, plus activations",
+          "rows": [
+            [
+              "1B model",
+              "≈ 16 GB · one big GPU"
+            ],
+            [
+              "8B model",
+              "≈ 130 GB · 2× H100 80 GB"
+            ],
+            [
+              "70B model",
+              "≈ 1.1 TB · 16× H100 + sharding"
+            ],
+            [
+              "LoRA on the same 70B",
+              "≈ 160 GB · 2–4× H100"
+            ]
+          ],
+          "answer": "Memory, not compute, decides whether you can full fine-tune"
+        },
+        "text": "Put numbers on it. A one billion parameter model needs about sixteen gigabytes, which is one large GPU. An eight billion model needs around a hundred and thirty, so at least two eighty-gigabyte GPUs. A seventy billion model needs over a terabyte, which means sixteen H100s and a sharding framework like DeepSpeed ZeRO or FSDP to split the weights, gradients and optimizer state across them. LoRA on that same seventy billion model needs a small fraction of that."
+      },
+      {
+        "visual": "CardGrid",
+        "params": {
+          "heading": "How teams make full fine-tuning fit",
+          "cols": 3,
+          "cards": [
+            [
+              "Mixed precision",
+              "bf16 compute, fp32 master copy",
+              "≈16 B/param"
+            ],
+            [
+              "ZeRO / FSDP",
+              "shard weights, grads, optimizer across GPUs",
+              "memory ÷ N GPUs"
+            ],
+            [
+              "Grad checkpointing",
+              "recompute activations, don't store them",
+              "less memory, ~30% slower"
+            ],
+            [
+              "8-bit optimizers",
+              "Adam state in 8 bits",
+              "16 → ≈10 B/param"
+            ],
+            [
+              "CPU offload",
+              "optimizer state in system RAM",
+              "fits more, runs slower"
+            ],
+            [
+              "Right-size the model",
+              "a full 8B tune can beat a 70B LoRA",
+              "try this first"
+            ]
+          ]
+        },
+        "text": "Teams make it fit with a standard toolbox. Mixed precision computes in bf16. ZeRO or FSDP shards everything across GPUs. Gradient checkpointing recomputes activations instead of storing them, trading time for memory. Eight-bit optimizers shrink the Adam state. Offloading parks state in system memory, at a speed cost. And often the best move is a smaller model."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Same 8B model, same data",
+          "beforeLabel": "full fine-tune",
+          "afterLabel": "LoRA",
+          "rows": [
+            [
+              "trainable parameters",
+              "8 billion",
+              "≈ 20 million"
+            ],
+            [
+              "training memory",
+              "≈ 130 GB",
+              "≈ 20 GB"
+            ],
+            [
+              "checkpoint",
+              "16 GB",
+              "≈ 40 MB"
+            ],
+            [
+              "narrow-task quality",
+              "best",
+              "within 1–2 pts"
+            ],
+            [
+              "forgetting risk",
+              "higher",
+              "lower"
+            ]
+          ],
+          "note": "For narrow tasks, try LoRA first; go full when the gap is real and measured."
+        },
+        "text": "Compare it with LoRA on the same eight billion model and the same data. Full fine-tuning trains eight billion parameters in around a hundred and thirty gigabytes. LoRA trains about twenty million in about twenty. The full checkpoint is sixteen gigabytes; the adapter is about forty megabytes. On a narrow task, LoRA usually lands within a point or two. Full fine-tuning also risks more forgetting, where the model gets better at your task and worse at everything else."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "When full fine-tuning is worth it",
+          "items": [
+            "A big shift: new language, deep domain vocabulary, new modality",
+            "Lots of data: hundreds of thousands of examples or more",
+            "It will run on dedicated capacity anyway",
+            "You have evals that would catch forgetting"
+          ]
+        },
+        "text": "So when is full fine-tuning worth it? When you are moving the model a long way, like a new language or a highly specialised domain. When you have a lot of data, hundreds of thousands of examples or more. When the model will run on its own dedicated capacity anyway. And when you have evaluations that would catch the model forgetting its general skills."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Run it · lesson 17 on your Mac",
+          "lines": [
+            "# same data, three ways: compare memory and quality",
+            "cd lessons/17-full-vs-peft-mlx",
+            "python peft_params.py --model 0.5b",
+            "bash run_variants.sh        # full · lora · dora",
+            "python compare_variants.py  # memory, time, size, accuracy"
+          ]
+        },
+        "text": "You can feel this on a laptop. Lesson seventeen trains the same small model three ways, full, LoRA and DoRA, on the ticket data, and prints peak memory, training time, checkpoint size and accuracy side by side. Watch the peak memory line for the full run."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "Full fine-tuning updates every weight: most power, most cost",
+            "≈16 bytes per parameter to train vs ≈2 to serve",
+            "Right-size and try LoRA first; go full when the gap is real"
+          ]
+        },
+        "text": "Three things to take away. Full fine-tuning updates every weight: the most powerful option and the most expensive. Training needs about sixteen bytes per parameter against two for serving, so memory decides what is possible. And right-size the model and try LoRA first; go full when the shift is big and the gap is measured."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 17 · Lab T2 — full vs LoRA vs DoRA on your Mac"
+        },
+        "text": "Next, supervised fine-tuning: the data format almost every customisation starts with. And when you are ready to run it: lesson seventeen, lab T2, full versus LoRA versus DoRA on your Mac."
+      }
+    ]
+  },
+  "sft": {
+    "title": "Supervised Fine-Tuning",
+    "subtitle": "Teaching by example",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 15 of 18 · training deep dive",
+          "headline": "Supervised fine-tuning",
+          "sub": "Teaching by example",
+          "learn": "what SFT data looks like, why only the answer is graded, and how to tell it is working"
+        },
+        "text": "Supervised fine-tuning is where almost every customisation starts. You show the model examples of exactly what you want, and it learns to imitate them. The idea is simple, and most of the skill is in the data."
+      },
+      {
+        "visual": "TrainingPipeline",
+        "params": {
+          "stage": 1
+        },
+        "text": "First, where it sits. A base model is pretrained on trillions of tokens, then its creator instruction-tunes it. Supervised fine-tuning is the next step, done by you, on your task: a prompt in, the ideal answer out, thousands of times."
+      },
+      {
+        "visual": "LossMask",
+        "params": {
+          "note": "Check your trainer: mlx-lm needs --mask-prompt; TRL needs assistant_only_loss=True."
+        },
+        "text": "Here is one training example for ticket triage: a system message, the customer's ticket, and the ideal JSON answer. The key detail is where the loss is counted. The system and user parts are context, so the model is not graded on predicting them. Only the assistant's answer is graded. This is called masking the prompt. Forget it, and you partly teach the model to write tickets instead of triaging them."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "The data format · JSONL, one example per line",
+          "lines": [
+            "{\"messages\": [",
+            "  {\"role\": \"system\",    \"content\": \"You triage tickets...\"},",
+            "  {\"role\": \"user\",      \"content\": \"Card declined twice...\"},",
+            "  {\"role\": \"assistant\", \"content\": \"{\\\"category\\\": \\\"billing\\\"}\"}",
+            "]}",
+            "",
+            "# Fireworks, MLX, TRL and Unsloth all read this format"
+          ]
+        },
+        "text": "On disk it is plain JSON lines, one conversation per line, in the same chat format the API uses. Fireworks, MLX, TRL and Unsloth all accept it, so one dataset works on every platform. Our labs rely on exactly that."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Data beats everything",
+          "items": [
+            "Consistent: the same kind of input always gets the same kind of answer",
+            "Covering: every category, edge case and refusal you care about",
+            "Clean: a wrong label is learned as confidently as a right one",
+            "Held out: split the test set off first; never train on it"
+          ]
+        },
+        "text": "Data quality decides the result. Consistent, so similar inputs get similar answers. Covering, so every category and edge case appears. Clean, because the model learns a wrong label just as confidently as a right one. And held out: split off your test set before training, and never train on it."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · how much data?",
+          "scenario": "ticket triage · 7B base · LoRA SFT · typical ranges",
+          "rows": [
+            [
+              "50 examples",
+              "format fixed, accuracy barely moves"
+            ],
+            [
+              "500 examples",
+              "+8 to 12 points"
+            ],
+            [
+              "2,000 examples",
+              "+12 to 16, then flattens"
+            ],
+            [
+              "20,000 noisy examples",
+              "worse than 2,000 clean"
+            ]
+          ],
+          "answer": "A few hundred clean examples first; add more where evals show gaps",
+          "answerLabel": "Rule of thumb"
+        },
+        "text": "How much data? These are typical ranges for a task like triage, not guarantees. Fifty examples mostly fix the format. Five hundred usually buy eight to twelve points of accuracy. Two thousand get most of the way, and then the curve flattens. Twenty thousand noisy examples often do worse than two thousand clean ones. Start small and clean, then add examples exactly where the evaluation shows gaps."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "The knobs that matter",
+          "items": [
+            "Epochs: 1–3 passes; more usually memorises",
+            "Learning rate: LoRA ≈ 1e-4 · full fine-tune ≈ 1e-5",
+            "Max length: fits your longest real example",
+            "Watch validation loss; decide on the task eval"
+          ]
+        },
+        "text": "Only a few knobs matter. Epochs, the number of passes over the data: one to three, because more usually memorises. Learning rate: around one times ten to the minus four for LoRA, about ten times smaller for full fine-tuning. A sequence length long enough for your real examples. And watch validation loss, but trust the task evaluation."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Reading the loss curves",
+          "beforeLabel": "means",
+          "afterLabel": "do",
+          "rows": [
+            [
+              "train ↓ · validation ↓",
+              "learning",
+              "keep going"
+            ],
+            [
+              "train ↓ · validation ↑",
+              "memorising",
+              "stop earlier, add data"
+            ],
+            [
+              "both flat and high",
+              "not learning",
+              "check data, raise LR"
+            ]
+          ]
+        },
+        "text": "Read the two loss curves together. If training and validation loss both fall, it is learning. If training loss keeps falling while validation loss rises, it is memorising the examples, so stop earlier or add data. If both stay flat and high, it is not learning at all: check the data format, or raise the learning rate."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "What SFT can and cannot do",
+          "rows": [
+            [
+              "output format, JSON, tone",
+              "✓ very good"
+            ],
+            [
+              "domain vocabulary and style",
+              "✓ good"
+            ],
+            [
+              "house rules and refusals",
+              "✓ good"
+            ],
+            [
+              "facts that change weekly",
+              "✗ use retrieval"
+            ],
+            [
+              "taste between two OK answers",
+              "✗ preference tuning"
+            ]
+          ],
+          "answer": "SFT teaches behaviour, not knowledge"
+        },
+        "text": "Know its limits. Supervised fine-tuning is excellent at format, tone, domain style and house rules. It is poor at injecting facts that change, which is a job for retrieval. And when both candidate answers are acceptable but one is better, you need preference tuning, which is videos seventeen and eighteen."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Run it · lessons 10, 11 and 17",
+          "lines": [
+            "# one train.jsonl, three trainers",
+            "python lessons/17-full-vs-peft-mlx/sft_data_check.py",
+            "bash lessons/11-lora-local-mlx/1_train_mlx.sh   # Mac",
+            "bash lessons/10-lora-fireworks/1_train.sh       # managed"
+          ]
+        },
+        "text": "In the labs, the same training file goes through three trainers: Fireworks in lesson ten, MLX on your Mac in lesson eleven, and in lesson seventeen a data checker that catches the mistakes that ruin runs: missing assistant turns, duplicates, leaked test examples and over-long rows."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "SFT imitates examples; loss is counted on the answer only",
+            "A few hundred clean, consistent examples beat many noisy ones",
+            "Teaches behaviour and format, not changing facts"
+          ]
+        },
+        "text": "Three things to take away. Supervised fine-tuning means imitating examples, and the loss is counted on the answer only. A few hundred clean, consistent examples beat many noisy ones. And it teaches behaviour and format, not facts that change."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 17 · Lab T2 — check the data, then train"
+        },
+        "text": "Next, parameter-efficient fine-tuning: LoRA and its family, and why it became the default. And when you are ready to run it: lesson seventeen, lab T2. Check the data, then train."
+      }
+    ]
+  },
+  "peft": {
+    "title": "Parameter-Efficient Fine-Tuning",
+    "subtitle": "LoRA and its family",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 16 of 18 · training deep dive",
+          "headline": "PEFT and LoRA",
+          "sub": "Parameter-efficient fine-tuning",
+          "learn": "how LoRA works, the arithmetic behind its size, and when to pick QLoRA, DoRA or the others"
+        },
+        "text": "Parameter-efficient fine-tuning, or PEFT, is a family of tricks that lets you customise a huge model by training a tiny fraction of it. LoRA is the famous one. It is the default on almost every platform, including Fireworks."
+      },
+      {
+        "visual": "WeightUpdate",
+        "params": {
+          "mode": "lora",
+          "note": "output = W·x + (α / r) · B·A·x  ·  W never changes"
+        },
+        "text": "Here is the idea. Take one weight matrix inside the model, say four thousand by four thousand. Freeze it. Beside it, add two thin matrices, B and A, that multiply together into a correction of the same shape. Only B and A train. The layer's output becomes the original output plus a small learned adjustment."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · the size of one adapter",
+          "scenario": "one 4096 × 4096 projection · rank r = 16",
+          "rows": [
+            [
+              "full matrix W",
+              "16.8 M"
+            ],
+            [
+              "LoRA A  (r × 4096)",
+              "65,536"
+            ],
+            [
+              "LoRA B  (4096 × r)",
+              "65,536"
+            ],
+            [
+              "trainable share",
+              "0.8% of this matrix"
+            ],
+            [
+              "whole 8B model, attention only",
+              "≈ 0.2–0.5% of weights"
+            ]
+          ],
+          "answer": "Rank r is the dial: bigger r, more capacity, more memory"
+        },
+        "text": "Do the arithmetic. The full matrix holds about sixteen point eight million numbers. With a rank of sixteen, A and B hold about sixty-five thousand each, under one percent of that matrix. Across a whole eight billion parameter model, adapting the attention projections, that is a fraction of one percent of all weights. The rank is the dial: higher rank means more capacity and more memory."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Why it works",
+          "items": [
+            "The change a fine-tune needs is low-rank: a few directions matter",
+            "The frozen base keeps its general knowledge",
+            "Merge for zero extra latency, or keep a tiny swappable file"
+          ]
+        },
+        "text": "Why does something so small work? Because the change a fine-tune needs tends to be low rank: a few directions in weight space matter, not all of them. The frozen base keeps its general knowledge, which also reduces forgetting. And after training you can merge the adapter into the weights for zero extra latency, or keep it separate as a tiny file."
+      },
+      {
+        "visual": "CardGrid",
+        "params": {
+          "heading": "The PEFT family",
+          "cols": 3,
+          "cards": [
+            [
+              "LoRA",
+              "two low-rank matrices beside frozen weights",
+              "the default"
+            ],
+            [
+              "QLoRA",
+              "LoRA on a 4-bit quantized base",
+              "big models, small memory"
+            ],
+            [
+              "DoRA",
+              "magnitude + direction; LoRA on direction",
+              "often +1–2 pts, slower"
+            ],
+            [
+              "Adapters",
+              "small bottleneck layers in each block",
+              "older; adds latency"
+            ],
+            [
+              "Prefix / prompt tuning",
+              "learn virtual tokens, not weights",
+              "tiny; weaker on hard tasks"
+            ],
+            [
+              "IA³",
+              "learn per-channel scaling vectors",
+              "smallest of all"
+            ]
+          ]
+        },
+        "text": "LoRA has relatives. QLoRA runs LoRA on top of a four-bit base model to save memory. DoRA separates each weight into a magnitude and a direction and applies LoRA to the direction, which often adds a point or two for a small speed cost. Adapter layers insert tiny bottleneck blocks. Prefix and prompt tuning learn virtual tokens instead of weights. And IA3 learns simple scaling vectors, the smallest of all."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "Choosing a variant",
+          "beforeLabel": "default",
+          "afterLabel": "switch to",
+          "rows": [
+            [
+              "memory is the limit",
+              "LoRA",
+              "QLoRA"
+            ],
+            [
+              "quality gap vs full",
+              "LoRA r = 16",
+              "DoRA / higher r"
+            ],
+            [
+              "hundreds of tenants",
+              "merged models",
+              "multi-LoRA"
+            ]
+          ]
+        },
+        "text": "Choosing is mostly about constraints. If memory is the limit, move from LoRA to QLoRA. If there is still a quality gap against full fine-tuning, try DoRA or a higher rank. And if you have hundreds of customers, each with their own tune, keep the adapters separate and serve them with multi-LoRA."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · 50 tenants",
+          "scenario": "one 8B base · one tune per customer",
+          "rows": [
+            [
+              "50 full fine-tunes",
+              "50 × 16 GB · 50 deployments"
+            ],
+            [
+              "50 LoRA adapters",
+              "50 × 40 MB · one deployment"
+            ],
+            [
+              "per request",
+              "the right adapter is applied"
+            ],
+            [
+              "serving bill",
+              "≈ 1 deployment, not 50"
+            ]
+          ],
+          "answer": "Multi-LoRA makes per-customer tuning affordable"
+        },
+        "text": "This is where PEFT changes the business. Fifty customers with fifty full fine-tunes means fifty sixteen-gigabyte models and fifty deployments. Fifty LoRA adapters are about forty megabytes each and can all be served from one deployment, with the right adapter chosen per request. The serving bill is roughly one deployment instead of fifty."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "The knobs",
+          "items": [
+            "rank r: 8–16 narrow tasks · 32–64 harder ones",
+            "alpha: scaling, often ≈ 2 × r",
+            "targets: attention only, or attention + MLP",
+            "layers: last N only saves memory (mlx: --num-layers)"
+          ]
+        },
+        "text": "The knobs are few. Rank: eight to sixteen for narrow tasks, thirty-two to sixty-four for harder ones. Alpha, a scaling factor usually set to about twice the rank. Which modules to adapt: attention only, or attention plus the feed-forward layers for more capacity. And how many layers, where adapting only the last few saves memory."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Run it · lesson 17",
+          "lines": [
+            "python peft_params.py --model 8b --rank 16",
+            "python peft_params.py --model 70b --rank 64 --mlp",
+            "bash run_variants.sh        # full · lora · dora",
+            "python compare_variants.py  # one table"
+          ]
+        },
+        "text": "Lesson seventeen has a calculator that prints the trainable parameters for any model and rank. Then it trains full, LoRA and DoRA on the same data, so you can see memory, time, adapter size and accuracy in one table."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "LoRA freezes W and trains a low-rank B·A beside it",
+            "<1% of parameters, near-full quality on narrow tasks",
+            "QLoRA for memory · DoRA for quality · multi-LoRA for tenants"
+          ]
+        },
+        "text": "Three things to take away. LoRA freezes the weights and trains a low-rank correction beside them. It touches under one percent of the parameters and gets close to full fine-tuning on narrow tasks. And pick QLoRA for memory, DoRA for quality, and multi-LoRA for many tenants."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 17 · Lab T2 — the PEFT calculator, then three runs"
+        },
+        "text": "Next, preference alignment, starting with RLHF, the technique that made chat models helpful. And when you are ready to run it: lesson seventeen, lab T2."
+      }
+    ]
+  },
+  "rlhf": {
+    "title": "RLHF",
+    "subtitle": "Reinforcement learning from human feedback",
+    "accent": "copper",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 17 of 18 · training deep dive",
+          "headline": "RLHF",
+          "sub": "Reinforcement learning from human feedback",
+          "learn": "why imitation is not enough, the three stages of RLHF, and what the KL leash is for"
+        },
+        "text": "Supervised fine-tuning teaches a model to imitate. But for many tasks there is no single right answer, only better and worse ones. Reinforcement learning from human feedback, RLHF, is how models learn that difference. It is the technique behind the first helpful chat assistants."
+      },
+      {
+        "visual": "PrefPair",
+        "params": {
+          "heading": "Why preferences, not answers",
+          "prompt": "Customer: “Your outage cost us a day. Explain.”",
+          "chosen": "Apologises, gives cause and timeline, states the fix and offers a credit.",
+          "rejected": "Accurate root-cause paragraph. No apology, no next step.",
+          "note": "Both are correct. People struggle to write the perfect answer, but easily pick the better one."
+        },
+        "text": "Here is why. A customer writes in, angry about an outage. Answer A apologises, explains the cause, and offers a fix and a credit. Answer B is a technically accurate root cause with no apology and no next step. Both are correct. Writing the perfect reply is hard, but anyone can say which of these two is better. RLHF learns from exactly that kind of judgement."
+      },
+      {
+        "visual": "RlhfLoop",
+        "params": {
+          "stage": 0
+        },
+        "text": "RLHF has three stages. Stage one: start from a supervised fine-tuned model, one that already follows instructions and gives reasonable answers. You cannot reinforce behaviour the model never produces."
+      },
+      {
+        "visual": "RlhfLoop",
+        "params": {
+          "stage": 1
+        },
+        "text": "Stage two: collect comparisons. The model writes two answers to each prompt, and people pick the better one. Those choices train a reward model, a copy of the language model that outputs a single number. It learns to predict which answer a person would prefer, so it can score any new answer without a person in the loop."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · the reward model's job",
+          "scenario": "prompt: the outage complaint",
+          "rows": [
+            [
+              "answer A · apology, cause, fix, credit",
+              "score 2.1"
+            ],
+            [
+              "answer B · accurate, no apology",
+              "score −0.4"
+            ],
+            [
+              "P(person prefers A) = σ(2.1 + 0.4)",
+              "≈ 92%"
+            ],
+            [
+              "training data",
+              "tens of thousands of comparisons"
+            ]
+          ],
+          "answer": "The reward model turns human judgement into a number an optimizer can chase"
+        },
+        "text": "Concretely, the reward model might score the empathetic answer two point one and the curt one minus zero point four. The difference, passed through a sigmoid, says there is about a ninety-two percent chance a person prefers A. That is the Bradley-Terry model, trained on tens of thousands of human comparisons."
+      },
+      {
+        "visual": "RlhfLoop",
+        "params": {
+          "stage": 2
+        },
+        "text": "Stage three is the reinforcement learning loop, usually with an algorithm called PPO. The model, now called the policy, writes answers. The reward model scores them. The policy is updated to make high-scoring answers more likely. Round and round, many thousands of times."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "The KL leash",
+          "items": [
+            "Reward models are imperfect, and can be gamed",
+            "Unleashed: flattery, padding, repeated phrases (reward hacking)",
+            "KL penalty: pay for drifting from the reference model",
+            "β = leash length: too tight learns nothing, too loose hacks"
+          ]
+        },
+        "text": "There is a catch. The reward model only approximates human taste, and a policy that optimises it hard will find loopholes: flattery, padding, repeating phrases the reward model likes. This is called reward hacking. The fix is a leash. A KL penalty charges the policy for drifting too far from the original model, and beta sets the length of the leash."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "What RLHF costs",
+          "beforeLabel": "SFT",
+          "afterLabel": "RLHF with PPO",
+          "rows": [
+            [
+              "models in memory",
+              "1",
+              "4"
+            ],
+            [
+              "human data",
+              "prompt + answer",
+              "ranked comparisons"
+            ],
+            [
+              "stability",
+              "simple loss",
+              "many knobs, can diverge"
+            ]
+          ],
+          "note": "Four models: policy, frozen reference, reward model, value model."
+        },
+        "text": "It works, but it is heavy. Supervised fine-tuning needs one model in memory. PPO needs four: the policy, a frozen reference, the reward model and a value model. It needs lots of human comparisons, and it has many hyperparameters and can be unstable. That cost is exactly why the next technique, DPO, was invented."
+      },
+      {
+        "visual": "CardGrid",
+        "params": {
+          "heading": "The reinforcement family today",
+          "cols": 2,
+          "cards": [
+            [
+              "RLHF + PPO",
+              "human preferences → reward model → PPO",
+              "the original recipe"
+            ],
+            [
+              "RLAIF",
+              "an AI judge replaces human labels",
+              "cheaper labels"
+            ],
+            [
+              "GRPO",
+              "score a group of answers against each other; no value model",
+              "popular for reasoning"
+            ],
+            [
+              "RFT with graders",
+              "a program scores 0–1: tests pass, JSON valid, answer matches",
+              "Fireworks RFT"
+            ]
+          ]
+        },
+        "text": "The family has grown. RLAIF replaces human labellers with an AI judge. GRPO, used for many reasoning models, compares a group of answers against each other and drops the value model. And reinforcement fine-tuning with graders uses a program to score each answer, such as tests passing or an exact match. Fireworks offers that as RFT."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Run it · lesson 16 (toy) and 18",
+          "lines": [
+            "# the whole RLHF pipeline in numpy, seconds",
+            "python lessons/16-training-toy/toy_alignment.py",
+            "python lessons/16-training-toy/toy_alignment.py --beta 0",
+            "",
+            "# real PPO / GRPO on a Mac (optional, advanced)",
+            "pip install mlx-lm-lora"
+          ]
+        },
+        "text": "Lesson sixteen runs the entire RLHF pipeline on a toy problem, in pure numpy, in a few seconds. It does supervised fine-tuning, fits a reward model to preference pairs, and optimises a policy with and without the KL leash, so you can watch reward hacking happen. Lesson eighteen points to the real trainers."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "RLHF learns from comparisons when no single answer is right",
+            "SFT → reward model → PPO, with a KL leash",
+            "Powerful but heavy: four models, many knobs"
+          ]
+        },
+        "text": "Three things to take away. RLHF learns from comparisons when there is no single right answer. It runs in three stages: supervised fine-tuning, a reward model, then PPO with a KL leash. And it is powerful but heavy: four models and many knobs."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 16 · Lab T1 — watch reward hacking in a toy RLHF"
+        },
+        "text": "Next, DPO, which gets most of the benefit of RLHF with none of the reinforcement learning machinery. And when you are ready to run it: lesson sixteen, lab T1."
+      }
+    ]
+  },
+  "dpo": {
+    "title": "Direct Preference Optimization",
+    "subtitle": "RLHF's result, without the RL",
+    "accent": "teal",
+    "scenes": [
+      {
+        "visual": "Title",
+        "params": {
+          "kicker": "Video 18 of 18 · training deep dive",
+          "headline": "DPO",
+          "sub": "Direct preference optimization",
+          "learn": "how DPO learns from pairs, what β does, and how to build preference data from your own product"
+        },
+        "text": "Direct preference optimization, DPO, is the shortcut. It learns from the same preference pairs as RLHF, but skips the reward model and the reinforcement loop entirely. Today it is one of the most common ways teams align a model to their taste."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "The insight",
+          "items": [
+            "RLHF's optimal policy has a closed form in terms of the reward",
+            "So the reward can be expressed with the policy itself",
+            "Train directly on pairs with a classification-style loss"
+          ]
+        },
+        "text": "The insight, from a twenty twenty-three paper, is mathematical. The best possible policy under the RLHF objective can be written in terms of the reward, which means the reward can be written in terms of the policy. Substitute that in, and you can train straight on preference pairs with a simple loss: no reward model and no sampling loop."
+      },
+      {
+        "visual": "DpoShift",
+        "params": {
+          "note": "β is the leash from RLHF, built into the loss."
+        },
+        "text": "Here is what that loss does. For each pair, it compares how likely the model makes the chosen answer and the rejected one, each relative to a frozen reference copy. Training pushes the chosen answer up and the rejected one down. Beta controls how far it may move from the reference: the same leash as before, built into the loss."
+      },
+      {
+        "visual": "BeforeAfter",
+        "params": {
+          "heading": "DPO vs RLHF with PPO",
+          "beforeLabel": "RLHF + PPO",
+          "afterLabel": "DPO",
+          "rows": [
+            [
+              "models in memory",
+              "4",
+              "2 (policy + reference)"
+            ],
+            [
+              "reward model",
+              "trained separately",
+              "implicit"
+            ],
+            [
+              "sampling in training",
+              "yes · slow",
+              "no"
+            ],
+            [
+              "stability",
+              "many knobs",
+              "close to SFT"
+            ]
+          ]
+        },
+        "text": "Side by side with PPO: two models in memory instead of four, no separate reward model, no sampling during training, and a training loop about as stable as supervised fine-tuning. That simplicity is why it spread so quickly."
+      },
+      {
+        "visual": "PrefPair",
+        "params": {
+          "heading": "Preference data from your own product",
+          "prompt": "Ticket: “Card declined twice, launch is tomorrow.”",
+          "chosen": "{\"category\": \"billing\", \"severity\": 4, \"next_action\": \"route to billing\"}",
+          "rejected": "Sure! This looks like a billing issue, and I'd say it's fairly urgent…",
+          "note": "Chosen: what an agent approved. Rejected: what they edited, or a thumbs-down."
+        },
+        "text": "Where do pairs come from? Often, from your own product. When a support agent edits a model's draft, the edited version is chosen and the original is rejected. A thumbs-down, a regenerate or a correction all create pairs. Here, the concise, valid JSON is chosen, and the chatty answer that breaks the parser is rejected."
+      },
+      {
+        "visual": "Worked",
+        "params": {
+          "heading": "Worked example · one DPO step",
+          "scenario": "β = 0.1 · log-probabilities relative to the reference",
+          "rows": [
+            [
+              "chosen:   log π − log π_ref",
+              "+0.8"
+            ],
+            [
+              "rejected: log π − log π_ref",
+              "−0.4"
+            ],
+            [
+              "β × margin",
+              "0.1 × 1.2 = 0.12"
+            ],
+            [
+              "loss = −log σ(0.12)",
+              "0.63  (0.69 at start)"
+            ]
+          ],
+          "answer": "The loss falls as chosen and rejected pull apart",
+          "answerLabel": "Read it"
+        },
+        "text": "One step, with numbers. Relative to the reference, the chosen answer has become zero point eight more likely in log terms, and the rejected one zero point four less. The margin is one point two, and times a beta of zero point one gives zero point one two. The loss is minus log sigmoid of that: about zero point six three, down from zero point six nine when both were equal. More separation means lower loss."
+      },
+      {
+        "visual": "Bullets",
+        "params": {
+          "heading": "Getting DPO right",
+          "items": [
+            "SFT first: DPO refines a model that already does the task",
+            "Pairs should differ in the thing you care about",
+            "Start β ≈ 0.1; lower moves further from the reference",
+            "Measure win-rate AND task accuracy"
+          ]
+        },
+        "text": "A few rules. Do supervised fine-tuning first: DPO refines behaviour, it does not teach the task. Make pairs differ in the thing you care about, not in random noise. Start beta around zero point one. And evaluate both the win rate against the old model and the task accuracy, because improving taste can quietly cost correctness."
+      },
+      {
+        "visual": "CardGrid",
+        "params": {
+          "heading": "DPO's relatives",
+          "cols": 2,
+          "cards": [
+            [
+              "IPO",
+              "regularises against over-fitting the pairs",
+              ""
+            ],
+            [
+              "KTO",
+              "single thumbs-up / thumbs-down, no pairs",
+              ""
+            ],
+            [
+              "ORPO",
+              "SFT + preference in one step, no reference model",
+              "Fireworks: --loss-method ORPO"
+            ],
+            [
+              "SimPO",
+              "reference-free, length-normalised",
+              ""
+            ]
+          ]
+        },
+        "text": "There are relatives. IPO regularises against over-fitting the pairs. KTO learns from single thumbs up or down, no pairs needed. ORPO folds supervised fine-tuning and preference into one step with no reference model, and Fireworks supports it alongside DPO. SimPO is reference-free and length-normalised."
+      },
+      {
+        "visual": "CommandCard",
+        "params": {
+          "heading": "Run it · lesson 18",
+          "lines": [
+            "python make_pairs.py            # pairs from the ticket data",
+            "bash dpo_mlx.sh                 # mlx_lm_lora --train-mode dpo",
+            "bash dpo_fireworks.sh           # firectl dpo-job create",
+            "python pref_eval.py --target mlx"
+          ]
+        },
+        "text": "In lesson eighteen you build pairs from the ticket data, train DPO on your Mac with MLX, optionally run the same job on Fireworks with one command, and compare valid-JSON rate, accuracy and answer length before and after."
+      },
+      {
+        "visual": "Recap",
+        "params": {
+          "heading": "Recap",
+          "items": [
+            "DPO learns from chosen / rejected pairs with a simple loss",
+            "Two models, no reward model, no RL loop: nearly as stable as SFT",
+            "SFT first, then DPO; measure win-rate and accuracy"
+          ]
+        },
+        "text": "Three things to take away. DPO learns from chosen and rejected pairs with a simple loss. It needs two models, no reward model and no reinforcement loop, so it is nearly as stable as supervised fine-tuning. And do SFT first, then DPO, and measure both win rate and task accuracy."
+      },
+      {
+        "visual": "EndCard",
+        "params": {
+          "line": "Lesson 18 · Lab T3 — DPO on your Mac and on Fireworks"
+        },
+        "text": "That completes the training series: full fine-tuning, supervised fine-tuning, LoRA and its family, RLHF, and DPO. When you are ready to run it: lesson eighteen, lab T3, DPO on your Mac and on Fireworks."
+      }
+    ]
+  }
+}

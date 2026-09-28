@@ -1,0 +1,45 @@
+# Scene start times of the 18 videos, in seconds (one decimal). Read by scripts/course.mjs.
+#
+# Format: <stem> <t0> <t1> ... <tN-1>, one time per narration.json scene of that video, in scene order
+# (0-based), so "scenes: [a, b]" in course/course.yaml plays from the start of scene a to the start of
+# scene b. The last time on each line is the start of the end card: it is not a chapter, but it ends a
+# range that runs up to the end card. Chapter labels are not stored here; course.mjs takes them from
+# the scene (its heading, or the scene kind made human).
+#
+# How it was measured (2026-09-26, in Docker on optimus, never on the Mac):
+# - Every scene of the Remotion source (04-video-source/src/Explainer.tsx) draws a scene counter
+#   "NN / MM" in the top right corner, and it changes exactly where one <Series.Sequence> ends and the
+#   next begins. The files are 1248x702 at 24 fps, starting at 0 (ffprobe).
+# - ffmpeg (linuxserver/ffmpeg) wrote the counter's two digits (crop 34x24 at 1131,27, gray) of every
+#   frame; a script (python:3.13-slim) took the mean absolute pixel change between frames. Each video
+#   has exactly (scenes - 1) changes of 3.7 or more; every other frame changes by 0.83 or less.
+# - A scene starts on the first frame with the new counter (frame k, at k / 24 s). The time is rounded
+#   UP to one decimal, so a player seeking to it always lands inside the new scene (each scene's audio
+#   starts with a 0.35 s lead-in, so nothing spoken is skipped).
+# - Checks: all 18 videos: the frame shown at each time has the same counter as the middle of its own
+#   scene and a different one from the scene before, and the count matches narration.json. Frames at
+#   every time were grabbed with the counter enlarged; for 01, 02, 06, 09, 15 and 17 every frame was
+#   looked at: the counter reads scene k+1 and the burned-in subtitle is the first words of scene k's
+#   narration.
+# Durations (ffprobe, s): 01 181.96, 02 182.38, 03 189.83, 04 163.08, 05 177.75, 06 194.42, 07 187.00,
+# 08 170.75, 09 175.75, 10 142.38, 11 156.62, 12 169.00, 13 160.92, 14 256.92, 15 242.29, 16 229.96,
+# 17 250.00, 18 230.17.
+
+01-inference-101 0.0 10.1 27.7 42.6 60.4 84.7 111.0 129.5 149.2 165.9
+02-kv-cache 0.0 12.1 29.2 53.8 68.9 91.2 106.9 130.5 151.5 168.3
+03-gpu-bandwidth 0.0 12.0 32.3 54.9 78.6 97.6 109.8 134.3 158.7 174.0
+04-quantization 0.0 11.3 26.0 42.0 62.4 74.8 88.7 115.0 133.6 148.8
+05-batching 0.0 10.5 25.5 42.4 61.1 83.9 98.9 124.3 148.2 162.7
+06-training 0.0 9.2 22.8 41.5 60.0 75.3 94.3 114.6 137.1 159.4 175.3
+07-offloading 0.0 7.6 25.2 47.7 70.9 94.0 110.3 134.0 156.5 173.5
+08-platform 0.0 9.8 26.3 38.9 56.8 78.5 94.9 119.3 141.2 155.1
+09-serving-stack 0.0 11.5 31.8 48.8 67.6 85.4 108.3 127.7 148.3 162.1
+10-benchmarking 0.0 9.3 24.1 41.3 55.1 69.0 83.0 103.4 121.1 134.1
+11-prefix-caching 0.0 13.7 30.6 49.0 66.3 80.0 94.8 114.7 135.0 147.8
+12-qlora 0.0 10.5 28.0 42.5 57.6 77.5 94.5 117.3 138.6 154.5
+13-scale-out 0.0 8.3 24.7 41.7 64.2 79.3 87.1 111.7 133.8 150.7
+14-full-finetuning 0.0 17.6 41.0 59.3 86.3 120.8 146.8 178.0 200.6 219.4 241.5
+15-sft 0.0 15.2 32.5 58.5 76.8 97.4 123.8 147.1 168.8 190.0 210.2 228.3
+16-peft 0.0 17.1 39.3 64.8 87.5 115.1 135.6 158.9 182.0 197.8 217.6
+17-rlhf 0.0 20.2 45.7 61.4 82.5 103.3 122.6 146.9 170.1 194.9 217.1 236.6
+18-dpo 0.0 19.0 41.8 64.0 80.0 102.2 129.3 152.9 175.1 191.6 213.2

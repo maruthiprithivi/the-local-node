@@ -1,0 +1,141 @@
+# The guided course: 12 days, 22 steps. Structure only; the plain-language text for each day is in
+# content/day-NN.yaml. The kit folders are never edited: where the kit and the course disagree (the
+# README "Watch" lines, the lab book plan), this file wins on the site.
+#
+# Step fields
+#   id        stable id used by progress storage (never rename once published)
+#   slug      last URL segment for generated pages; lesson steps live at /lessons/<lesson>/
+#   lesson    03-labs/lessons/<dir> this step is built on (omit for generated pages)
+#   page      generated page kind: get-the-code | product-criticism | lesson16-part2
+#   minutes   total for the step, video included
+#   cost      shown on the step and day; paid: true adds the $ badge and the `make fw-check` reminder
+#   videos    stem = 01-videos/<stem>.mp4
+#             mode: all | rewatch (collapsed, earlier day) | optional (collapsed)
+#             scenes: [from, to) scene indexes in narration.json order (chapters.txt gives exact times)
+#   cards     lab book cards for the optional "Go deeper" links (never shown as labels in the course)
+#   files     for split lessons: which code files this step shows
+#   download  GB of new model downloads the step starts, when the README figure counts earlier ones too
+#   checks    for split lessons: which README "Check yourself" items (1-based) belong to this step
+
+days:
+  - n: 1
+    part: 1
+    title: Guardrails and first calls
+    cost: about $0.02
+    paid: true
+    steps:
+      - { id: d1-s1, slug: get-the-code, page: get-the-code, title: "Get the code, run it offline", minutes: 15, cost: free,
+          videos: [{ stem: 01-inference-101, mode: all, note: "Watch while pip installs." }] }
+      - { id: d1-s2, lesson: 00-setup, title: "Set up your Mac and the spend cap", minutes: 30, cost: free, cards: [L1] }
+      - { id: d1-s3, lesson: 01-latency-harness, title: "Measure TTFT and ITL", minutes: 30, cost: about $0.02, paid: true, cards: [F1],
+          videos: [{ stem: 01-inference-101, mode: rewatch, scenes: [3, 6] }] }
+
+  - n: 2
+    part: 1
+    title: Local stack on the Mac
+    cost: free
+    steps:
+      - { id: d2-s1, lesson: 02-three-local-servers, title: "Serve one model three ways", minutes: 35, cost: free, cards: [L2],
+          videos: [{ stem: 09-serving-stack, mode: all }] }
+
+  - n: 3
+    part: 1
+    title: Benchmark like a field engineer
+    cost: free
+    steps:
+      - { id: d3-s1, lesson: 03-concurrency-sweep, title: "Concurrency sweep", minutes: 50, cost: free, cards: [L3],
+          videos: [{ stem: 10-benchmarking, mode: all }, { stem: 05-batching, mode: all }, { stem: 03-gpu-bandwidth, mode: all }] }
+
+  - n: 4
+    part: 1
+    title: Memory levers
+    cost: free
+    steps:
+      - { id: d4-s1, lesson: 04-quantization, title: "Quantization", minutes: 50, cost: free, cards: [L4],
+          videos: [{ stem: 04-quantization, mode: all, note: "Watch while the 17 GB download runs." },
+                   { stem: 03-gpu-bandwidth, mode: rewatch, scenes: [2, 3] }] }
+      - { id: d4-s2, lesson: 05-kv-cache, title: "KV cache and context length", minutes: 50, cost: free, cards: [L5],
+          videos: [{ stem: 02-kv-cache, mode: all }] }
+
+  - n: 5
+    part: 1
+    title: Agent workloads
+    cost: about $0.03
+    paid: true
+    steps:
+      - { id: d5-s1, lesson: 06-prefix-caching, title: "Prefix caching", minutes: 35, cost: about $0.03, paid: true, cards: [L6, F2],
+          videos: [{ stem: 11-prefix-caching, mode: all }] }
+
+  - n: 6
+    part: 1
+    title: Structured output and batch
+    cost: about $0.03
+    paid: true
+    steps:
+      - { id: d6-s1, lesson: 07-structured-output, title: "Structured output", minutes: 30, cost: about $0.02, paid: true, cards: [F3],
+          no_video: "No video covers how the server forces a reply's format. \"In plain words\" below is the explanation." }
+      - { id: d6-s2, lesson: 08-batch-api, title: "Batch API", minutes: 25, cost: fractions of a cent, paid: true, cards: [F4],
+          videos: [{ stem: 08-platform, mode: all }] }
+
+  - n: 7
+    part: 1
+    title: Training day, managed
+    cost: about $5
+    paid: true
+    long: "Split it: step 1 one evening, step 2 the next."
+    steps:
+      - { id: d7-s1, lesson: 09-eval-harness, title: "Eval harness", minutes: 60, cost: about $0.10, paid: true, cards: [F6],
+          videos: [{ stem: 06-training, mode: all }] }
+      - { id: d7-s2, lesson: 10-lora-fireworks, title: "LoRA on Fireworks", minutes: 120, cost: "about $5: cents to train, about $8 an hour to serve", paid: true, cards: [F5],
+          videos: [{ stem: 12-qlora, mode: all, note: "Watch while the training job runs." }] }
+
+  - n: 8
+    part: 1
+    title: Training day, local
+    cost: free
+    steps:
+      - { id: d8-s1, lesson: 11-lora-local-mlx, title: "The same LoRA on your Mac", minutes: 85, cost: free, cards: [L8],
+          videos: [{ stem: 12-qlora, mode: optional }] }
+
+  - n: 9
+    part: 1
+    title: Scale-out
+    cost: about half a GPU-hour
+    paid: true
+    long: "Step 3 is optional and needs a DGX Spark (2 to 3 hours)."
+    steps:
+      - { id: d9-s1, lesson: 12-moe-vs-dense, title: "MoE vs dense", minutes: 40, cost: free, download: 14, cards: [L7],
+          videos: [{ stem: 07-offloading, mode: all }] }
+      - { id: d9-s2, lesson: 13-speculative-decoding, title: "Speculative decoding", minutes: 50, cost: 30 to 45 min of one deployment, paid: true, cards: [F7],
+          videos: [{ stem: 13-scale-out, mode: all }, { stem: 05-batching, mode: rewatch, scenes: [4, 5] }] }
+      - { id: d9-s3, lesson: 14-spark-track, title: "The Spark track", minutes: 150, cost: free (your hardware), optional: "Needs a DGX Spark", cards: [L9],
+          videos: [{ stem: 09-serving-stack, mode: rewatch, scenes: [3, 6] }] }
+
+  - n: 10
+    part: 1
+    title: Capstone and rehearsal
+    cost: free
+    steps:
+      - { id: d10-s1, lesson: 15-capstone, title: "Sizing memo and 10-minute talk", minutes: 120, cost: free,
+          videos: [{ stem: 08-platform, mode: rewatch, scenes: [5, 7] }] }
+      - { id: d10-s2, slug: product-criticism, page: product-criticism, title: "One product criticism", minutes: 30, cost: free }
+
+  - n: 11
+    part: 2
+    title: Training methods in miniature
+    cost: free
+    steps:
+      - { id: d11-s1, lesson: 16-training-toy, title: "Training toys, part 1", minutes: 30, cost: free, cards: [T1], files: [toy_finetune.py], checks: [1],
+          videos: [{ stem: 14-full-finetuning, mode: all }, { stem: 16-peft, mode: all }] }
+      - { id: d11-s2, lesson: 17-full-vs-peft-mlx, title: "Full vs LoRA vs DoRA", minutes: 65, cost: free, cards: [T2],
+          videos: [{ stem: 15-sft, mode: all }] }
+
+  - n: 12
+    part: 2
+    title: Preference tuning
+    cost: free (Fireworks DPO optional, paid)
+    steps:
+      - { id: d12-s1, slug: training-toys-part-2, page: lesson16-part2, lesson: 16-training-toy, title: "Training toys, part 2", minutes: 25, cost: free, cards: [T1], files: [toy_alignment.py], checks: [2, 3, 4],
+          videos: [{ stem: 17-rlhf, mode: all }] }
+      - { id: d12-s2, lesson: 18-preference-dpo, title: "Preference tuning with DPO", minutes: 80, cost: "free locally, Fireworks optional (paid)", cards: [T3],
+          videos: [{ stem: 18-dpo, mode: all }] }

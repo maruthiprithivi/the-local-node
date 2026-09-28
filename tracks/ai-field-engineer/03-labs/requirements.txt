@@ -1,0 +1,7 @@
+# core — every lesson
+openai>=1.40
+jsonschema>=4
+# charts (lessons 03, 04) — optional, scripts fall back to text tables
+matplotlib>=3.8
+# Apple silicon only (lessons 02, 06, 11) — comment out on Linux
+mlx-lm>=0.20

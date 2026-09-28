@@ -1,0 +1,13 @@
+[project]
+name = "felab"
+version = "1.0.0"
+description = "Follow-along labs for the AI Field Engineer / AI engineering"
+requires-python = ">=3.10"
+dependencies = ["openai>=1.40", "jsonschema>=4"]
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.8"]
+mac = ["mlx-lm>=0.20"]   # Apple silicon only
+
+[tool.setuptools]
+packages = ["felab"]

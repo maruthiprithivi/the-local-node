@@ -1,0 +1,1101 @@
+# Day 7 · Training day, managed. Plain-language content for the guided course (course-spec.md section 3).
+# Style: plain/style.md; depth and layering follow the approved Day 4 sheet (plain/day4-content.md).
+# Sources (kit root = fireworks-field-engineer-kit/):
+#   L09    03-labs/lessons/09-eval-harness/README.md (table lines 11-14, graders 19-22, Run 35-42, mock output 51-55,
+#          checks 61-62, say 66-67); evaluate.py (RUBRIC 31-35, no price -> usd_per_1k 0.0 lines 40-43 and 80,
+#          judge nan line 86, p95 of whole-request time lines 65-70 and 87)
+#   L10    03-labs/lessons/10-lora-fireworks/README.md (what and why 8-19, five steps 23-29, Run 35-43, BASE_MODEL 45-46,
+#          sample 50-55, checks 59-61, say 65-66); _state.sh (BASE_MODEL line 7, DEPLOY_RATE $8/h line 8);
+#          1_train.sh (0.3M tokens lines 5-6, rank/epochs 8-9, saved ids 17-19); 2_wait.sh (10-30 min, 60 s poll);
+#          3_deploy.sh (clock starts, 20 s poll); 4_eval.sh (60 tickets, no judge, no prices); 5_teardown.sh
+#   L11    03-labs/lessons/11-lora-local-mlx/README.md, 1_train_mlx.sh (Qwen2.5-7B-Instruct-4bit base, 300 iters, batch 2)
+#   L00    03-labs/lessons/00-setup/README.md (70% of RAM rule), fireworks_guardrails.sh
+#   data   03-labs/data/make_tickets.py (800 train, 100 valid, 100 test; categories, severity 1-5)
+#   mock   03-labs/felab/mock_server.py (base ~75%, -lora ~93% line 81-85; judge rigged lines 153-159)
+#   tgt    03-labs/felab/targets.py (fireworks default gpt-oss-120b line 74); .env.example line 10
+#   live   checked 2026-09-27: https://fireworks.ai/models/fireworks/gpt-oss-20b "Serverless: Not supported", so the
+#          README Run line 41 (gpt-oss-20b@0.07/0.30) is shown via `replace` with gpt-oss-120b@0.15/0.60 from
+#          https://fireworks.ai/models/fireworks/gpt-oss-120b ($0.15 in, $0.60 out per 1M tokens). evaluate.py's
+#          header (line 7) labels the 81% / 640 ms sample row gpt-oss-20b. Cost: 0.15 / 0.07 = 2.1, 0.60 / 0.30 = 2,
+#          so the README's about $0.10 becomes at most about $0.20. evaluate.py max_tokens=120 (reasoning caveat).
+#          run[].cmd keeps the README's 20b text: the validator keys notes to the unreplaced Run block.
+#   memo   03-labs/lessons/15-capstone/build_memo.py lines 52, 75-76, 114 (best/worst category_% of all 09-eval rows)
+#   narr   04-video-source/src/narration.json: training lines 686-817 (worked example 745-777, Recap 802-812);
+#          qlora lines 1529-1667 (Worked 1592-1624, BeforeAfter 1626-1650, Recap 1652-1662); full-finetuning 1861
+#          (about 16 bytes per parameter)
+#   LB     02-lab-book/field-engineer-lab-book.html: 661 (multi-LoRA, default quota 100), 688-700 (on-demand $8/h,
+#          billed per GPU-second; LoRA SFT $0.50 per 1M at <=16B, DPO and full SFT $1.00), 707 (prices as of
+#          23 Sep 2026), 717 (LoRA serves on dedicated only), 751 ($5,840/month break-even line), 1571-1577
+#          (checklist: prepaid credit, spend limit pauses at 100%), 1648-1657 (fine-tune calculator), 1767 (plan day 7)
+#   FG     02-lab-book/inference-field-guide.html 628 (3/4 word per token), 938 (spice packet analogy), 1903
+#   kitREADME  fireworks-field-engineer-kit/README.md lines 151-157 (troubleshooting)
+# Arithmetic (recomputed): 640 / 310 = 2.06; 96 - 81 = 15; 0.42 / 0.02 = 21; 0.3 x 0.50 = 0.15;
+#   38 / 60 x 8 = 5.07; 5.07 / 0.15 = 33.8; 8 x 730 = 5,840; 12 x 5,840 = 70,080; 5,840 / 0.42 x 1,000 = 13.9 million;
+#   13,904,762 / (730 x 3,600) = 5.3 per second; 97 - 80 = 17; 4.5 - 3.9 = 0.6; 97 - 74 = 23; 93 - 89 = 4;
+#   2,000 x 600 x 2 = 2.4 million; 2.4 x 0.50 = 1.20; 89 - 81 = 8; 100 - 89 = 11; 2.4 x 1.00 = 2.40; 1.20 + 8 = 9.20;
+#   8 x 0.5 = 4 GB; 30 / 5,000 = 0.6%; 0.7 x 16 = 11.2; 0.7 x 36 = 25.2; 8 x 16 = 128 GB; 128 / 11 = 11.6;
+#   300 x 2 / 800 = 0.75; 100 / 60 = 1.67 points per ticket (58/60 = 96.7, 59/60 = 98.3, so 97.0 is not reachable);
+#   11 - 5 = 6 GB; 640 ms = about 2/3 s, 310 ms = about 1/3 s; 2 + 60 + 120 + 10 = 192 min (day chip about 3 h 10).
+# Glossary: shared terms copy the earliest day's text (Days 1, 3, 6, 8, 10 and 12 checked on 2026-09-26).
+
+day: 7
+tile: "Score models on real tasks, then train a custom one on Fireworks"
+
+overview:
+  today: >-
+    Build the table that decides between models: how often each is right, how fast it answers, what it costs.
+    Every model takes the same test, sorting customer support tickets (help requests) by type and urgency. Then
+    train your own version on Fireworks (a fine-tune), measure the gain and shut down its GPU (the chip it runs
+    on) before it runs up a bill.
+  example: >-
+    Imagine a support team whose AI sends one in five tickets to the wrong team. In the lesson's sample, training
+    it on past tickets reduces that error to about three in a hundred. The training costs only cents, but keeping
+    a rented chip running to use the result costs several dollars even for a short test. Today you will measure
+    both the improvement and the full bill before recommending it to a customer.
+  deliverable: >-
+    Your fine-tune's measured gain and total cost, next to step 1's scores for the untuned models.
+  expected: >-
+    In the lesson's sample: 80% to about 97% of ticket categories right (a 17-point gain), for $5.07 of serving
+    plus about 15 cents of training.
+  before:
+    - title: "About 3 hours 10 minutes, best split over two sittings."
+      body: >-
+        Step 1 takes about an hour. Step 2 takes about 2 hours, mostly waiting: 10 to 30 minutes of training,
+        then up to an hour with a GPU running. Do step 1 one day and step 2 the next. Run step 2's last three
+        commands (start the GPU, test, shut down) in one sitting: the GPU bills by the hour in between.
+    - title: "Enough Fireworks credit, and nothing already running."
+      body: >-
+        Step 2 costs about $5 to $8: a dedicated deployment (a GPU reserved for you) bills about $8 an hour.
+        Check that your prepaid credit covers it. Check too that your monthly spend cap from Day 1 has that much
+        room left: once spending reaches the cap, Fireworks stops answering requests. Then, from the `03-labs`
+        folder:
+      command: "make fw-check"
+      after: >-
+        The deployments list should be empty. Anything listed bills by the hour: delete it with
+        `firectl deployment delete <DEPLOYMENT_ID>`.
+    - title: "The practice server."
+      body: >-
+        Step 1 starts with a free rehearsal on the kit's practice server (made-up numbers, nothing to download).
+        Start it from `03-labs` if it is not already running:
+      command: "make mock &"
+      after: "It prints a line starting `mock LLM on http://localhost:9000/v1`."
+    - title: "Ollama and MLX from Day 2."
+      body: >-
+        Step 1 also grades your Mac's model from Day 2, served two ways, so both servers must be running. Start
+        Ollama with `ollama serve` (skip it if the Ollama app is open). Then start MLX in a second terminal, from
+        `03-labs`:
+      command: "bash lessons/02-three-local-servers/serve_mlx.sh"
+      after: "Leave both running. `make check` shows which servers are up."
+  feeds: >-
+    Day 8 trains the same kind of small add-on (a LoRA adapter) on your Mac and compares it with today's cloud
+    run: your answer to "do it ourselves, or pay a service?". Day 10's memo quotes the lowest and highest share
+    of categories right in all your eval results (today's and Day 8's) as the before and after. It reads every
+    row, practice runs included, and names only the top one. So on Day 10, check that the before figure is a
+    real model's, not the practice server's 75.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 1 · Eval harness (lesson 09-eval-harness)
+  # ---------------------------------------------------------------------------------------------------------
+  d7-s1:
+    why: >-
+      You build the table that decides between models: how often each is right, how fast it answers and what it
+      costs. Every model sorts the same customer support tickets. Customers switch models on that table, not on a
+      hunch.
+    why_example: >-
+      The lesson's example: a big general model sorts 81% of support tickets into the right category, at $0.42
+      per 1,000 tickets. A small fine-tuned model (one given extra training on examples of this task) sorts 96% at
+      $0.02, and answers about twice as fast.
+    videos:
+      06-training:
+        in_this_video: >-
+          The four standard ways to change how an existing model behaves, how to choose one from what is going
+          wrong, and why LoRA (training a small add-on instead of the whole model) keeps it cheap.
+        key_points:
+          - point: >-
+              Pick the method from the kind of mistake: examples teach format, comparisons teach taste, an
+              automatic score teaches correctness.
+            detail: >-
+              Can you write the right answer? Supervised fine-tuning (SFT: training on examples of it). Can you
+              only say which of two answers is better? Preference tuning (DPO, direct preference optimization).
+              Can a program score an answer? Reinforcement fine-tuning (RFT). Missing facts need looking up
+              (retrieval), not training.
+          - point: >-
+              LoRA (low-rank adaptation) keeps it cheap: the model stays frozen (unchanged) and only a small
+              add-on is trained, so one running model can carry many add-ons.
+            detail: >-
+              The video's ticket example: 2,000 examples x 600 tokens (word pieces) x 2 passes = 2.4 million
+              training tokens, about $1.20 at $0.50 per million. Accuracy rose from 81% to 89%, and the add-on is
+              about 30 MB, a tiny fraction of the model.
+          - point: >-
+              Try a better prompt and retrieval first: they are free.
+            detail: >-
+              Train only when those stop helping. Then look at what is still wrong: the video's example stops at
+              89% and asks what the other 11% of mistakes look like, because that picks the next method.
+    plain:
+      lead: >-
+        An eval (short for evaluation) is a repeatable test: the same questions, graded the same way, for every
+        model you are considering. Here the task is sorting support tickets. Each reply is graded three ways,
+        cheapest first: automatic code checks, a second AI model acting as judge, and a person checking a
+        sample. The results go in one table, with speed and cost beside quality.
+      picture: >-
+        Hiring for a job: every candidate does the same work sample, instead of you trusting their CV. An
+        automatic check catches the basic errors, a senior colleague scores the judgement calls, and you
+        spot-check that colleague's marks. Then you weigh the scores against salary and speed.
+      numbers_source: "lesson 09's example table and the kit's ticket dataset"
+      numbers:
+        - >-
+          The test: 100 support tickets kept aside and never used for training. Each run grades 50 or 60 of
+          them.
+        - >-
+          Each reply must give a category (billing, outage, how-to or abuse), a severity from 1 to 5 and a next
+          step.
+        - >-
+          Big general model: 81% of categories right, 3.9 out of 5 from the AI judge, 95 of 100 replies back
+          within 640 ms (thousandths of a second: about two thirds of a second), $0.42 per 1,000 tickets.
+        - >-
+          Small fine-tuned model: 96% right, 4.5 out of 5, within 310 ms, $0.02 per 1,000 tickets.
+        - >-
+          So the small model wins on all three: 15 points more accurate (96 - 81), about twice as fast
+          (640 ÷ 310 = 2.1) and 21 times cheaper (0.42 ÷ 0.02).
+      words:
+        - term: "Eval (eval harness)"
+          def: >-
+            a repeatable test of a model on a fixed set of prompts. Example: the held-out tickets, graded three
+            ways.
+        - term: "Held-out tickets"
+          def: >-
+            test examples the model was never trained on, so a good score means it learned the task, not the
+            answers. Example: the 100 tickets in `test.jsonl`.
+        - term: "Judge (LLM judge)"
+          def: >-
+            a second model that scores answers against a scoring guide (a rubric). Example: 3.9 against 4.5 out
+            of 5.
+        - term: "p95"
+          def: >-
+            the value 95 out of 100 requests stay under. Example: 95 of 100 replies back within 310 ms.
+    run:
+      - cmd: "python evaluate.py mock:mock-8b mock:mock-8b-lora --n 60 --judge mock"
+        note: >-
+          A free, offline rehearsal. The practice server pretends to be two models: `mock-8b` (untuned) and
+          `mock-8b-lora` (a pretend fine-tune). Each sorts the same 60 test tickets, and the practice server also
+          plays the judge. If it is not running, start it with `make mock &` from `03-labs`. **Look for** the
+          `-lora` row higher on `category_%` (categories right): about 93 against 75. These numbers are made up:
+          never quote them.
+      - cmd: "python evaluate.py ollama mlx --n 50"
+        note: >-
+          The same test, free, on your Mac's model from Day 2: Llama 3.1 8B at 4 bits, served by Ollama and by
+          MLX, 50 tickets each. **Look for** real scores, and 0.0 in `usd_per_1k`: your own Mac charges nothing
+          per token. `judge_1to5` reads nan (not a number: empty), since no judge was asked.
+      - cmd: 'python evaluate.py "fireworks:accounts/fireworks/models/gpt-oss-20b@0.07/0.30" --n 50 --judge fireworks'
+        note: >-
+          **Run it as shown here and in the code block above, with gpt-oss-120b**, not with the gpt-oss-20b the
+          kit's own README names. Why: on 27 September 2026
+          [gpt-oss-20b's model page](https://fireworks.ai/models/fireworks/gpt-oss-20b) said "Serverless: Not
+          supported". Fireworks no longer runs it per token, so the kit's line would fail. gpt-oss-120b is
+          still billed per token, at $0.15 per million tokens sent and $0.60 per million received
+          ([its model page](https://fireworks.ai/models/fireworks/gpt-oss-120b), checked the same day).
+
+          The run grades the same 50 tickets. `@0.15/0.60` passes those two prices, so the cost column fills in.
+          `--judge fireworks` has your default Fireworks model, also gpt-oss-120b, score each suggested next
+          step. Paid: the lesson estimates about $0.10 on the old model. gpt-oss-120b costs about twice as much
+          per token (0.15 ÷ 0.07 = 2.1 for tokens in, 0.60 ÷ 0.30 = 2 for tokens out), so allow up to about
+          $0.20. Prices change: copy today's from the model's page. **Look for** a judge score between 1 and 5
+          and a cost above 0. Your categories right, p95 and cost will not match the lesson's sample table: its
+          big-model row (81%, 640 ms) was written for gpt-oss-20b, the model `evaluate.py`'s header names.
+    see: >-
+      Each row is one model on the same test tickets. `schema_valid_%` is the share of replies in the right
+      format; `category_%` and `severity_%` are the shares with the right category and the right urgency.
+      `judge_1to5` is the judge's average, and nan (not a number) means no judge was asked. `p95_ms` is the time
+      95 of 100 replies came back within, and `usd_per_1k` the dollars per 1,000 tickets. On the practice server
+      expect about 75% of categories right for `mock-8b`, about 93% for `mock-8b-lora`, and 0.0 dollars. The
+      sample below is not from this exact command: it shows 0.015 dollars, which a run with no prices cannot
+      print.
+    checks:
+      - q: >-
+          A judge model (a second AI model that grades answers against a scoring guide) gives the fine-tuned
+          model 4.5 out of 5 and the original model 3.9. Is that proof the fine-tune is better?
+        plain: >-
+          No. First check that the judge agrees with you: score about 20 of the same answers yourself and
+          compare. AI judges tend to reward longer, more polished answers even when they are no more correct.
+        picture: >-
+          A teacher who gives longer essays in neat handwriting higher marks, whatever they say. Before you trust
+          their grades, you mark 20 of the same essays yourself and see whether you agree.
+        numbers_source: "lesson 09's example table and its scoring guide"
+        numbers:
+          - >-
+            The judge scores each suggested next step from 1 to 5: 5 = specific, right owner, safe; 3 = plausible
+            but vague; 1 = wrong or unsafe.
+          - >-
+            Average scores: 3.9 for the original model, 4.5 for the fine-tune, a gap of 0.6 points
+            (4.5 - 3.9).
+          - >-
+            The check: score about 20 of the same answers by hand. If you and the judge often disagree, the 0.6
+            means little.
+          - >-
+            Code checks need no such trust: 81% against 96% of categories right is counted against the known
+            answers.
+        words:
+          - term: "Judge (LLM judge)"
+            def: "a second model that scores answers against a rubric. Example: gpt-oss-120b in the Fireworks run."
+          - term: "Rubric"
+            def: "the scoring guide a judge follows. Example: 5 = specific, right owner, safe; 1 = wrong or unsafe."
+          - term: "Hand-labelled sample"
+            def: "answers a person has marked right or wrong, used to check a judge. Example: about 20 scores, redone by you."
+          - term: "Bias (judge bias)"
+            def: "a judge's habit of favouring something that is not correctness. Example: longer, more polished answers."
+        more: >-
+          The lesson also says to change the `RUBRIC` prompt and watch the scores move, which shows why judges
+          need calibrating. `evaluate.py` prints only the average (`judge_1to5`), so to hand-check, print each
+          `judge_score()` result next to its ticket. In the practice run the stand-in judge is rigged: it gives 4
+          or 5 when the next step names the ticket's true category and 1 to 3 otherwise
+          (`felab/mock_server.py`), so its scores track category accuracy. A real judge has no such anchor.
+      - q: >-
+          After fine-tuning, accuracy went up 17 points: 17 more tickets in every 100 sorted correctly. But p95
+          latency doubled: the time within which 95 of 100 replies come back is now twice as long. What do you
+          recommend?
+        plain: >-
+          Recommend it only if the slower replies still meet the customer's speed promise (their SLO, service
+          level objective). Show them both numbers so they choose. Then offer ways to keep the accuracy without
+          the wait: fine-tune a smaller starting model, or add a small helper model that drafts the next few words
+          for the big one to check (speculative decoding).
+        picture: >-
+          A delivery service that gets more parcels to the right door but takes twice as long. For flowers that
+          must arrive today, that is a no; for a monthly supplies order, it is fine.
+        numbers_source: "lesson 09's example table"
+        numbers:
+          - >-
+            The question's trade: 17 more tickets right in every 100, but the time within which 95 of 100 replies
+            come back is twice as long.
+          - >-
+            For scale, the eval lesson's example table has p95 figures of 310 ms and 640 ms: 640 ÷ 310 = 2.1, about
+            a third of a second against about two thirds.
+          - >-
+            In that same table the small fine-tuned model is the fast one: 96% right, 310 ms, $0.02 per 1,000
+            tickets, against the big model's 81%, 640 ms, $0.42. That is why a smaller starting model is one of the
+            answers.
+          - >-
+            The lesson's own example is harsher, 3 times the wait: that can be the wrong call for a chat product
+            and the right one for batch work that runs overnight (like Day 6's Batch API).
+        words:
+          - term: "SLO (service level objective)"
+            def: "the speed promise. Example: 95 of 100 replies back within a set time."
+          - term: "p95 latency"
+            def: "the time within which 95 of 100 replies come back. Example: 640 ms against 310 ms."
+          - term: "Speculative decoding"
+            def: "a small draft model guesses several tokens and the big model checks them all in one pass; the output does not change. Example: Day 9."
+          - term: "Base model"
+            def: "the model you start from, before any fine-tuning. Example: a smaller one can be faster and cheaper."
+        more: >-
+          The p95 here is whole-request latency: `evaluate.py` times each call from sending it to the full reply,
+          not time to first token. Speculative decoding (Day 9) cuts the time per token when a small draft
+          model's guesses are accepted. A smaller base model cuts time and cost together, and the lesson's table
+          shows a small fine-tune beating a big general model on all three columns.
+    say:
+      ask: "A new model tops the public benchmarks. How would you decide whether it is right for us?"
+      means:
+        - phrase: "Benchmarks are for launches"
+          meaning: >-
+            Public benchmarks (standard tests every model maker reports scores on) help compare models when they
+            come out. They do not measure this customer's job.
+        - phrase: "For a customer I use three graders"
+          meaning: >-
+            I grade each answer three ways, cheapest first: code checks (free and exact), an AI judge with a
+            scoring guide, and a person checking a sample.
+        - phrase: "on their data"
+          meaning: >-
+            On the customer's own examples, kept aside from any training (held out), like the 100 test tickets
+            here.
+        - phrase: "and one table"
+          meaning: >-
+            All the results side by side, so nobody chooses a model on one number.
+        - phrase: "quality, p95 latency and dollars per thousand tasks"
+          meaning: >-
+            How often it is right, how long 95 of 100 answers take, and what 1,000 tasks cost. The lesson's
+            example: 81% against 96%, 640 ms against 310 ms, $0.42 against $0.02.
+    fields:
+      - id: d7-base-row
+        label: "gpt-oss-120b on Fireworks, untuned: categories right (%), p95 (ms), $ per 1,000 tickets"
+        hint: >-
+          The `category_%`, `p95_ms` and `usd_per_1k` columns of the run with `--judge fireworks` (the
+          gpt-oss-120b line). Write the three in that order.
+        unit: "% / ms / $"
+        meaning: >-
+          The bar a fine-tune must clear, on quality, speed and cost at once, to be worth paying for.
+        example: "81 / 640 / 0.42 (the lesson's sample big general model, written for gpt-oss-20b; yours will differ)"
+      - id: d7-judge
+        label: "Judge score for that model (1 to 5)"
+        hint: >-
+          The `judge_1to5` column of the same run. `nan` means no judge was asked.
+        unit: "of 5"
+        meaning: >-
+          How a second model rated the suggested next steps. Trust it only after checking some of its scores by
+          hand.
+        example: "3.9 (the lesson's big general model)"
+      - id: d7-local-rows
+        label: "Your Mac, Ollama and MLX rows: categories right (%) and p95 (ms)"
+        hint: >-
+          The `ollama` and `mlx` rows of `python evaluate.py ollama mlx --n 50`: the same model, served two ways.
+          Their `usd_per_1k` is 0.0, since your own Mac charges nothing per token.
+        unit: "% / ms"
+        meaning: >-
+          What a free model on your own machine does on the same task, before any training.
+        example: "ollama __ / __; mlx __ / __ (the lesson has no sample for these)"
+    done: >-
+      The practice run, your Mac's two servers and the Fireworks model have each printed a row, all saved in
+      `results/09-eval.csv`. You have written down the Fireworks model's categories right, p95, cost per 1,000
+      tickets and judge score: the bar step 2's fine-tune has to clear.
+    stuck:
+      - problem: "`Connection refused` on the practice run."
+        fix: >-
+          The practice server is not running. From `03-labs`, run `make mock &`, then run the command again.
+      - problem: "`Connection refused` on the `ollama mlx` run."
+        fix: >-
+          One of the two servers is not running: `make check` (from `03-labs`) shows which. Start Ollama with
+          `ollama serve`, and MLX in another terminal with `bash lessons/02-three-local-servers/serve_mlx.sh`.
+      - problem: "`FIREWORKS_API_KEY is not set`"
+        fix: >-
+          Your key belongs in the `.env` file in `03-labs`, as on Day 1: a line `FIREWORKS_API_KEY=` followed
+          by the key. Then run the command again.
+      - problem: "The kit's gpt-oss-20b line fails, or says the model is not found."
+        fix: >-
+          Expected: gpt-oss-20b is no longer offered per token ("Serverless: Not supported" on
+          [its model page](https://fireworks.ai/models/fireworks/gpt-oss-20b), checked 27 September 2026). Run
+          the gpt-oss-120b line from the code block instead:
+          `python evaluate.py "fireworks:accounts/fireworks/models/gpt-oss-120b@0.15/0.60" --n 50 --judge fireworks`.
+      - problem: "A Fireworks model id is not found, even on the gpt-oss-120b line."
+        fix: >-
+          Model ids change. Copy a current one from the model library on fireworks.ai that is offered
+          serverless, put it in place of `accounts/fireworks/models/gpt-oss-120b`, and copy its current prices
+          after the `@` too.
+      - problem: "The Fireworks row shows a low `schema_valid_%`, or empty replies."
+        fix: >-
+          gpt-oss-120b writes out its thinking before its answer (a reasoning model, as on Day 6). `evaluate.py`
+          allows each reply 120 tokens (`max_tokens`), and the thinking may use them up, so the answer comes
+          back cut off or empty. Write it down as a finding: it is part of that model's row, not a broken
+          setup.
+      - problem: "The `--judge fireworks` run says a model is not found."
+        fix: >-
+          The judge is your default Fireworks model, gpt-oss-120b. Put a current id in `03-labs/.env` as
+          `FIREWORKS_MODEL=accounts/fireworks/models/<id>`, then run the command again.
+      - problem: "`judge_1to5` says nan."
+        fix: >-
+          No judge was asked: only runs with `--judge` fill that column. The `ollama mlx` run has no judge, so
+          nan is expected there.
+    replace:
+      - find: 'python evaluate.py "fireworks:accounts/fireworks/models/gpt-oss-20b@0.07/0.30" --n 50 --judge fireworks'
+        with: 'python evaluate.py "fireworks:accounts/fireworks/models/gpt-oss-120b@0.15/0.60" --n 50 --judge fireworks'
+      - find: "# base models you will fine-tune against in 10/11"
+        with: "# untuned models on the same task: the bar a fine-tune must clear (step 2 today, Day 8)"
+      - find: "Write down your **base** model's row. It is the number the fine-tunes in lessons 10 and 11 have to beat."
+        with: >-
+          Write down the **base** (untuned) rows, above all the Fireworks one. They are the bar the fine-tunes in
+          step 2 today and on Day 8 have to clear. Both also re-grade their own starting model, Qwen2.5 7B
+          Instruct, beside the fine-tune.
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 2 · LoRA on Fireworks (lesson 10-lora-fireworks)
+  # ---------------------------------------------------------------------------------------------------------
+  d7-s2:
+    why: >-
+      You fine-tune a real model on Fireworks from start to finish: upload examples, train, put it online, test
+      it, shut it down. It proves what customers most need to hear: training is cheap, and keeping the model
+      running for users is the real cost.
+    why_example: >-
+      The lesson's sample: training costs about 15 cents, while 38 minutes on a GPU (the chip that runs the
+      model) reserved for it cost $5.07. The fine-tune sorted about 97% of tickets into the right category,
+      against 80% before.
+    start_first:
+      command: "cd lessons/10-lora-fireworks && bash 1_train.sh"
+      note: >-
+        Run it from the `03-labs` folder with the Python environment on (`source .venv/bin/activate`). First
+        check that `make fw-check` lists no deployments. `1_train.sh` uploads the 800 training tickets and starts
+        training, billed per token: about $0.15. Then run `bash 2_wait.sh`. It checks once a minute and usually
+        finishes in 10 to 30 minutes. Watch the video while it waits.
+    videos:
+      12-qlora:
+        in_this_video: >-
+          How to fine-tune on a computer you already own, with the model shrunk to 4 bits and left unchanged,
+          and how that compares with today's paid cloud run.
+        key_points:
+          - point: >-
+              QLoRA (LoRA on a model shrunk to 4 bits) leaves the model unchanged and trains only a small add-on,
+              so an 8-billion-number model trains on a laptop.
+            detail: >-
+              The video's Mac example: about 5 GB of model left unchanged (frozen), a 30 MB add-on, about 11 GB
+              of memory at the peak, 30 to 50 minutes, $0. Day 8 runs a similar one on your Mac: Qwen2.5 7B on
+              the same 800 tickets.
+          - point: >-
+              The data and a test set kept aside decide the result, not the hardware.
+            detail: >-
+              200 messy, unchecked examples: 97% right on the examples it trained on, but 74% on new ones, so it
+              memorised. 2,000 clean examples: 93% and 89%. Set the test examples aside before training, never
+              after.
+          - point: >-
+              Compare doing it yourself with a managed service on time, privacy and cost.
+            detail: >-
+              Your own machine: free, and the data stays home. Managed, as in today's run: the video says a
+              dollar or two of training (today's smaller dataset costs cents) and a working model in minutes. But
+              serving a LoRA on a hosted platform usually needs a GPU reserved for it.
+    plain:
+      lead: >-
+        Fine-tuning teaches an existing model a new habit from examples. LoRA (low-rank adaptation) freezes the
+        model and trains a small add-on (an adapter) instead, so training is quick and cheap. The expensive part
+        comes after: on Fireworks a fine-tuned model needs a GPU reserved for it, billed for as long as it runs,
+        used or not.
+      picture: >-
+        Training is like printing a cookbook: you pay once. Serving the model (keeping it running so it can
+        answer) is like renting a stall to sell the book: rent is due every hour the stall is open, buyers or not.
+        So you share the stall with other sellers, make sure enough buyers come, and close up the moment you are
+        done.
+      numbers_source: "lesson 10's scripts and sample output, and the lab book's prices"
+      numbers:
+        - >-
+          Training data: 800 example tickets with the right answers, read twice (2 epochs): about 0.3 million
+          tokens (word pieces).
+        - >-
+          Training price: $0.50 per million tokens for models up to 16 billion numbers. 0.3 x $0.50 = about
+          $0.15.
+        - >-
+          Serving: a dedicated GPU at about $8 an hour, charged by the second from the moment it starts, used or
+          not.
+        - >-
+          The lesson's sample kept it up 38 minutes: 38 ÷ 60 x $8 = $5.07, over 30 times the training cost.
+        - >-
+          Left on for a month (about 730 hours): 730 x $8 = $5,840. That is why you shut the GPU down (delete
+          the deployment) in the same sitting.
+        - >-
+          The result: 80% of ticket categories right before, about 97% after, a 17-point gain.
+      words:
+        - term: "LoRA"
+          def: >-
+            a cheap way to customise a model: train a small add-on instead of changing the whole model. Example:
+            the Training Techniques video's 30 MB add-on.
+        - term: "Adapter"
+          def: >-
+            the small add-on LoRA trains, saved as its own file and applied on top of the frozen model. Example:
+            about 30 MB in the Training Techniques video.
+        - term: "Dedicated deployment"
+          def: >-
+            a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not.
+            Example: about $8 an hour.
+        - term: "Epoch"
+          def: >-
+            one full pass over the training examples. Example: 2 epochs over 800 tickets.
+    run:
+      - cmd: "bash ../00-setup/fireworks_guardrails.sh"
+        note: >-
+          Shows who you are signed in as and anything running on your Fireworks account. **Look for** an empty
+          deployments list: anything listed bills by the hour. Delete a leftover with
+          `firectl deployment delete <DEPLOYMENT_ID>`.
+      - cmd: "bash 1_train.sh"
+        note: >-
+          Uploads the 800 training tickets and starts training a small add-on for Qwen2.5 7B Instruct (rank 8,
+          the add-on's size setting; 2 passes over the data). Billed per training token: about 0.3 million
+          tokens, so about $0.15.
+          **Look for** `started triage-sft-` followed by a date stamp. If you ran it under Start this first, skip
+          it.
+      - cmd: "bash 2_wait.sh"
+        note: >-
+          Checks the job once a minute until it finishes, usually in 10 to 30 minutes. Nothing bills by the hour
+          yet, and the ids are saved, so you can close the terminal and come back. **Look for** `trained:`
+          followed by your model's name.
+      - cmd: "bash 3_deploy.sh"
+        note: >-
+          Puts your fine-tune on a dedicated deployment (a GPU reserved for you). The billing clock starts now,
+          about $8 an hour, used or not. **Look for** the time it was created, then a dot every 20 seconds until
+          `ready`. Run the next two commands straight away.
+      - cmd: "bash 4_eval.sh"
+        note: >-
+          Step 1's test on 60 held-out tickets: the base model (Qwen2.5 7B Instruct before your training), paid
+          per token, against your fine-tune on its GPU. **Look for** the fine-tune's `category_%` well above the
+          base's, then a last line with the minutes so far and their cost.
+      - cmd: "bash 5_teardown.sh"
+        note: >-
+          Deletes the deployment, which shuts down the GPU and stops the clock, then lists what is left. Your
+          trained model stays stored in your account, so you can put it back online later. **Look for**
+          `deleted after` with the minutes and dollars, and nothing listed below it. Never skip this step.
+    see: >-
+      Two rows graded on the same 60 held-out tickets: the base model first, then your fine-tune, labelled with
+      its deployment's id. In the lesson's sample, categories right rise from 80.0 to 97.0 (17 points), urgency
+      (severity) from 70.0 to 95.0, and p95 drops a little, from 420 to 380 ms. The sample is illustrative: each
+      of the 60 tickets is worth 1.67 points (100 ÷ 60), so your figures land on values like 96.7 or 98.3.
+      `judge_1to5` reads nan (no judge was asked) and `usd_per_1k` reads 0.0 (no prices were given; the
+      fine-tune bills by the hour). The last line is that bill: 38 minutes at $8 an hour = $5.07.
+    checks:
+      - q: >-
+          The customer wants 12 fine-tuned versions of a model, one for each business unit. Served separately,
+          each one needs its own reserved GPU (the chip that runs the model), billed by the hour. How do you keep
+          serving costs sensible?
+        plain: >-
+          Share one GPU. Keep one copy of the base model running and load the right small add-on (adapter) for
+          each request. This is multi-LoRA: one bill instead of 12.
+        picture: >-
+          One kitchen with one set of equipment and 12 spice packets, one per restaurant brand, instead of 12
+          separate kitchens. Each order says which packet to use.
+        numbers_source: "lesson 10's deployment rate and the lab book's prices"
+        numbers:
+          - >-
+            One dedicated GPU: about $8 an hour, charged whether or not anyone uses it.
+          - >-
+            Running all month (about 730 hours): 730 x $8 = $5,840.
+          - >-
+            12 separate deployments: 12 x $5,840 = $70,080 a month.
+          - >-
+            Multi-LoRA, 1 deployment holding 12 adapters: $5,840, one twelfth, as long as one GPU keeps up with
+            the traffic.
+          - >-
+            Each adapter is small: about 30 MB in the Training Techniques video. One deployment holds up to 100
+            by default, the lab book says.
+        words:
+          - term: "Multi-LoRA"
+            def: "serving many LoRA add-ons on one running copy of the base model, picking the add-on for each request. Example: 12 business units, 1 GPU."
+          - term: "Adapter"
+            def: "the small add-on LoRA trains, applied on top of the frozen model. Example: about 30 MB."
+          - term: "Dedicated deployment"
+            def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate, used or not. Example: about $8 an hour."
+          - term: "Base model"
+            def: "the model you start from, before any fine-tuning. Example: Qwen2.5 7B Instruct in this lesson."
+        more: >-
+          Adapters are loaded per request: each request names its adapter, and the server applies it on top of
+          the shared base weights, batching requests for different adapters together (the field guide: hundreds
+          of fine-tunes on one base at the base model's price). The lab book adds the Fireworks details: a
+          default quota of 100 adapters per deployment, and multi-LoRA needs a BF16 (16-bit) deployment shape
+          with `--enable-addons`; FP8 and FP4 (8-bit and 4-bit) shapes cannot host adapters.
+      - q: >-
+          A fine-tune gains 17 points of accuracy: 17 more tickets in every 100 sorted correctly. When would you
+          still advise against it?
+        plain: >-
+          When a cheaper fix gets most of the way there: a better prompt, or a few worked examples inside it. Or
+          when there is too little traffic to pay for a GPU that bills every hour.
+        picture: >-
+          Hiring a full-time specialist to handle one call a day. First try better instructions for the staff you
+          have; if that closes most of the gap, or the calls are rare, the salary is not worth it.
+        numbers_source: "lesson 10's sample, lesson 09's example table and the lab book's prices"
+        numbers:
+          - >-
+            The gain: 80% to about 97% of categories right, 17 points (lesson 10's sample).
+          - >-
+            The fine-tune needs its own GPU: about $5,840 a month if it stays on (730 hours x $8).
+          - >-
+            Paying per token instead: the big general model in the eval lesson's table costs $0.42 per 1,000
+            tickets.
+          - >-
+            Break-even: $0.42 buys 1,000 tickets, so $5,840 buys 5,840 ÷ 0.42 = about 13,900 lots of 1,000: 13.9
+            million tickets a month, about 5 every second, day and night. Below that, paying per token is cheaper.
+          - >-
+            Say no if traffic is below that volume, or if a better prompt closes most of the 17 points. Or share
+            the GPU with other fine-tunes (multi-LoRA), so each pays less.
+        words:
+          - term: "Few-shot examples"
+            def: "a few worked examples placed in the prompt to show the model what you want, with no training. Example: a cheaper fix to try first."
+          - term: "Serverless (pay-per-token)"
+            def: "Fireworks' shared, always-on models, billed per token you send and receive. Example: $0.42 per 1,000 tickets."
+          - term: "Break-even"
+            def: "the volume at which two ways of paying cost the same. Example: about 13.9 million tickets a month."
+          - term: "GPU-hour"
+            def: "one GPU for one hour, the unit dedicated deployments are billed in. Example: about $8."
+        more: >-
+          Try the free levers first: the Training Techniques video puts better prompts and retrieval before any
+          training. Then compare the monthly dedicated cost with the pay-per-token bill at the real volume. The
+          lab book's cost calculator draws that line against one H100 at $8 an hour, 24x7 ($5,840 a month).
+          Multi-LoRA changes the sum by splitting that GPU across adapters. The sum above pairs a big general
+          model's price with a small fine-tune's GPU; for a real answer, use the customer's own candidates.
+      - q: >-
+          During training the loss (how wrong the model is on its training examples) keeps falling, but its
+          accuracy on the held-out test tickets stays flat. What does that mean?
+        plain: >-
+          The model is memorising its training examples instead of learning the task, so it does no better on new
+          tickets. Train less (fewer passes), give it more varied examples, or make the add-on smaller (a lower
+          rank).
+        picture: >-
+          A student who memorises last year's exam answers: their practice scores keep rising, but on a new exam
+          they do no better. More varied practice, fewer repeats and a smaller notebook to cram into all help.
+        numbers_source: "the QLoRA On Your Own Box video and lesson 10's training settings"
+        numbers:
+          - >-
+            The video's example, 200 messy, unchecked examples: 97% right on the examples it trained on, 74% on
+            held-out ones. A 23-point gap: memorised.
+          - >-
+            2,000 cleaner examples: 93% and 89%. A 4-point gap: it learned the task.
+          - >-
+            Today's settings are already small: 2 passes (epochs) over 800 examples, adapter rank 8. The script
+            suggests 16 to 32 only for harder tasks.
+          - >-
+            The fixes: fewer passes, more varied examples, or a lower rank.
+        words:
+          - term: "Loss (training loss)"
+            def: "a score of how wrong the model is on its training examples; training pushes it down. Example: it can fall while test accuracy stays flat."
+          - term: "Overfitting (memorising)"
+            def: "training until the model remembers its examples instead of learning the task. Example: 97% on training examples, 74% on new ones."
+          - term: "Epoch"
+            def: "one full pass over the training examples. Example: 2 in `1_train.sh`."
+          - term: "Rank (LoRA rank)"
+            def: "the size setting of a LoRA add-on; a higher rank trains more numbers. Example: 8 here, 16 to 32 for harder tasks."
+        more: >-
+          Falling training loss with flat held-out accuracy is overfitting. `1_train.sh` says it in one line:
+          more epochs means memorising, so watch the eval, not the loss. On Day 8 the MLX run prints validation
+          loss (loss on examples kept out of training) every 50 steps: stop when it flattens. A lower rank means
+          fewer trainable numbers, so less room to memorise.
+    say:
+      ask: "Fine-tuning sounds expensive. What will it really cost us?"
+      means:
+        - phrase: "Training was about a dollar"
+          meaning: >-
+            Teaching the model cost little. This lesson's 800 examples are about 0.3 million training tokens,
+            about $0.15; the Training Techniques video's bigger job, 2.4 million tokens, is $1.20.
+        - phrase: "The thing to plan is serving"
+          meaning: >-
+            The real cost is running the fine-tuned model for users afterwards.
+        - phrase: "a LoRA needs dedicated capacity"
+          meaning: >-
+            On Fireworks a LoRA fine-tune cannot be served pay-per-token. It needs a GPU reserved for it, about $8
+            an hour whether or not anyone uses it: the lesson's 38-minute test cost $5.07.
+        - phrase: "so we either share it with multi-LoRA"
+          meaning: >-
+            Put many fine-tunes on that one GPU so they split its cost: 12 business units, 1 GPU.
+        - phrase: "or justify it with volume"
+          meaning: >-
+            Send enough traffic that the GPU is cheaper than paying per token: about 13.9 million tasks a month,
+            at the eval lesson's $0.42 per 1,000.
+    fields:
+      - id: d7-lora-accuracy
+        label: "Categories right, base then fine-tune (%)"
+        hint: >-
+          The `category_%` column of `4_eval.sh`: the first row is the base model, the second your fine-tune.
+        unit: "%"
+        meaning: >-
+          The gain your fine-tune bought, measured on tickets it never saw in training.
+        example: "80 / 97 (the lesson's sample, a 17-point gain; yours land on values like 96.7 or 98.3)"
+      - id: d7-lora-p95
+        label: "p95 latency, base then fine-tune (ms)"
+        hint: >-
+          The `p95_ms` column of the same table.
+        unit: "ms"
+        meaning: >-
+          95 of 100 replies came back within this many milliseconds. A fine-tune should not be much slower than
+          its base. Here the base runs on Fireworks' shared servers and the fine-tune on its own GPU, so part of
+          any difference is the setup, not the training.
+        example: "420 / 380 (the lesson's sample)"
+      - id: d7-lora-cost
+        label: "Total cost: minutes deployed and serving dollars, plus training"
+        hint: >-
+          The line `5_teardown.sh` prints once the deployment is deleted, `deleted after ... min` with its dollar
+          figure. Add the training: about $0.15 (0.3 million tokens at $0.50 per million).
+        unit: "min / $"
+        meaning: >-
+          What the whole experiment cost. Serving is nearly all of it; training is about 15 cents.
+        example: "38 min, $5.07 serving + about $0.15 of training (the lesson's sample)"
+    done: >-
+      `5_teardown.sh` has printed `deleted after` with nothing listed below it, and `make fw-check` lists no
+      deployments. You have written down the fine-tune's gain over the base and the total cost.
+    stuck:
+      - problem: "`1_train.sh` fails because the base model cannot be fine-tuned, or is not found."
+        fix: >-
+          Pick a model from Fireworks' list of tunable models and run
+          `BASE_MODEL=accounts/fireworks/models/<id> bash 1_train.sh`. Pass the same `BASE_MODEL=...` to
+          `bash 4_eval.sh` later: the scripts do not remember it, and would grade the default base instead.
+      - problem: "`2_wait.sh` stops with FAILED or CANCELLED."
+        fix: >-
+          It prints the job's details: read the error there. Nothing bills by the hour yet. Once it is fixed, run
+          `bash 1_train.sh` again: it starts a new job with new names.
+      - problem: "`3_deploy.sh` keeps printing dots and never reaches `ready`."
+        fix: >-
+          The deployment already exists, so it may be billing. Press Ctrl-C and check the deployment's state in
+          the Fireworks console. If it shows ready, carry on with `bash 4_eval.sh`. If it is not coming up, run
+          `bash 5_teardown.sh`, then `make fw-check` from `03-labs`.
+      - problem: "`4_eval.sh` stops with an error, such as a model not found."
+        fix: >-
+          Your GPU is still billing: if you cannot fix this in a few minutes, run `bash 5_teardown.sh` first and
+          come back. If the error names your fine-tune, copy the model string from the deployment's API tab in
+          the Fireworks console and run `python ../09-eval-harness/evaluate.py "fireworks:<that string>" --n 60`.
+          If it names the base model, its id may have changed: copy a current one from the model library and run
+          `BASE_MODEL=accounts/fireworks/models/<id> bash 4_eval.sh`.
+      - problem: "You closed the terminal while the deployment was running."
+        fix: >-
+          Go back to `lessons/10-lora-fireworks` and run `bash 5_teardown.sh`. The ids are saved in the
+          `.state` file, and the clock runs until you do.
+      - problem: "`5_teardown.sh` stops with an error, or you are unsure whether anything is still billing."
+        fix: >-
+          From `03-labs`, run `make fw-check`. Delete anything it lists with
+          `firectl deployment delete <DEPLOYMENT_ID>`, then run `make fw-check` again until the list is empty.
+    replace:
+      # The stopwatch symbol U+23F1 counts as an emoji; it is written as an escape so this file holds none.
+      - find: "**\u23F1 clock starts**"
+        with: "**clock starts**"
+      - find: "**\u23F1 clock stops**"
+        with: "**clock stops**"
+      - find: "bash 3_deploy.sh                             # \u23F1"
+        with: "bash 3_deploy.sh                             # clock starts"
+      - find: "# \u23F1 stop — do not skip"
+        with: "# clock stops: do not skip"
+      - find: "lesson 09's harness"
+        with: "step 1's eval harness"
+      - find: "so you can close the terminal after step 1."
+        with: "so you can close the terminal after `1_train.sh`."
+
+wrapup:
+  done: >-
+    Your notes show what the fine-tune gained and what it cost. Gain: categories right before and after (the
+    lesson's sample: 80% to about 97%). Cost: minutes deployed and their dollars (38 minutes, $5.07), plus about
+    15 cents of training. Step 1's untuned Fireworks row is written down too, and `make fw-check` lists nothing.
+  whiteboards:
+    - video: 06-training
+      q: >-
+        A customer's support-ticket model (up to 16 billion numbers) sorts 81% of tickets into the right
+        category. You fine-tune it with LoRA on 2,000 examples of about 600 tokens each, going through them
+        twice. How many tokens do you pay for, what does it cost, and what do you do next?
+      given: >-
+        Training on a service such as Fireworks bills every token the model reads, on every pass: $0.50 per
+        million tokens for models up to 16 billion numbers. After training, the model sorts 89% correctly. The
+        add-on it produces (the adapter) is about 30 MB.
+      plain: >-
+        About 2.4 million tokens and about $1.20, for 8 more points of accuracy: the video calls it the cheapest
+        8 points you will ever buy. Next, look at the 11% it still gets wrong, because the kind of mistake
+        decides the next method.
+      picture: >-
+        A tutor for a student who knows the subject but answers in the wrong format. One short course of 2,000
+        worked examples, gone over twice, costs less than a coffee and lifts the grade from 81 to 89. The
+        remaining mistakes tell you whether they need more examples, a different kind of teaching, or a textbook.
+      steps:
+        - "Tokens per pass: 2,000 examples x 600 tokens = 1,200,000 tokens (1.2 million)."
+        - "Two passes (epochs): 1.2 million x 2 = 2.4 million training tokens."
+        - "Cost: 2.4 million x $0.50 per million = $1.20."
+        - "Gain: 89% - 81% = 8 more tickets in every 100 sorted correctly, for $1.20."
+        - >-
+          Still wrong: 100% - 89% = 11%. Read those mistakes. Wrong format or wording: more examples of the right
+          answer (SFT). Right answer but poor judgement: pairs of answers with the better one marked (DPO). An
+          answer a program can check: train against that checker (RFT). Missing facts: look them up and add them
+          to the prompt (retrieval), not training.
+        - >-
+          Serving: the 30 MB adapter runs on top of a base model that can carry many adapters, so each extra
+          fine-tune adds little to the serving bill.
+        - >-
+          Day 7's lesson run is smaller: 800 short examples, 2 passes, about 0.3 million tokens (the script's
+          estimate), so 0.3 x $0.50 = about $0.15. In the lesson's sample, 38 minutes of serving cost $5.07, over
+          30 times more.
+      note: >-
+        The $0.50 per million is the lab book's reading of Fireworks' prices on 23 September 2026. Prices move
+        weekly: check the pricing page before you quote one.
+      kit_q: "2,000 examples × 600 tokens × 2 epochs = 2.4M training tokens"
+      kit_a: >-
+        Make it concrete with a ticket triage model. The base model gets eighty one percent of categories right.
+        Two thousand examples of supervised fine tuning, about two point four million training tokens, costs a
+        little over a dollar on a managed platform and takes the model to eighty nine percent. That is the
+        cheapest eight points you will ever buy.
+      more: >-
+        The scene's rows: base model accuracy 81%, after LoRA SFT 89%, training cost about $1.20 at $0.50 per 1M,
+        adapter about 30 MB, serving one base with many adapters; 2.4M x $0.50 = $1.20 exactly. The lab book's
+        fine-tune calculator starts on the same case (2,000 examples, 600 tokens, 2 epochs, LoRA SFT, up to 16B)
+        and adds 1 hour of dedicated serving at $8, so its total is $9.20: serving is most of it. As LoRA DPO or
+        full-parameter SFT ($1.00 per million at up to 16B) the same job would cost $2.40.
+      words:
+        - term: "Epoch"
+          def: "one full pass over the training examples. Example: 2 here, so every token is billed twice."
+        - term: "Training token"
+          def: "one token read during training; managed training bills every token on every pass. Example: 2.4 million here."
+        - term: "SFT (supervised fine-tuning)"
+          def: "training on examples of the right answer, to teach format, tone and domain patterns. Example: 2,000 labelled tickets."
+        - term: "Adapter"
+          def: "the small add-on LoRA trains, applied on top of the frozen model. Example: about 30 MB."
+    - video: 12-qlora
+      q: >-
+        A customer asks whether they can fine-tune an 8-billion-number model on an Apple-silicon laptop, with
+        2,000 examples. Will it fit in memory, how long will it take and what will it cost?
+      given: >-
+        QLoRA keeps the model frozen (unchanged) and stored at 4 bits, half a byte per number. It trains only a
+        small add-on. Full fine-tuning changes every number, so it holds about 16 bytes per number while
+        training. Those are the number itself, a correction for it (its gradient), the training method's running
+        notes and a spare full-precision copy (the Full Fine-Tuning video, Day 11). Day 1's rule of thumb for
+        serving, used here too: plan to use at most about 70% of the Mac's memory.
+      plain: >-
+        Yes. Training peaks at about 11 GB: tight on a 16 GB Mac, where that is right at Day 1's 70% guide (11.2
+        GB), and roomy on a 36 GB one. It takes 30 to 50 minutes and costs nothing. Full fine-tuning the same
+        model would need about 128 GB.
+      picture: >-
+        Full fine-tuning rewrites a whole textbook, with a draft copy and editor's notes for every page: a
+        warehouse job. QLoRA keeps the textbook closed and writes on sticky notes on top: a desk job.
+      steps:
+        - >-
+          The frozen model at 4 bits: 8 billion x 0.5 bytes = 4 GB. 4-bit files also store small shared scales,
+          so about 5 GB in practice (Day 4's 4-bit Llama 3.1 8B file was 4.9 GB).
+        - "The adapter: about 30 MB, 0.6% of the 5 GB model (30 ÷ 5,000 = 0.006)."
+        - >-
+          Peak memory while training: about 11 GB (the video's figure). The model and add-on are about 5 GB; the
+          other 11 - 5 = about 6 GB is training's working space: in-between results plus the add-on's
+          corrections and notes.
+        - >-
+          Does it fit? Day 1's 70% guide on a 16 GB Mac: 0.7 x 16 = 11.2 GB. About 11 GB is right at the limit,
+          so close other apps or train with `--batch-size 1`. A 36 GB Mac has room (0.7 x 36 = 25.2 GB).
+        - >-
+          Full fine-tuning instead: 8 billion x 16 bytes = 128 GB before working space. 128 ÷ 11 = about 12 times
+          the QLoRA peak, which is why it needs a cluster (several GPUs working as one).
+        - >-
+          Time and cost: 300 training steps in 30 to 50 minutes, $0 on a machine you already own. Then fuse
+          (bake) the adapter into the model and serve it with `mlx_lm.server` (Day 8).
+      note: >-
+        Memory is not the hard part; data is. In the same video, 200 messy, unchecked examples reached only 74%
+        on held-out examples, while 2,000 clean ones reached 89%.
+      kit_q: "mlx_lm.lora · 2,000 examples · 300 iterations"
+      kit_a: >-
+        Concretely, on an Apple silicon laptop: an eight billion parameter model in four bit is about five
+        gigabytes of weights, the adapter adds tens of megabytes, and training on two thousand examples for three
+        hundred iterations takes well under an hour. Peak memory stays around eleven gigabytes, which is why this
+        works on a machine you already own.
+      more: >-
+        The scene's rows: 4-bit base weights about 5 GB, LoRA adapter about 30 MB, peak memory about 11 GB,
+        training time 30 to 50 min, cost $0. Day 8's lesson trains Qwen2.5 7B at 4 bits with `--iters 300
+        --batch-size 2`, about 0.75 of a pass over its 800 examples (300 x 2 ÷ 800), and its memory budget puts
+        QLoRA at about 6 GB against about 120 GB for a full fine-tune of a 7B model. The 16 bytes per parameter
+        are the weights, a same-size gradient, Adam's two running averages in full precision and a
+        full-precision master copy (the Full Fine-Tuning video).
+      words:
+        - term: "QLoRA"
+          def: "LoRA on a model stored at 4 bits: the frozen model is small and only the add-on trains. Example: about 11 GB at the peak for an 8B model."
+        - term: "Frozen"
+          def: "not changed during training; only the add-on learns. Example: the 5 GB of 4-bit weights."
+        - term: "Gradient"
+          def: "the correction training works out for each number, saying which way to nudge it. Example: full fine-tuning holds one per number."
+        - term: "Optimizer state"
+          def: "the running notes the training method keeps for every number it updates. Example: part of the 16 bytes per number."
+
+
+glossary:
+  # Shared with other days: the earliest day's definition, word for word (lower-case first letter, as in the
+  # approved Day 4 sheet). Where Day 7 is the earliest day, the text matches the later days that reuse it.
+  - term: "4-bit, 8-bit, 16-bit"
+    def: "how many bits store each number; fewer bits, smaller model."
+    example: "an 8B model is about 5 GB at 4-bit in the QLoRA On Your Own Box video."
+  - term: "Accuracy (category accuracy)"
+    def: "the share of replies with the right answer, checked against each test example's known label."
+    example: "`category_%` of about 97 in Day 7's sample: about 97 of every 100 tickets sorted right."
+  - term: "Adam"
+    def: "the usual training method for adjusting a model's numbers; it keeps two running averages per trainable number."
+    example: "its two averages are part of the 16 bytes per number a full fine-tune needs."
+  - term: "Adapter (LoRA adapter)"
+    def: "the small set of extra numbers LoRA trains and saves; the base model stays unchanged."
+    example: "about 30 MB in the Training Techniques video."
+  - term: "API"
+    def: "the agreed format one program uses to send requests to another and get answers back."
+    example: "a deployment's API tab in the Fireworks console shows the model string to send."
+  - term: "Base model"
+    def: "the model a fine-tune starts from and leaves unchanged."
+    example: "Qwen2.5 7B Instruct on Day 7."
+  - term: "Batch API"
+    def: "Fireworks' way to send many requests as one file and collect the answers later, at about half the serverless price."
+    example: "a good home for slow but accurate work that can run overnight."
+  - term: "bf16 (bfloat16)"
+    def: "a 16-bit number format used for training, 2 bytes per number."
+    example: "multi-LoRA on Fireworks needs a BF16 deployment shape."
+  - term: "Break-even"
+    def: "the point where two options cost the same."
+    example: "about 13.9 million tickets a month for one $8-an-hour GPU against $0.42 per 1,000."
+  - term: "CSV file"
+    def: "a plain table file: one row per line, commas between the columns."
+    example: "`results/09-eval.csv`."
+  - term: "Dedicated deployment"
+    def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not."
+    example: "about $8 an hour: $5.07 for the lesson's 38-minute test."
+  - term: "Deployment shape"
+    def: "a preset for a dedicated deployment on Fireworks: the GPU and the number format it runs."
+    example: "`--deployment-shape default` in `3_deploy.sh`."
+  - term: "Epoch"
+    def: "one full pass through all the training examples."
+    example: "2 epochs over 800 tickets on Day 7, so every token is billed twice."
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "Day 7 grades 50 or 60 held-out tickets three ways."
+  - term: "Few-shot examples"
+    def: "a few solved examples placed in the prompt to show the model what a good answer looks like."
+    example: "a cheaper fix to try before a fine-tune."
+  - term: "Fine-tune"
+    def: "further training of an existing model on your own examples."
+    example: "800 labelled tickets, 2 passes, on Fireworks on Day 7."
+  - term: "firectl"
+    def: "Fireworks' command-line tool for your account, quotas and deployments."
+    example: "`firectl deployment list` shows what is billing by the hour."
+  - term: "FP8"
+    def: "an 8-bit number format, 1 byte per number, with built-in math on H100."
+    example: "FP8 deployment shapes cannot host LoRA adapters."
+  - term: "Frozen"
+    def: "left unchanged during training."
+    example: "QLoRA keeps the 4-bit model frozen."
+  - term: "Fuse (fused model)"
+    def: "baking the adapter into the base model's numbers to make one self-contained model."
+    example: "the step after QLoRA training on Day 8."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "one reserved GPU serves Day 7's fine-tune."
+  - term: "GPU-hour"
+    def: "one GPU rented for one hour."
+    example: "about $8 for an H100 in the lab book."
+  - term: "Gradient"
+    def: "the correction worked out for each trainable number at each training step."
+    example: "full fine-tuning keeps one for every number of the model."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "$8 an hour on a dedicated deployment in the lab book."
+  - term: "Harness"
+    def: "one test script you can point at any server, so the numbers compare fairly."
+    example: "`evaluate.py`, reused by `4_eval.sh` and on Day 8."
+  - term: "Held-out prompts"
+    def: "test prompts the model was never trained on."
+    example: "the 100 tickets in `test.jsonl`."
+  - term: "Iteration (training step)"
+    def: "one update: the model sees a small batch of examples and adjusts."
+    example: "300 in the QLoRA On Your Own Box video's Mac example."
+  - term: "Judge (LLM judge)"
+    def: "a second model that scores answers against a rubric."
+    example: "gpt-oss-120b scores each suggested next step from 1 to 5."
+  - term: "Latency"
+    def: "how long someone waits."
+    example: "p95 of 310 ms in the eval lesson's example table."
+  - term: "Llama 3.1 8B, Llama 3 70B"
+    def: "the open models used in the lessons and videos, with 8 and 70 billion parameters."
+    example: "Day 7 grades the 8B at 4 bits on Ollama and on MLX."
+  - term: "LoRA"
+    def: "a cheap way to customise a model: train a small add-on instead of changing the whole model."
+    example: "rank 8, 2 passes over 800 tickets on Day 7."
+  - term: "Loss (training loss)"
+    def: "a score of how wrong the model's guesses are on the examples it trains on; lower is better."
+    example: "falling loss with flat test accuracy means memorising."
+  - term: "make"
+    def: "a tool that runs named shortcuts listed in a file called `Makefile`."
+    example: "`make mock`, `make fw-check`."
+  - term: "Managed service"
+    def: "a provider runs the hardware and software for you and bills for use."
+    example: "Fireworks training and serving Day 7's fine-tune."
+  - term: "MLX"
+    def: "Apple's own software for running and training models on Apple chips; `mlx_lm.server` is its model server."
+    example: "port 8081; the same library fine-tunes a model on Day 8."
+  - term: "Multi-LoRA"
+    def: "one server keeps one base model and many adapters, applying the right adapter to each request."
+    example: "12 business units on 1 GPU; up to 100 adapters by default on Fireworks."
+  - term: "Ollama"
+    def: "a one-command model server built on llama.cpp that chooses most settings for you."
+    example: "`ollama serve` answers on port 11434."
+  - term: "Optimizer state"
+    def: "the running averages the training method (Adam) keeps per trainable number to size each correction."
+    example: "part of the about 16 bytes per number that full fine-tuning needs."
+  - term: "Overfitting"
+    def: "learning the training examples by heart instead of the task, so new examples go worse."
+    example: "97% on training examples but 74% on held-out ones in the QLoRA On Your Own Box video."
+  - term: "p95"
+    def: "the value 95 out of 100 requests stay under."
+    example: "95 of 100 replies back within 310 ms."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "Qwen2.5 7B Instruct has about 7.6 billion."
+  - term: "Practice server (mock)"
+    def: "the kit's stand-in server with realistic behaviour and made-up numbers."
+    example: "it sorts about 75% of tickets right, or about 93% for a `-lora` model name."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "a support ticket plus the sorting instructions."
+  - term: "QLoRA"
+    def: "LoRA on a base model stored in 4 bits, so training fits in far less memory."
+    example: "about 11 GB at the peak for an 8B model in the QLoRA On Your Own Box video."
+  - term: "Quantization (quantize)"
+    def: "storing numbers with fewer bits."
+    example: "QLoRA's frozen model at 4 bits."
+  - term: "Qwen2.5 7B Instruct"
+    def: "an open model with 7.6 billion numbers, already trained to follow instructions; Days 7 and 8 fine-tune it."
+    example: "`qwen2p5-7b-instruct` on Fireworks."
+  - term: "RAG (retrieval-augmented generation)"
+    def: "an app that first looks up relevant documents and puts them in the prompt, then asks the question."
+    example: "the fix for missing facts, instead of training."
+  - term: "Rank (LoRA rank)"
+    def: "how wide the adapter's small grids are; a higher rank means more capacity and a bigger file."
+    example: "8 on Day 7, whose script suggests 16 to 32 for harder tasks."
+  - term: "Request"
+    def: "one message sent to the model for an answer."
+    example: "one ticket sent for sorting."
+  - term: "Scale"
+    def: "one shared number stored with a small block of numbers so they can be squeezed into fewer bits."
+    example: "part of why a 4-bit 8B model is about 5 GB, not 4."
+  - term: "Schema-valid rate"
+    def: "the share of replies that come back as correctly formatted data."
+    example: "`schema_valid_%`, 100.0 in the lesson's samples."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "the practice server on port 9000."
+  - term: "Serverless"
+    def: "Fireworks' shared, always-on models, billed per token you send and receive."
+    example: "the gpt-oss-120b run on Day 7, at $0.15 and $0.60 per million tokens (checked 27 September 2026)."
+  - term: "SLO (service level objective)"
+    def: "the speed promise."
+    example: "decides whether a doubled p95 is acceptable."
+  - term: "Speculative decoding"
+    def: "a small draft model guesses several tokens and the big model checks them all in one pass; the output does not change."
+    example: "Day 9 measures when it pays."
+  - term: "Spend cap"
+    def: "a monthly limit on your Fireworks spending; at 100% Fireworks pauses the API."
+    example: "leave room under it for Day 7's $5 to $8."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "Day 7's training job survives closing it."
+  - term: "Ticket triage"
+    def: "sorting incoming support tickets by type and urgency."
+    example: "a category, a severity from 1 to 5 and a next step for each ticket."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "1,000 tokens is roughly 750 words."
+  - term: "TTFT (time to first token)"
+    def: "how long until the first token (word piece) of the reply appears."
+    example: "`evaluate.py`'s p95 times the whole reply instead."
+  - term: "Validation loss"
+    def: "a score of how wrong the model still is on the validation set; lower is better."
+    example: "Day 8's run prints it every 50 steps."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "frozen during LoRA; only the adapter changes."
+  # New on Day 7.
+  - term: "Benchmark (public benchmark)"
+    def: "a standard test that model makers report scores on, used to compare models at launch."
+    example: "it says little about one customer's tickets."
+  - term: "Bias (judge bias)"
+    def: "a judge's habit of favouring something that is not correctness."
+    example: "longer, more polished answers."
+  - term: "Cluster"
+    def: "several GPUs, often across machines, working as one."
+    example: "what a full fine-tune of an 8B model needs, at about 128 GB."
+  - term: "DPO (direct preference optimization)"
+    def: "training from pairs of answers where one is marked better, to teach taste or judgement."
+    example: "Day 12 runs it on your Mac."
+  - term: "gpt-oss-20b, gpt-oss-120b"
+    def: "two open mixture-of-experts models with about 21 and 117 billion parameters, of which only about 3.6 and 5.1 billion are used for each token. On Fireworks, gpt-oss-120b is billed per token (serverless); gpt-oss-20b no longer is (its model page, checked 27 September 2026: 'Serverless: Not supported'), but batch jobs still take it."
+    example: "gpt-oss-120b is Day 7's Fireworks eval model and its default judge; the kit's command names gpt-oss-20b."
+  - term: "Grader"
+    def: "anything that scores a model's reply: a code check, a judge model or a person."
+    example: "Day 7's eval uses three, cheapest first."
+  - term: "Hand-labelled sample"
+    def: "answers a person has marked right or wrong, used to check a judge."
+    example: "about 20 of the judge's scores, redone by you."
+  - term: "Instruct model"
+    def: "a model already trained to follow instructions and chat."
+    example: "Qwen2.5 7B Instruct."
+  - term: "nan (not a number)"
+    def: "what a column shows when it has no value."
+    example: "`judge_1to5` when no judge was asked."
+  - term: "RFT (reinforcement fine-tuning)"
+    def: "training against a grader that scores each answer from 0 to 1, for tasks where correctness can be checked automatically."
+    example: "the tests pass, the format validates, the number matches."
+  - term: "Rubric"
+    def: "the scoring guide a judge follows."
+    example: "5 = specific, right owner, safe; 3 = plausible but vague; 1 = wrong or unsafe."
+  - term: "Serving (serve)"
+    def: "keeping a model running so it can answer requests."
+    example: "$5.07 for 38 minutes of a dedicated GPU in Day 7's sample."
+  - term: "Severity (severity_%)"
+    def: "how urgent a ticket is, from 1 to 5; `severity_%` is the share rated correctly."
+    example: "70.0 before and 95.0 after the fine-tune in Day 7's sample."
+  - term: "SFT (supervised fine-tuning)"
+    def: "training on examples of the right answer, to teach format, tone and domain patterns."
+    example: "800 labelled tickets on Day 7."
+  - term: "Teardown"
+    def: "deleting everything that bills by the hour at the end of a session, then checking the list is empty."
+    example: "`5_teardown.sh`, then `make fw-check`."
+  - term: "Training token"
+    def: "one token read during training; managed training bills every token on every pass."
+    example: "2,000 examples x 600 tokens x 2 passes = 2.4 million."

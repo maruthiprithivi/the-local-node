@@ -1,0 +1,24 @@
+# Poster frame per video: the second, just before the first scene cut, where the title card is fully
+# drawn (underline complete). Checked on a contact sheet of all 18.
+# Used by the Dockerfile poster stage and by scripts/sync.mjs, which versions each poster URL from a hash
+# of this file plus the video's own version, so browsers fetch a changed poster.
+# Mask: bottom 20% to the frame edge (burned-in caption band and progress bar) painted #0C0E14 in RGB.
+# Edit this line when the Dockerfile poster step changes, so the poster URLs change too.
+01-inference-101 9.5
+02-kv-cache 11.7
+03-gpu-bandwidth 11.6
+04-quantization 11.0
+05-batching 10.1
+06-training 8.8
+07-offloading 7.2
+08-platform 9.5
+09-serving-stack 11.2
+10-benchmarking 8.9
+11-prefix-caching 13.3
+12-qlora 10.2
+13-scale-out 7.9
+14-full-finetuning 17.2
+15-sft 14.8
+16-peft 16.6
+17-rlhf 19.8
+18-dpo 18.5

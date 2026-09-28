@@ -1,0 +1,1385 @@
+# Day 9 · Scale-out. Plain-language content for the guided course (course-spec.md section 3).
+# Style: plain/style.md; depth and layering follow the approved Day 4 sheet (plain/day4-content.md).
+# Step 3 (d9-s3, lesson 14) is optional: it needs a DGX Spark. It is written in full.
+# Sources (kit root = fireworks-field-engineer-kit/):
+#   L12    03-labs/lessons/12-moe-vs-dense/README.md (table 12-15, options 21-24, Run 33-39, sample 43-47,
+#          notes 49-51, checks 55-57, say 61-62)
+#   probe  .../12-moe-vs-dense/moe_probe.py (KNOWN 26-27: gpt-oss:20b 21.0 / 3.6, gpt-oss:120b 117.0 / 5.1;
+#          EFFICIENCY 0.75 line 28; DEMO line 29: 546 GB/s, 4.9 GB at 84.0 tok/s, 13.8 GB at 118.0 tok/s;
+#          warm-up then up to 200 timed tokens, lines 47-51; `pass --bw` line 62)
+#   L13    03-labs/lessons/13-speculative-decoding/README.md (formula 17-19, Run 34-44, sample 49-53, checks 58-60,
+#          say 64-66)
+#   math   .../spec_math.py (E = (1 - a^(k+1)) / (1 - a), speed-up = E / (1 + k c), c = 0.1, a 0.3-0.9, k 2-8)
+#   sserve .../serve_spec_llamacpp.sh (Llama 3.1 8B Q4_K_M + Llama 3.2 1B Q4_K_M draft, --draft-max 8, :8080)
+#   sbench .../spec_bench.py (5 structured + 5 prose prompts; alpha only from llama.cpp `timings`, lines 58-65;
+#          Fireworks: one perf_metrics sample printed, lines 61-63)
+#   fwspec .../fireworks_spec.sh (1B draft, --draft-token-count=4, 20 s poll, trap deletes on exit, lines 14-27)
+#   L14    03-labs/lessons/14-spark-track/README.md and scripts: remote.sh (passes only HF_TOKEN, line 11);
+#          0_check.sh; 1_vllm.sh (image 25.09-py3, --max-model-len 8192, --gpu-memory-utilization 0.8, lines 16-27);
+#          2_bench.sh (bench_ttft --runs 5, sweep 1-64 at 1,000 ms, plot, prefix_bench); 2b_vllm_bench.sh (512 in,
+#          128 out, 64 prompts, rates 1 4 16 inf); 3_sglang.sh (Qwen3-8B, :30000, --enable-cache-report); TWO_BOX.md
+#   L00    03-labs/lessons/00-setup/README.md lines 25 (llama3.1:8b on Day 1), 38 and 46 (about 70% of RAM)
+#   hw     03-labs/felab/hardware.py lines 24 (M4 Pro 273, M4 Max 546) and 27 (DGX Spark 273, H100 SXM 3,350)
+#   tgt    03-labs/felab/targets.py lines 25-38 (.env is read by Python only), 56, 77-79 (spark target)
+#   pfx    03-labs/lessons/06-prefix-caching/prefix_bench.py (preamble printed as len // 4 = 3,028 tokens;
+#          --usage makes one extra call, lines 78-83)
+#   kv     03-labs/lessons/05-kv-cache/kv_calc.py (Llama 3.1 8B: 128 KiB per token; 8,192 tokens = 1.07 GB)
+#   memo   03-labs/lessons/15-capstone/build_memo.py lines 53, 91, 115 (last 4 rows of 13-spec); README 44-45
+#   narr   04-video-source/src/narration.json: Fitting Big Models 820-941 (memory 838, options 843, MoE 848,
+#          parallelism 853, 128 GB desktop 865, Worked 405B 866-892, Why MoE 895-920, Recap 932);
+#          Speculation & Scale-Out 1678-1822 (SpecDecode 1696, formula 1701-1708, TwoBox 1713, Worked 1743-1773,
+#          Two boxes 1775-1801, Recap 1813); Batching SpecDecode 592; Serving With vLLM 1080-1228 (containers
+#          1110-1119, five flags 1136-1148, startup log 1150-1180)
+#   LB     02-lab-book/field-engineer-lab-book.html: 655 and 663 (on-demand, speculation options), 687-694 (H100
+#          $8.00 an hour, billed per GPU-second), 835-900 (DGX Spark page: 115 GB usable, 12x less than H100,
+#          200 Gb link, published measurements, stack hygiene), 1038 (concept line), 1293-1306 (speculation card),
+#          1421-1432 (MoE card), 1451-1473 (Spark card), 1666-1678 (Spark calculator), 1769 (plan day 9)
+#   FG     02-lab-book/inference-field-guide.html: 734 (NVLink about 900 GB/s on H100), 922 (405B = 810 GB),
+#          937 (MoE), 1420-1430 (parallelism captions), 1651 (Llama 3.1 405B: 126 layers, 8 KV heads, head dim 128)
+#   kitREADME  fireworks-field-engineer-kit/README.md lines 66 (Day 9 row) and 151-157 (troubleshooting)
+# Arithmetic (recomputed by hand): 546 x 0.75 = 409.5; 409.5 / 84 = 4.875 (4.9); 4.875 / 4.9 = 99.5%;
+#   409.5 / 118 = 3.47 (3.5); 3.47 / 13.8 = 25.1%; 3.6 / 21 = 17.1%; 13.8 / 4.9 = 2.8; 118 / 84 = 1.40;
+#   25.1 / 17.1 = 1.47; 546 x 0.60 / 118 = 2.8 GB; 546 x 0.85 / 118 = 3.9 GB; 4.9 + 13.8 = 18.7 (the README's 19 GB);
+#   0.7 x 16 = 11.2; 0.7 x 24 = 16.8; 70 / 5.1 = 13.7; 55.4 / 2.7 = 20.5; 273 / 55.4 = 4.9; 59 GiB = 63.4 GB;
+#   55.4 / 22.7 = 2.4; 900 / (200 / 8) = 36 (headline figures); 900 / 2 = 450 per direction, 450 / 25 = 18;
+#   160 / 80 = 2; 70 / 5.1 = 13.7 against 55.4 / 2.7 = 20.5 measured.
+#   Series form of E: 1 + 0.8 + 0.64 + 0.512 + 0.4096 = 3.36; 1 + 0.9 + 0.81 + 0.729 + 0.6561 = 4.10;
+#   1 + 0.3 + 0.09 + 0.027 + ... = 1.43. Spark vLLM ceiling: (0.8 x 128 - 8) / 1.07 = 94.4 / 1.07 = 88.2.
+#   Ridge point (GPU Bandwidth video, narr 311): 989 TFLOPs / 3.35 TB/s = 295.
+#   E(a, k) = (1 - a^(k+1)) / (1 - a); speed-up = E / (1 + 0.1 k): E(0.8, 4) = 0.672 / 0.2 = 3.36, / 1.4 = 2.40;
+#   E(0.3, 6) = 1.428, / 1.6 = 0.89; E(0.3, 8) = 1.429, / 1.8 = 0.79; E(0.3, 4) = 1.425, / 1.4 = 1.02;
+#   E(0.9, 8) = 6.126, / 1.8 = 3.40; E(0.4, 4) = 0.98976 / 0.6 = 1.65, / 1.4 = 1.18; E(0.75, 4) = 3.05;
+#   E(0.9, 4) = 4.10; 118 / 62 = 1.90; 70 / 61.5 = 1.14.
+#   8,192 x 131,072 B = 1.07 GB; 20 / 1.07 = 18.6; 20 / 0.537 = 37.2; 8,234 x 16 = 131,744; 131,744 / 8,192 = 16.1;
+#   273 / 8 = 34.1; 20.5 / 34.1 = 60%; 368 / 20.5 = 18.0; 3,350 / 273 = 12.3; 0.8 x 128 = 102.4.
+#   405 x 2 = 810; 8 x 80 = 640; 405 x 0.5 = 202.5; 4 x 80 = 320; 2 x 126 x 8 x 128 x 2 = 516,096 B (504 KiB);
+#   x 8,192 = 4.23 GB; x 32 = 135.3 GB (67.6 GB in FP8); (405 + 135) x 1.1 = 594; (203 + 135) x 1.1 = 372;
+#   (203 + 68) x 1.1 = 298; 135.3 / 40 = 3.4. Deployment: 0.5 h to 0.75 h x $8 = $4 to $6.
+
+day: 9
+tile: "See why huge models can run fast, and when draft models help"
+
+overview:
+  today: >-
+    Learn why some very large models still write fast, and time one on your Mac. Then let a small draft model
+    guess ahead for a big one, and measure when that pays, on your Mac and on a paid Fireworks deployment.
+    Step 3 is optional: it needs an NVIDIA DGX Spark (a desktop AI computer), and the rest of the course works
+    without it.
+  example: >-
+    Imagine two support bots running on the same Mac. One model file is much bigger, so you might expect its
+    reply to appear more slowly. In the lesson's sample it actually writes faster: it loads only the specialist
+    parts needed for each piece of the reply. Today you will compare the two writing speeds and find out why
+    file size alone does not predict the customer's wait.
+  deliverable: "Your own estimate of how much of a mixture-of-experts model is read per token, plus a table of writing speeds with and without a draft model."
+  expected: >-
+    gpt-oss:20b (the mixture-of-experts model) faster than Llama 3.1 8B, with about a quarter of it read per
+    token (25% in the sample). With a draft model, predictable prompts about 1.9 times faster (62 to 118 tokens
+    a second), creative ones only a little (61.5 to 70).
+  before:
+    - title: "About 14 GB of free disk space. A Mac with 24 GB of memory or more (16 GB: use the sample numbers)."
+      body: >-
+        Step 1 downloads gpt-oss:20b, a 13.8 GB model. Llama 3.1 8B (4.9 GB) is already there from Day 1, so
+        only this download is new. Day 1's rule keeps a model under about 70% of memory. On a 16 GB Mac that is
+        0.7 × 16 = 11.2 GB, too little, so use the lesson's sample numbers there. Start the download now.
+      command: "ollama pull gpt-oss:20b"
+      after: "Ollama must be running. If you restarted your Mac since Day 1, start it first with `ollama serve &`."
+    - title: "llama.cpp from Day 2, with port 8080 free."
+      body: >-
+        Step 2 serves Day 2's 4-bit Llama 3.1 8B again, now with a small draft model (Llama 3.2 1B) that it
+        downloads on first start. Stop any llama.cpp server still running from Days 2, 4 or 5 first: they all
+        use port 8080.
+    - title: "Your Fireworks key, spend cap and firectl from Day 1."
+      body: >-
+        Step 2 ends on a paid Fireworks deployment for about 30 to 45 minutes. The script deletes it when it
+        finishes, even if you press Ctrl+C. At the lab book's H100 price of $8 an hour, 30 to 45 minutes costs
+        about $4 to $6.
+    - title: "Optional step 3 only: a DGX Spark you can reach from your Mac."
+      body: >-
+        Step 3 takes 2 to 3 hours and needs an NVIDIA DGX Spark (a desktop AI computer) or a similar NVIDIA GPU
+        machine. Put its network address in `03-labs/.env` as `SPARK_IP`, set up SSH keys, and add a Hugging Face
+        token as `HF_TOKEN` for models that need one. No Spark? Read step 3, answer its checks, then tap Skip.
+  feeds: >-
+    Two of Day 10's 20-second drill questions come from today: "Why is the MoE faster than the smaller dense
+    model?" and "Will speculative decoding help us?". The sizing memo also quotes your speculation speeds from
+    `results/13-spec.csv`.
+
+steps:
+  d9-s1:
+    why: >-
+      Some of the biggest open models are built as a team of specialists and read only a few of them for each
+      token. You time one on your Mac and work out, from its speed alone, how much of it is read.
+    why_example: >-
+      A customer sees the larger model file and assumes it will answer more slowly. In the lesson's sample,
+      that model actually writes 118 word pieces a second against the smaller model's 84. It reads only the
+      specialist parts it needs for each new piece, so the file's total size is a poor speed prediction.
+    start_first:
+      command: "ollama pull gpt-oss:20b"
+      note: "About 14 GB. Start it now and watch the video while it downloads. Ollama must be running (`ollama serve &`)."
+
+    videos:
+      07-offloading:
+        in_this_video: "How to answer \"will it fit?\" with a formula, why mixture-of-experts models are big in memory but fast, and the two ways to split a model across GPUs."
+        key_points:
+          - point: "Memory needed = the model's weights + its notes + about 10% for the server's working memory."
+            detail: >-
+              The weights are the model's learned numbers (parameters): count × bytes each. A 405-billion-parameter
+              model at 16 bits (2 bytes each) is 810 GB, more than eight 80 GB H100s (NVIDIA's data-center chips)
+              hold: 640 GB.
+          - point: "A mixture-of-experts model needs memory for all of itself, but reads only a few experts per token."
+            detail: >-
+              The video's example on a 128 GB desktop (a DGX Spark): a 120-billion-parameter model stored at 4 bits
+              (half a byte each) is about 60 GB on disk but reads about 5 GB per token. It writes 55 tokens a
+              second, against 23 for a dense 14-billion-parameter one.
+          - point: "If it does not fit: store it in fewer bits, add GPUs, or allow shorter conversations and fewer users. Moving part of the model off the GPU is the last resort."
+            detail: >-
+              Offloading (moving layers to the CPU or disk) is about 10 times slower (the video's "order of
+              magnitude"), because the model then crosses a much narrower connection than the GPU's own memory.
+
+    plain:
+      lead: >-
+        Some models are built as a mixture of experts (MoE): many specialist blocks, with a small router that
+        sends each token to only a few of them. The whole model must fit in memory, but its writing speed depends
+        only on the part read for each token. So a big MoE can write faster than a much smaller ordinary (dense)
+        model.
+      picture: >-
+        A hospital employs dozens of specialists, and every one needs an office: that is the memory. But the
+        receptionist sends each patient to only two to four of them, so a visit is as quick as at a small
+        clinic. A dense model is a clinic where every doctor sees every patient. One difference: the model
+        repeats this choice at each of its layers (processing stages), so one token meets a new small team at
+        every stage.
+      numbers_source: "the lesson's sample table, lesson 12 (a Mac like an M4 Max)"
+      numbers:
+        - "The sample Mac's memory moves 546 GB a second. The script assumes a model gets 75% of that: 546 × 0.75 = 409.5 GB a second."
+        - "Dense Llama 3.1 8B: a 4.9 GB file writing 84 tokens a second. Memory delivers 409.5 GB a second, shared by those 84 tokens: 409.5 ÷ 84 = 4.9 GB read per token, the whole file."
+        - "Mixture-of-experts gpt-oss:20b: a 13.8 GB file, 2.8 times bigger (13.8 ÷ 4.9), yet it writes 118 tokens a second, 1.4 times faster."
+        - "409.5 ÷ 118 = 3.5 GB read per token. 3.5 ÷ 13.8 = 25%: about a quarter of the file."
+        - "The published figure: 3.6 of its 21 billion parameters are used per token, 17%. A stopwatch estimate within 2 times of that is a good result."
+      words:
+        - term: "Mixture of experts (MoE)"
+          def: "a model made of many specialist blocks (experts); for each token a small router picks a few of them. Example: gpt-oss:20b."
+        - term: "Active parameters"
+          def: "the parameters (learned numbers) actually read to write one token. Example: 3.6 of gpt-oss:20b's 21 billion."
+        - term: "Dense model"
+          def: "a model that uses all of its numbers for every token. Example: Llama 3.1 8B."
+        - term: "Bandwidth (memory bandwidth)"
+          def: "how many GB per second memory delivers to the chip. Example: 546 GB/s on an M4 Max."
+
+    run:
+      - cmd: "python moe_probe.py --demo"
+        note: >-
+          Prints the lesson's sample table without downloading anything: illustrative figures for a Mac like an M4
+          Max (546 GB a second), not a measured run. **Look for** gpt-oss:20b writing 118 tokens a second from a
+          13.8 GB file, faster than the 4.9 GB dense model's 84.
+      - cmd: "ollama pull llama3.1:8b && ollama pull gpt-oss:20b"
+        note: >-
+          Downloads both models through Ollama. You have the 8B from Day 1 and started gpt-oss:20b above, so this
+          only finishes what is missing. **Look for** both downloads to complete without an error.
+      - cmd: "python moe_probe.py llama3.1:8b gpt-oss:20b"
+        note: >-
+          Times each model writing up to 200 tokens, after a short untimed warm-up, and works backwards to the GB
+          read per token. The first line shows the memory speed it used for your chip. Some chips come in two
+          versions (M3 Max, M4 Max); the script assumes the faster one, so look yours up and add `--bw <GB/s>`.
+          **Look for** gpt-oss:20b faster than llama3.1:8b, and its active_% far below 100. Optional on a Mac with
+          64 GB or more: `ollama pull qwen3:30b-a3b` (another mixture-of-experts model, 3.3 of its 30.5 billion
+          parameters used per token), then add it to this command.
+
+    see: >-
+      Each row is one model. file_gb is its size, tok_s its writing speed, gb_per_token the GB read per token
+      (memory speed × 75% ÷ tok_s); active_% is that share of the file, published_% the maker's figure. The
+      dense model reads almost all of itself (99.5%); the MoE about a quarter (25.1%, against 17.1% published),
+      higher because some parts are read for every token and the 75% is an estimate.
+
+    checks:
+      - q: >-
+          A customer asks why their 120B mixture-of-experts model (120 billion parameters, split among many
+          specialists) writes faster than their 70B dense model (70 billion, all used for every token). What do you
+          tell them?
+        plain: >-
+          Writing speed depends on how much the model reads for each token, not on its total size. The MoE reads
+          about 5 billion parameters per token; the dense model reads all 70 billion.
+        picture: >-
+          Looking something up in a 1,200-page encyclopedia is quick when the index sends you to 50 pages. Reading
+          a 700-page manual cover to cover is slow, although it is the smaller book. You still need shelf space for
+          all 1,200 pages.
+        numbers_source: "lesson 12's published sizes and the lab book's DGX Spark measurements"
+        numbers:
+          - "gpt-oss 120B: 117 billion parameters in total, 5.1 billion used per token (the published figures in lesson 12's script)."
+          - "A 70B dense model uses all 70 billion for every token: 70 ÷ 5.1 = about 14 times as much to read."
+          - "Writing speed is capped at memory speed ÷ bytes read per token, so fewer bytes means faster writing."
+          - "Measured on a DGX Spark (lab book): gpt-oss 120B writes 55.4 tokens a second; Llama 3.1 70B stored at 8 bits writes 2.7."
+          - "55.4 ÷ 2.7 = about 20 times faster, although the MoE holds more parameters (117 billion against 70)."
+          - "The measured gap is bigger than 14 partly because the lab book's two runs used different server software (llama.cpp and SGLang) and number formats. Read it as roughly 14 to 20 times."
+        words:
+          - term: "Parameters"
+            def: "the model's learned numbers. Example: 70B means 70 billion."
+          - term: "Active parameters"
+            def: "the parameters read to write one token. Example: 5.1 billion for gpt-oss 120B."
+          - term: "Decode"
+            def: "the writing phase, one token at a time; its speed is set by the bytes read per token."
+          - term: "DGX Spark"
+            def: "NVIDIA's desktop AI computer: 128 GB of memory moving 273 GB a second."
+        more: >-
+          Decode is memory-bound: tok/s is about bandwidth × efficiency ÷ bytes read per token. For an MoE those
+          bytes are the chosen experts plus the parts every token uses (attention, embeddings, router) and the KV
+          cache, each at its own precision. The lab book inverts the Spark figure directly: 273 ÷ 55 ≈ 5 GB per
+          token out of a 63 GB file, under 10% of the model. The two figures also differ in format: the 70B is FP8,
+          1 byte per parameter; gpt-oss 120B is MXFP4, a 4-bit format. Memory is still sized on the total: all
+          59 GiB (63.4 GB) must fit.
+
+      - q: >-
+          Why can a mixture-of-experts model be harder, not easier, to serve to many people at once on GPUs?
+        plain: >-
+          Different people's tokens need different experts, so they cannot all share one read of the model, as
+          they do with a dense model. Spread over several GPUs, tokens must also travel between chips to reach
+          their experts.
+        picture: >-
+          A bus is efficient because everyone rides the same route. If every passenger needs a different part of
+          town, you end up running many half-empty minibuses. And if the specialists work in different buildings,
+          patients spend time walking between them.
+        numbers_source: "Day 3's practice server and the field guide's expert example"
+        numbers:
+          - "Dense model on Day 3's practice server: 8 people got about 5 times one person's total output, because they share each read of the model."
+          - "The field guide's MoE example: 4 experts in a layer, 2 used per token."
+          - "One person: 2 of the 4 experts are read, half of that layer's experts."
+          - "Two people whose tokens pick different pairs: all 4 experts are read, and each read serves only one person."
+          - "With the 4 experts on 4 GPUs, as in the field guide, each token is sent to the GPUs that hold its 2 experts, and the results are sent back."
+        words:
+          - term: "Expert"
+            def: "one specialist block in an MoE; only the few the router picks are read for a token."
+          - term: "Batching"
+            def: "serving several people with one pass over the model."
+          - term: "Expert parallelism"
+            def: "placing different experts on different GPUs, so tokens travel to the GPUs that hold their experts."
+          - term: "All-to-all"
+            def: "a network step where every GPU sends data to every other GPU. Example: moving tokens to their experts."
+        more: >-
+          Batched decode shares one weight read across the batch. In an MoE layer each token's router picks its own
+          experts, so as the batch grows the set of experts read approaches all of them, while each expert's share
+          of the batch shrinks: more bytes per step and smaller, less efficient matrix multiplies. Expert
+          parallelism puts experts on different GPUs and needs an all-to-all exchange of token activations in every
+          MoE layer, out to the experts and back. That adds network traffic, and the busiest expert sets the pace.
+
+      - q: >-
+          A model needs 160 GB of memory, and each H100 GPU has 80 GB, so it must be split over 2 GPUs. Do you
+          split every layer (one of the model's stacked processing stages) across both (TP=2, tensor parallel) or
+          give each GPU half of the layers (PP=2, pipeline parallel)?
+        plain: >-
+          Split every layer (TP=2) when both GPUs sit in one server with a very fast link between them: each token
+          then finishes sooner. Use the half-the-layers split (PP=2) only when the link between the GPUs is slow.
+        picture: >-
+          Two cooks can split every dish: each chops half the vegetables, and they combine their halves before
+          every next step. That constant passing only works side by side. Or one cook makes starters and the other
+          mains: one hand-off per order, fine in separate kitchens. But each order waits for both, and a cook stands
+          idle when orders are few.
+        numbers_source: "the check's numbers, the field guide and lesson 14's two-box notes"
+        numbers:
+          - "160 GB ÷ 80 GB per GPU = 2 GPUs at the very least, before any room for notes."
+          - "TP=2: each GPU holds half of every layer, and the two sync inside every layer, many times per token."
+          - "Inside one server, NVLink joins H100s at about 900 GB a second (field guide): fast enough for constant syncing."
+          - "Two DGX Sparks are joined by a 200-gigabit cable: 200 ÷ 8 = 25 GB a second. NVLink's 900 adds both directions together; even halved to 450, it is 18 times the cable (450 ÷ 25)."
+          - "Over a link like that, PP=2 often does better: one hand-off per token between the two halves, instead of syncs in every layer."
+        words:
+          - term: "Tensor parallelism (TP)"
+            def: "splitting every layer across GPUs so they work on each token together; they sync inside every layer."
+          - term: "Pipeline parallelism (PP)"
+            def: "giving each GPU a block of layers; each token passes from one GPU to the next."
+          - term: "NVLink"
+            def: "NVIDIA's very fast direct link between GPUs inside one server. Example: about 900 GB/s on H100."
+          - term: "Pipeline bubble"
+            def: "time a GPU sits idle in a pipeline, waiting for work from the stage before it."
+        more: >-
+          TP shards each weight matrix and all-reduces activations inside every layer, so it cuts per-token latency
+          but is bound by interconnect latency and bandwidth: keep it inside one NVLink domain. PP places
+          consecutive layer blocks on each GPU and passes activations once per stage boundary. It tolerates slower
+          links but adds per-hop latency, and bubbles unless enough requests keep every stage busy. Across boxes the
+          kit's advice flips to trying PP first, because TP wants NVLink-class bandwidth (TWO_BOX.md). Note that
+          2 × 80 GB leaves no headroom for a 160 GB model: the Fitting Big Models video adds about 10% for
+          activations and the runtime.
+
+    say:
+      ask: "Why is the MoE model faster than the smaller dense one?"
+      means:
+        - phrase: "Memory is set by total parameters"
+          meaning: "The machine must hold every expert, the whole model. gpt-oss:20b needs its full 13.8 GB file in memory, though it reads only part of it per token."
+        - phrase: "decode speed by active parameters"
+          meaning: "How fast it writes depends only on what it reads per token: 3.6 of its 21 billion parameters. In the sample it writes 118 tokens a second, against 84 for the 4.9 GB dense 8B."
+        - phrase: "I can estimate a model's active footprint from its decode speed on known hardware"
+          meaning: "If I know the machine's memory speed, I time the writing and work backwards: 546 × 0.75 ÷ 118 = 3.5 GB read per token, about a quarter of the file."
+
+    fields:
+      - id: d9-moe-dense-tps
+        label: "Dense Llama 3.1 8B: writing speed (tok/s)"
+        hint: "The tok_s column of the llama3.1:8b row from `python moe_probe.py llama3.1:8b gpt-oss:20b`."
+        unit: "tok/s"
+        meaning: "How fast a model writes when it reads all of itself for every token."
+        example: "84.0 in the lesson's sample (a Mac like an M4 Max)."
+      - id: d9-moe-moe-tps
+        label: "Mixture-of-experts gpt-oss:20b: writing speed (tok/s)"
+        hint: "The tok_s column of the gpt-oss:20b row. On a 16 GB Mac, use the `--demo` row."
+        unit: "tok/s"
+        meaning: "How fast a model writes when it reads only the experts it picks."
+        example: "118.0 in the sample: faster than the dense model, from a file 2.8 times bigger."
+      - id: d9-moe-active
+        label: "gpt-oss:20b: GB read per token / active %"
+        hint: "The gb_per_token and active_% columns of the gpt-oss:20b row. Write both, for example \"3.5 / 25.1\"."
+        unit: "GB / %"
+        meaning: "Your stopwatch estimate of how much of the model is read for each token."
+        example: "3.5 GB and 25.1% in the sample, against 17.1% published: within 2 times, a good result."
+
+    done: >-
+      `moe_probe.py` printed a row for both models: gpt-oss:20b writes faster than Llama 3.1 8B although its file
+      is about 3 times bigger, and its active_% is well under 100. On a 16 GB Mac, the `--demo` table counts.
+
+    stuck:
+      - problem: "`Connection refused`."
+        fix: "Ollama is not running. Start it with `ollama serve &`, then run the command again."
+      - problem: "`gpt-oss:20b not pulled — run: ollama pull gpt-oss:20b`."
+        fix: "Run that pull. The name must match exactly, including `:20b`."
+      - problem: "`pass --bw <GB/s>`."
+        fix: >-
+          The script does not know your chip's memory speed. Look it up and add it by hand, for example
+          `python moe_probe.py llama3.1:8b gpt-oss:20b --bw 546` for a chip that moves 546 GB a second.
+      - problem: "gpt-oss:20b is very slow or will not load."
+        fix: >-
+          Your Mac is probably short of memory: the model needs its whole 13.8 GB, and Day 1's rule keeps models
+          under about 70% of memory. Close other apps, or use the `--demo` numbers.
+
+  d9-s2:
+    why: >-
+      A small draft model guesses the next few tokens and the big model checks them all in one pass. You measure
+      when that speeds up writing and when it slows it down, on your Mac and on a paid Fireworks deployment.
+    why_example: >-
+      In the lesson's sample, the draft model lifts predictable output (lists, code, JSON data) from 62 to 118
+      tokens a second, about 1.9 times. Creative prose only goes from 61.5 to 70.
+
+    videos:
+      13-scale-out:
+        in_this_video: "How a small draft model speeds up a big one, why the acceptance rate decides whether it pays, and what linking a second machine does and does not buy."
+        key_points:
+          - point: "A small draft model guesses a few tokens; the big model checks them all in one pass."
+            detail: >-
+              Correct guesses are free tokens, and the big model still decides every token, so the output does not
+              change. With 75% of guesses kept and 4 guesses a round, it writes about 3 tokens per big pass instead
+              of 1.
+          - point: "The acceptance rate, the share of guesses kept, decides whether it pays."
+            detail: >-
+              At 80% kept with 4 guesses, the video estimates about 2 times faster once the draft model's own time
+              is paid. At 40% it calls the gain barely worth it, and a mismatched draft model can make writing
+              slower.
+          - point: "A second machine adds memory, not speed."
+            detail: >-
+              Two linked 128 GB desktops (256 GB) can run a 235-billion-parameter model at 4 bits, but it writes
+              about 12 tokens a second (11.7). Good for testing that model, not for serving many users.
+
+    plain:
+      lead: >-
+        Normally the big model writes one token per pass, and each pass reads the whole model. With speculative
+        decoding, a small draft model quickly guesses the next few tokens. The big model checks all the guesses
+        in one pass: it keeps them up to the first one it would not have written, then writes the next token
+        itself. The output is the same, with fewer big passes.
+      picture: >-
+        An intern drafts the next few words of an email, and a senior engineer approves or corrects them at a
+        glance. With a predictable email, such as a form letter, most words pass and it goes fast. With a creative
+        one, most guesses are wrong, and checking them wastes the senior's time.
+      numbers_source: "the lesson's formula and sample table, lesson 13"
+      numbers:
+        - "Acceptance rate α (alpha): the share of guesses the big model keeps. Take α = 0.8, with 4 guesses a round (k = 4)."
+        - "The big model always adds 1 token of its own. Guess 1 is kept 80% of the time (0.8). Guess 2 counts only if guess 1 was kept too: 0.8 × 0.8 = 0.64. Guess 3: 0.51. Guess 4: 0.41."
+        - "Add them: 1 + 0.8 + 0.64 + 0.51 + 0.41 = 3.36 tokens per big pass instead of 1. The lesson's formula, (1 − 0.8^5) ÷ (1 − 0.8), is a shortcut for this sum."
+        - "The draft model also runs 4 times a round, at about a tenth of a big pass each: 1 + 4 × 0.1 = 1.4 passes of time. 3.36 ÷ 1.4 = 2.4 times faster."
+        - "With α = 0.3 and 8 guesses: 1 + 0.3 + 0.09 + 0.03 + ... = 1.43 tokens per pass, but 1 + 8 × 0.1 = 1.8 passes of time. 1.43 ÷ 1.8 = 0.79: slower than no draft at all."
+        - "The lesson's sample: predictable prompts 62 to 118 tokens a second (1.9 times, α 0.78); prose 61.5 to 70 (1.14 times, α 0.41)."
+      words:
+        - term: "Draft model"
+          def: "a small, fast model that guesses the next few tokens. Example: Llama 3.2 1B guessing for Llama 3.1 8B."
+        - term: "Acceptance rate (α, alpha)"
+          def: "the share of the draft's guesses the big model keeps. Example: 0.78 on predictable prompts."
+        - term: "k"
+          def: "how many tokens the draft model guesses per round. Example: up to 8 on your Mac, 4 on Fireworks."
+        - term: "Verification pass"
+          def: "one pass of the big model that checks all the guesses at once, the way it reads a prompt."
+
+    run:
+      - cmd: "python spec_math.py"
+        note: >-
+          Prints the formula as a table: the speed-up for acceptance rates from 0.3 to 0.9 and for 2, 4, 6 or 8
+          guesses a round, counting each guess as a tenth of a big pass. **Look for** the two cells marked with a
+          down arrow (slower than no draft): 0.89 and 0.79, at 0.3 with 6 and 8 guesses. The best cell is 3.40,
+          at 0.9 with 8 guesses.
+      - cmd: "bash serve_spec_llamacpp.sh off & sleep 30"
+        note: >-
+          Starts llama.cpp in the background with Day 2's 4-bit Llama 3.1 8B and no draft model, then waits 30
+          seconds for it to load. This is the baseline. **Look for** `baseline (no draft) on :8080`.
+      - cmd: "python spec_bench.py --target llamacpp --label baseline; kill %1"
+        note: >-
+          Sends 5 predictable prompts (lists, code, JSON data) and 5 creative ones, and reports the writing speed
+          for each kind. Then `kill %1` stops the server. `%1` is this terminal's first background job, so run
+          `jobs` first if you started others here. **Look for** two baseline rows at about the same speed (62.0 and
+          61.5 in the sample) with alpha `nan`: no draft, so nothing to accept.
+      - cmd: "bash serve_spec_llamacpp.sh & sleep 40"
+        note: >-
+          Starts the same model with a draft model, Llama 3.2 1B, which shares its tokenizer (it cuts text into
+          the same numbered tokens) and guesses up to 8 tokens a round. The first start also downloads the draft model. **Look for** the line
+          `speculative: target`, followed by both model names.
+      - cmd: "python spec_bench.py --target llamacpp --label spec; kill %1"
+        note: >-
+          The same 10 prompts with speculation on, then the server stops. **Look for** the structured row far
+          faster than its baseline (118.0 against 62.0 in the sample, 1.9 times) with a high alpha (0.780), and the
+          prose row only a little faster (70.0) with a low one (0.410).
+      - cmd: "bash fireworks_spec.sh"
+        note: >-
+          Paid. Creates a Fireworks deployment of Llama 3.1 8B with a 1B draft model guessing 4 tokens a round. It
+          prints a dot every 20 seconds until ready, runs the same 10 prompts, then deletes the deployment, even on
+          Ctrl+C. **Look for** the `fireworks perf_metrics sample:` line and two fw-spec rows. Their alpha is `nan`:
+          read acceptance in the perf_metrics sample instead. Their tok_s includes the trip over the internet, so
+          compare the two rows with each other, not with your Mac's. There is no Fireworks run without a draft, so
+          no speed-up figure. The last lines list your deployments: yours should be gone.
+
+    see: >-
+      Four rows from your Mac, two per run: label (baseline or spec), traffic (structured or prose), tok_s
+      (writing speed) and alpha (the share of guesses kept, `nan` with no draft). Compare each spec row with the
+      baseline row of the same traffic. In the sample, structured goes from 62.0 to 118.0 (1.9 times) and prose
+      from 61.5 to 70.0 (1.14 times): the predictable traffic gains most.
+
+    checks:
+      - q: >-
+          Why must the small draft model share the big model's tokenizer? (The tokenizer is the part that cuts text
+          into tokens and gives each token a number.)
+        plain: >-
+          The big model checks the guesses as token numbers, not as text. If the two models cut and number text
+          differently, the same number means different words, and the check means nothing.
+        picture: >-
+          Two warehouse clerks check an order by product code. That only works if they use the same catalogue: in
+          one, code 4521 is a lamp; in the other, a sofa.
+        numbers_source: "the lesson's two models, lesson 13"
+        numbers:
+          - "Big model: Llama 3.1 8B at 4 bits. Draft: Llama 3.2 1B at 4 bits, from the same family, so it uses the same token numbers."
+          - "The draft sends up to 8 guesses a round, as token numbers (`--draft-max 8`)."
+          - "The big model compares each guessed number with the number it would have picked, and keeps the matching run."
+          - "On Fireworks the lesson uses the same pair, Llama 3.1 8B checking a Llama 3.2 1B draft, with 4 guesses a round."
+        words:
+          - term: "Tokenizer"
+            def: "the part of a model that cuts text into tokens and numbers them. Example: Llama 3.1 8B and Llama 3.2 1B share one."
+          - term: "Token ID"
+            def: "the number a tokenizer gives each token; models compare these numbers, not the text."
+          - term: "Vocabulary"
+            def: "the full list of tokens a tokenizer knows, each with its own number."
+        more: >-
+          Verification compares the draft's proposed token ids with the target's own next-token choices position by
+          position (with sampling, it accepts against the target's probabilities), so both models must share one
+          vocabulary and tokenization. A draft from another family proposes ids that mean different strings to the
+          target. N-gram speculation and predicted outputs avoid the issue, because their drafts come from the
+          target's own tokens.
+
+      - q: >-
+          Why does speculative decoding help less when the server is busy with many people at once (high
+          concurrency)?
+        plain: >-
+          With one person, the chip spends most of each step waiting for memory, so it has spare math power to check
+          guesses almost for free. With many people, that spare power already goes to the other people's tokens, so
+          checking guesses now costs real time.
+        picture: >-
+          A delivery van on a single drop has lots of empty space, so carrying extra parcels on the off chance
+          costs nothing. Once it is full of other customers' parcels, every extra parcel pushes out a real one.
+        numbers_source: "the lab book's DGX Spark measurements and lesson 13's formula"
+        numbers:
+          - "One person: writing reads the whole model for each token, and the math units mostly wait (Day 3: memory-bound)."
+          - "Llama 3.1 8B at 8 bits on a DGX Spark (lab book): 20.5 tokens a second for 1 person, 368 in total for 32."
+          - "368 ÷ 20.5 = 18 times the output from the same memory reads: the spare math is now in use."
+          - "Checking 4 guesses means the math for 5 tokens per person instead of 1, and every rejected guess is wasted math."
+          - "So speculation pays most for one or a few people who want fast replies."
+        words:
+          - term: "Latency-bound"
+            def: "a workload where what matters is how fast each reply arrives, typical of one or a few people at a time."
+          - term: "Memory-bound"
+            def: "slowed by how fast memory delivers data, not by math. Example: writing for one person."
+          - term: "Batch size"
+            def: "how many requests share one pass over the model. Example: 1, then 32, on the Spark."
+          - term: "Compute"
+            def: "the chip's math power. Example: what checking guesses uses."
+        more: >-
+          At batch 1, decode does about two FLOPs per parameter (1 to 2 per byte fetched at 16 or 8 bits), against
+          an H100 ridge point of about 300 (989 teraflops ÷ 3.35 TB/s, the GPU Bandwidth video), so compute sits
+          idle and verifying k drafted tokens in the same weight read is almost free. As the batch grows,
+          arithmetic intensity rises toward the compute roof; verification adds k + 1 positions per sequence, and rejected positions become
+          wasted compute that displaces other users' tokens. Speculation shines on latency-bound, low-batch
+          workloads; at high concurrency its gain shrinks and can turn negative.
+
+      - q: >-
+          For editing tasks, where most of the answer repeats the input, what can you use instead of a draft model?
+        plain: >-
+          Use text you already have as the guess. N-gram speculation finds the last few words it wrote earlier in
+          the prompt and guesses what came next there. Fireworks' predicted outputs let you send the expected
+          answer, such as the original document, as the draft.
+        picture: >-
+          Proofreading: instead of an intern drafting from scratch, you hand the editor last week's version. Most of
+          it passes at a glance, and only the changed lines need real work.
+        numbers_source: "fireworks_spec.sh, the lab book and lesson 13's formula"
+        numbers:
+          - "The script's comment names the option: `--ngram-speculation-length=3`, no draft model; it reuses n-grams (short runs of tokens) from the prompt."
+          - "The lab book lists four ways on Fireworks: the default draft model, your own draft model, n-gram, or predicted outputs."
+          - "Suppose an edit keeps 9 of 10 guesses (α = 0.9, the highest rate in lesson 13's table; measure it on real edits). With 4 guesses: 1 + 0.9 + 0.81 + 0.73 + 0.66 = 4.1 tokens per big pass."
+          - "With no draft model to run, guessing costs almost nothing, so the ideal speed-up approaches those 4.1 times. Real gains come in lower."
+        words:
+          - term: "N-gram"
+            def: "a run of n tokens in a row. Example: a 3-gram is 3 tokens."
+          - term: "N-gram speculation"
+            def: "guessing the next tokens by copying what followed the same words earlier in the prompt; no draft model."
+          - term: "Predicted outputs"
+            def: "a Fireworks option: you send the expected answer as the draft for the model to check."
+        more: >-
+          N-gram (prompt-lookup) speculation matches the last few generated tokens against earlier text in the
+          context and proposes the tokens that followed; predicted outputs let the client send the expected
+          completion, for example the original file for a code edit. Both need no draft model and suit edits,
+          rewrites and extraction, where the output copies long spans of the input. Measure acceptance on the real
+          traffic, as with any drafter.
+
+    say:
+      ask: "Will speculative decoding help us?"
+      means:
+        - phrase: "Acceptance rate decides whether speculation pays"
+          meaning: "The share of the small model's guesses the big model keeps is the number that matters. At 0.8 with 4 guesses it is 2.4 times faster; at 0.3 with 8 guesses, 0.79 times: slower."
+        - phrase: "On structured traffic it can double decode speed"
+          meaning: "Decode speed is writing speed. Predictable output such as JSON data, code or extraction is easy to guess. In the lesson's sample it went from 62 to 118 tokens a second, 1.9 times."
+        - phrase: "a generic drafter on unusual traffic can make things slower"
+          meaning: "A draft model that has not seen this kind of text guesses badly, and the wasted guesses cost more than they save."
+        - phrase: "I measure α on their prompts before recommending it"
+          meaning: "I run the customer's own prompts with speculation on and read the acceptance rate (α) before I promise any speed-up."
+
+    fields:
+      - id: d9-spec-structured
+        label: "Predictable prompts (structured): tok/s without / with speculation"
+        hint: "The tok_s of the two structured rows: baseline, then spec. Write both, for example \"62.0 / 118.0\"."
+        unit: "tok/s"
+        meaning: "How much speculation speeds up easy-to-guess output on your Mac."
+        example: "62.0 / 118.0 in the lesson's sample: 1.9 times."
+      - id: d9-spec-prose
+        label: "Creative prompts (prose): tok/s without / with speculation"
+        hint: "The tok_s of the two prose rows: baseline, then spec."
+        unit: "tok/s"
+        meaning: "How much speculation helps when the next words are hard to guess."
+        example: "61.5 / 70.0 in the sample: 1.14 times."
+      - id: d9-spec-alpha
+        label: "Acceptance rate α: structured / prose"
+        hint: "The alpha column of the two spec rows."
+        unit: "share of guesses kept"
+        meaning: "The number that decides whether speculation pays."
+        example: "0.780 / 0.410 in the sample."
+      - id: d9-spec-fireworks
+        label: "Fireworks with speculation: tok/s structured / prose"
+        hint: "The two fw-spec rows from `bash fireworks_spec.sh`. Their alpha is `nan`; add the acceptance figure from the perf_metrics line if you find one."
+        unit: "tok/s"
+        meaning: "The same test on a Fireworks deployment with a 1B draft model guessing 4 tokens a round."
+        example: "The lesson has no sample for this run. Expect the structured row faster than the prose row."
+
+    done: >-
+      Your Mac's table has four rows (baseline and speculation, structured and prose) with an acceptance rate on
+      each speculation row. The Fireworks run finished, and its deployment is gone from the list it printed.
+
+    stuck:
+      - problem: "`spec_bench.py` cannot connect right after a server start."
+        fix: >-
+          The server was still loading. The first speculative start also downloads the draft model, which can take
+          longer than the 40-second wait. The `; kill %1` on that line then stops the server too: start it again
+          (`bash serve_spec_llamacpp.sh &`), wait until it says it is listening, then run the `spec_bench.py` line
+          again.
+      - problem: "The server will not start because port 8080 is in use."
+        fix: "Another llama.cpp server from Day 2, 4 or 5 is still running. Stop it with Ctrl+C in its terminal, then start again."
+      - problem: "`kill %1` says there is no such job, or stops the wrong program."
+        fix: "`%1` is the first background job of this terminal. Run `jobs` to list them and use the right number, for example `kill %2`."
+      - problem: "The server refuses the draft model."
+        fix: >-
+          The draft must share the big model's tokenizer. If you changed `DRAFT_REPO` or `LLAMACPP_REPO`, set them
+          back, or pick a draft from the same model family.
+      - problem: "`fireworks_spec.sh` stops with an error from `firectl`."
+        fix: >-
+          Check that you are signed in (`firectl whoami`, Day 1) and that your quota allows a deployment
+          (`firectl quota list`). Then run `make fw-check`: it should list nothing.
+      - problem: "`fireworks_spec.sh` never says ready."
+        fix: "Press Ctrl+C: the script deletes the deployment on the way out. Run `make fw-check` to confirm nothing is left, and try again later."
+
+    replace:
+      - find: "# \u23F1 deploy → measure → auto-delete"
+        with: "# paid: deploy, measure, then auto-delete"
+      - find: "or `perf_metrics` (Fireworks)."
+        with: "and, on Fireworks, prints one `perf_metrics` sample (the alpha column stays `nan` there, so read acceptance in that sample)."
+
+  d9-s3:
+    why: >-
+      Optional (needs a DGX Spark): you run the server software real services use, vLLM and SGLang, in containers
+      on NVIDIA hardware. Your own test scripts from earlier days then measure it, so its numbers compare directly
+      with your Mac's.
+    why_example: >-
+      If a team asks whether a small NVIDIA desktop can serve its internal users, test it with the same
+      questions and timing script you used on your Mac. This step is optional because it needs a DGX Spark.
+      Its published memory speed resembles an M4 Pro, but the measured reply speed and number of users it
+      supports must be checked on the actual machine.
+
+    plain:
+      lead: >-
+        The Mac taught the ideas. The Spark runs the production server software (the programs live services use):
+        vLLM and SGLang on an NVIDIA GPU. You start each one in a container on the Spark and drive it from your Mac
+        with the same scripts as before, so the numbers line up with your Mac's.
+      picture: >-
+        Same recipe, same measuring cups, but a professional kitchen. Because you measure the same way, any
+        difference in the result comes from the kitchen, not from how you measured.
+      numbers_source: "lesson 14 and the lab book's DGX Spark page"
+      numbers:
+        - "DGX Spark: 128 GB of memory shared by its CPU and GPU, about 115 GB usable for the model and its notes."
+        - "Its memory moves 273 GB a second, like an M4 Pro Mac. Llama 3.1 8B at 8 bits is 8 GB, so one person's limit is 273 ÷ 8 = 34 tokens a second."
+        - "The lab book's measurement: 20.5 tokens a second for 1 person, 60% of that limit (20.5 ÷ 34)."
+        - "With 32 people the same Spark wrote 368 tokens a second in total: 368 ÷ 20.5 = 18 times one person's output."
+        - "An H100 moves 3,350 GB a second, 12 times the Spark: the Spark is for learning the server stack, not for data-center speed."
+      words:
+        - term: "DGX Spark"
+          def: "NVIDIA's desktop AI computer, with 128 GB of memory shared by its CPU and GPU."
+        - term: "Container"
+          def: "a sealed package holding a program and the exact software versions it needs. Example: vLLM's image on the Spark."
+        - term: "vLLM"
+          def: "an open-source server for NVIDIA GPUs built for many users at once."
+        - term: "SGLang"
+          def: "another open-source server for NVIDIA GPUs, strong at reusing shared prompt openings."
+
+    run:
+      - cmd: "bash remote.sh 0_check.sh"
+        note: >-
+          Runs the check script on the Spark over SSH: your Mac logs in and runs it there. It needs `SPARK_IP` in
+          `03-labs/.env` and SSH keys set up. **Look for** the GPU name, driver and CUDA version, the memory, the
+          chip type (arm64, printed as `aarch64`), and a GPU listed from inside a test container: proof that Docker
+          can see the GPU.
+      - cmd: "bash remote.sh 1_vllm.sh nvidia/Llama-3.1-8B-Instruct-FP8"
+        note: >-
+          Starts vLLM in a container on the Spark with Llama 3.1 8B stored at 8 bits: conversations capped at 8,192
+          tokens, up to 80% of memory, prefix caching on (Day 5). The first run downloads the model. **Look for**
+          `ready at http://…:8000/v1`, then the log lines about the KV cache and `Maximum concurrency for 8192
+          tokens per request`: Day 4's notes calculation, done by the server.
+      - cmd: "bash 2_bench.sh"
+        note: >-
+          Runs on your Mac, not the Spark. It points three of your own scripts at the Spark: Day 1's timing test
+          (5 runs); Day 3's sweep from 1 to 64 people with a 1,000 ms promise, which it then draws with your
+          earlier sweeps on one chart; and Day 5's shared-opening test. **Look for** the sweep's `Capacity line:`
+          and the chart in `results/03-sweep.png`.
+      - cmd: "bash remote.sh 2b_vllm_bench.sh"
+        note: >-
+          Runs vLLM's own load tester inside the container: 64 made-up requests of 512 tokens in and 128 out, sent
+          at 1, 4 and 16 requests a second, then all at once. **Look for** `Output token throughput` (total tokens
+          written a second) and `P99 TTFT` (99 of 100 requests got their first token within this time): they
+          should tell the same story as your own sweep.
+      - cmd: "bash remote.sh 3_sglang.sh Qwen/Qwen3-8B"
+        note: >-
+          Stops vLLM (one server at a time on one GPU) and starts SGLang with the Qwen3 8B model, set to report
+          reused tokens (`--enable-cache-report`). **Look for** `ready. From the Mac:` followed by the exact
+          command to run next, with the Spark's address filled in.
+      - cmd: "SPARK_URL=http://$SPARK_IP:30000/v1 SPARK_MODEL=Qwen/Qwen3-8B"
+        note: >-
+          Day 5's shared-opening test against SGLang on port 30000, plus the extra call that prints token counts.
+          Your terminal fills in `$SPARK_IP` itself and does not read `.env`, so run
+          `export SPARK_IP=<the Spark's address>` first, or paste the command `3_sglang.sh` printed. **Look for**
+          the `usage:` line, with cached_tokens close to prompt_tokens on the same line: nearly the whole opening
+          (the script estimates about 3,028 tokens) was reused.
+      - cmd: "bash remote.sh 9_teardown.sh"
+        note: >-
+          Stops both servers and frees the GPU; downloaded models stay on the Spark for next time. **Look for** no
+          vllm or sglang in the container list. The GPU memory line may read N/A: the Spark's memory is shared, so
+          the lab book says to use `free -h` there instead.
+
+    see: >-
+      First, vLLM's `Maximum concurrency for 8192 tokens per request: …x` line is Day 4's notes calculation, done
+      by the server: how many full 8,192-token conversations fit in its memory for notes. Second, the Spark's
+      sweep curve keeps rising well past your Mac's: vLLM lets requests join at every step and hands out note
+      memory in small pages. Third, SGLang's usage line shows cached_tokens close to prompt_tokens: proof it
+      reused the shared opening.
+
+    checks:
+      - q: >-
+          vLLM's startup log says its memory for notes holds 18 full conversations of 8K tokens (8,192, about
+          6,000 words) at once: maximum concurrency 18x. How do you double that?
+        plain: >-
+          Make each conversation's notes smaller, or give the notes more memory. Store them in 8 bits instead of
+          16, lower the cap on conversation length, or use a smaller or more compressed model.
+        picture: >-
+          A wardrobe holds 18 coats. Vacuum-pack each coat to half its size, or allow jackets instead of long
+          coats, and 36 fit. Or take out the big suitcase that was using some of the space.
+        numbers_source: "Day 4's calculator for Llama 3.1 8B, and the vLLM settings from the Serving With vLLM video"
+        numbers:
+          - "Notes for one 8,192-token conversation at 16 bits: 1.07 GB (Day 4)."
+          - "Say the server has 20 GB for notes, as in Day 4's example: 20 ÷ 1.07 = 18.6, so vLLM reports about 18.6x (18 whole conversations): the check's 18x."
+          - "8-bit notes (`--kv-cache-dtype fp8`): 1.07 ÷ 2 = 0.54 GB each, so 20 ÷ 0.54 = 37."
+          - "Or cap conversations at 4,096 tokens (`--max-model-len 4096`): also 0.54 GB each, also 37, if real requests fit in 4,096."
+          - "Or a smaller or more compressed model: its weights shrink, and vLLM gives the freed memory to notes."
+        words:
+          - term: "Maximum concurrency"
+            def: "vLLM's count of how many full-length conversations fit in its memory for notes."
+          - term: "KV cache dtype"
+            def: "the number format the notes are stored in; 8-bit instead of 16-bit halves their memory."
+          - term: "Max model length (--max-model-len)"
+            def: "vLLM's cap on tokens per conversation, which caps that conversation's notes."
+          - term: "FP8"
+            def: "an 8-bit number format, 1 byte per number."
+        more: >-
+          vLLM's figure is KV-cache tokens ÷ max_model_len. The Serving With vLLM video's sample log: 8,234 blocks ×
+          16 tokens ≈ 131,000 tokens, about 16 requests at 8K. FP8 KV halves bytes per token, so it doubles the
+          figure exactly (the video: "roughly doubles concurrency"). Halving `--max-model-len` also doubles it, but
+          is only safe if the real p95 fits (Day 4). A smaller or quantized model frees memory inside
+          `--gpu-memory-utilization` for the KV pool, which raises the figure by however much it frees.
+
+      - q: >-
+          When would you pick SGLang over vLLM, the two main open-source servers for NVIDIA GPUs?
+        plain: >-
+          When many requests share long openings or branch from one conversation, as agents do, or when most output
+          must follow a strict format such as JSON (a common format for structured data). Either way, test both on
+          the customer's real traffic before choosing.
+        picture: >-
+          Two delivery firms: one is best at many different parcels, the other at many parcels to the same street.
+          Which is cheaper depends on your parcels, so you give each a trial week.
+        numbers_source: "Day 5's prefix test and this step's SGLang run"
+        numbers:
+          - "Day 5's shared opening: about 3,028 tokens by the script's estimate, sent with each of 12 questions."
+          - "Reusing it made the first word 20 times sooner in the lesson's sample: 740 ms down to 36 ms (thousandths of a second)."
+          - "SGLang keeps saved notes like a family tree (RadixAttention): one shared opening at the root, a branch for each follow-up, so every branch reuses the common start."
+          - "This step's proof: SGLang's `usage:` line shows cached_tokens close to prompt_tokens on the same line: nearly the whole opening was reused."
+        words:
+          - term: "SGLang"
+            def: "an open-source server for NVIDIA GPUs, strong at reusing shared prompt openings."
+          - term: "RadixAttention"
+            def: "SGLang's store of saved notes, kept as a tree of shared openings."
+          - term: "Agent"
+            def: "a program that calls a model many times, using tools, to finish a task."
+          - term: "Structured generation"
+            def: "making every reply follow a fixed format, such as JSON."
+        more: >-
+          SGLang's RadixAttention keeps the KV cache in a radix tree keyed by token prefixes and schedules requests
+          to maximise prefix hits, which suits multi-turn and branching agent traffic; its constrained decoding is
+          strong for JSON-heavy pipelines. vLLM's automatic prefix caching also reuses identical block prefixes, so
+          the gap depends on the traffic: benchmark both on the customer's prompts, with their cache hit rates.
+
+      - q: >-
+          Why run vLLM and SGLang on the Spark only inside containers, never installed straight onto the machine
+          with pip (Python's package installer)?
+        plain: >-
+          The GPU's driver, NVIDIA's CUDA software and the server must be exactly matching versions. A container
+          ships a set known to work together; installing with pip on the machine mixes versions and can break them.
+        picture: >-
+          A meal kit comes with exactly the ingredients the recipe was tested with. Shop for each item yourself and
+          you end up with a different flour, and the cake fails.
+        numbers_source: "the Serving With vLLM video (from Day 2), the lab book's DGX Spark page and lesson 14's scripts"
+        numbers:
+          - "The Serving With vLLM video: when versions clash, the usual workaround switches off a GPU speed-up (CUDA graphs) and loses 20 to 30% of total output."
+          - "The lab book: the pip route for vLLM on the Spark's arm64 chip has broken for people (mismatched versions of PyTorch, the Python library vLLM is built on, and CUDA)."
+          - "NVIDIA ships about 65 DGX Spark setup guides (playbooks) that fix container versions known to work."
+          - "`1_vllm.sh` pins one image tag, `nvcr.io/nvidia/vllm:25.09-py3`; swap it only for another tag built for the Spark (GB10/arm64)."
+        words:
+          - term: "Container"
+            def: "a sealed package holding a program and the exact software versions it needs, so it runs the same anywhere."
+          - term: "CUDA"
+            def: "NVIDIA's software layer that lets programs run on its GPUs."
+          - term: "Driver"
+            def: "the software that lets the operating system use a piece of hardware such as a GPU."
+          - term: "pip"
+            def: "Python's tool for installing packages. Example: `pip install vllm`, which the lesson forbids on the Spark."
+        more: >-
+          On GB10 (arm64 with a Blackwell GPU) the host OS, driver and CUDA move together on NVIDIA's schedule.
+          Prebuilt wheels can expect a different CUDA than the host has, and the usual workaround, eager mode without
+          CUDA graphs (`--enforce-eager`), costs 20 to 30%. NGC and vendor containers pin CUDA, PyTorch and the
+          engine together, so a customer can reproduce your numbers with the same tag.
+
+    say:
+      ask: "What do you test models on, and how do you keep the numbers honest?"
+      means:
+        - phrase: "Mac for iteration"
+          meaning: "I try ideas on my Mac first: free, quick and private."
+        - phrase: "Spark for the server stack"
+          meaning: "I run the production server software, vLLM and SGLang in containers, on an NVIDIA DGX Spark, which a Mac cannot run."
+        - phrase: "It's the same harness pointed at both"
+          meaning: "The same test scripts from Days 1, 3 and 5 run against both machines; only the target changes (`--target spark`)."
+        - phrase: "so the numbers are comparable"
+          meaning: "Any difference comes from the machine and the server software, not from how I measured. The Spark and an M4 Pro Mac both move 273 GB a second, so one person's writing speed should be close: a gap there is mostly the software. Reading long prompts and serving many people also need math power, where the Spark is far stronger (the lab book: compute-rich, bandwidth-poor)."
+        - phrase: "and I validate the fabric before I scale across boxes"
+          meaning: "Before I split one model over two linked Sparks, I test the link (the fabric) on its own, with a network speed test and NVIDIA's GPU-to-GPU test (NCCL). A slow link wipes out the gain."
+
+    fields:
+      - id: d9-spark-maxconc
+        label: "vLLM on the Spark: maximum concurrency at 8,192 tokens (x)"
+        hint: "From the `Maximum concurrency for 8192 tokens per request:` log line that `1_vllm.sh` prints."
+        unit: "x"
+        meaning: "How many full-length conversations fit in vLLM's memory for notes at once."
+        example: "The lesson prints no sample. The kit's numbers give at most (0.8 × 128 − 8) ÷ 1.07 = about 88; expect fewer after vLLM's own working memory. The Serving With vLLM video's log, from another machine, shows about 16."
+      - id: d9-spark-capacity
+        label: "Spark sweep: people at once before the first-token wait passes 1 second / total tok/s at that point"
+        hint: "The `Capacity line:` from `2_bench.sh` gives the users; read agg_tok_s on that row of the sweep table."
+        unit: "users / tok/s"
+        meaning: "How many people one Spark serves while 95 of 100 still get their first token within a second."
+        example: "The lesson prints no sample. For scale, the lab book's SGLang figure for this model: 368 tokens a second in total at 32 people."
+      - id: d9-spark-cached
+        label: "SGLang: cached_tokens / prompt_tokens"
+        hint: "The `usage:` line of the prefix test against port 30000."
+        unit: "tokens"
+        meaning: "How much of the prompt SGLang reused instead of reading again."
+        example: "cached_tokens close to prompt_tokens on the same line: nearly the whole opening (the script estimates about 3,028 tokens) was reused."
+
+    done: >-
+      vLLM and SGLang both answered from the Spark, `2_bench.sh` printed a sweep with a capacity line, SGLang's
+      usage line shows reused tokens, and `9_teardown.sh` freed the GPU. No Spark: read the page, answer the
+      checks, then tap Skip.
+
+    stuck:
+      - problem: "`set SPARK_IP in .env`."
+        fix: "Add `SPARK_IP=<the Spark's address>` to the `.env` file in `03-labs`, plus `SPARK_USER=<your login>` if it is not `nvidia`."
+      - problem: "SSH asks for a password, or says `Permission denied (publickey)`."
+        fix: "`remote.sh` needs SSH keys. Set them up once with `ssh-copy-id nvidia@<the Spark's address>` (with your own login if it differs), then try again."
+      - problem: "An image tag is not found."
+        fix: >-
+          Container tags change often. Look up the current GB10/arm64 tag (links are in the script comments). Then
+          replace the tag after `:-` in the `IMAGE=` line near the top of `1_vllm.sh` or `3_sglang.sh`, in your
+          copy on the Mac (`remote.sh` sends that file to the Spark). `remote.sh` passes only `HF_TOKEN`, so
+          `VLLM_IMAGE` or `SGLANG_IMAGE` set on your Mac never arrives.
+      - problem: "A model download fails with an access error."
+        fix: >-
+          It may be a gated model, one you must request on Hugging Face first. Request access, then put your token
+          in `.env` as `HF_TOKEN=…`; `remote.sh` passes it to the Spark.
+      - problem: "`2_bench.sh` says `python: command not found` or `No module named 'felab'`."
+        fix: "It runs on your Mac. From the `03-labs` folder, run `source .venv/bin/activate` first."
+      - problem: "The prefix test cannot connect to `http://:30000/v1`."
+        fix: "`$SPARK_IP` was empty in your terminal. Run `export SPARK_IP=<the Spark's address>`, or paste the command `3_sglang.sh` printed."
+      - problem: "`nvidia-smi` shows memory as N/A."
+        fix: "Normal on a Spark: its CPU and GPU share one memory, so the usual fields are blank. Use `free -h` on the Spark instead."
+
+    replace:
+      - find: "lessons 01, 03 and 06"
+        with: "lessons 01, 03 and 06 (Days 1, 3 and 5)"
+      - find: "lesson 05's KV maths"
+        with: "lesson 05's KV maths (Day 4)"
+      - find: "and set `VLLM_IMAGE` or `SGLANG_IMAGE`."
+        with: "and replace the tag after `:-` in the `IMAGE=` line near the top of `1_vllm.sh` or `3_sglang.sh`, in your copy on the Mac (`remote.sh` sends that file to the Spark). (`remote.sh` passes only `HF_TOKEN` to the Spark, so `VLLM_IMAGE` or `SGLANG_IMAGE` set on your Mac never arrives.)"
+      - find: "close to the preamble size on calls 2 and later."
+        with: "close to the preamble size on the extra call the script makes after its 12 timed calls."
+
+wrapup:
+  done: >-
+    Your notes hold two results. From step 1: how much of gpt-oss:20b is read per token, in GB and as a share.
+    From step 2: writing speeds with and without the draft model on structured and prose prompts, with acceptance
+    rates, and the Fireworks deployment deleted.
+  whiteboards:
+    - video: 07-offloading
+      q: >-
+        A customer asks: can we run a 405-billion-parameter model (Llama 3.1 405B) on H100 GPUs, which have 80 GB
+        each and come 8 to a server? 32 people use it at once, each with conversations of up to 8K tokens (8,192,
+        about 6,000 words). At what precision, and on how many GPUs?
+      given: >-
+        The model has 405 billion parameters (learned numbers). Each takes 2 bytes at 16 bits, 1 byte at 8 bits and
+        half a byte at 4 bits. The notes (KV cache) come on top. The field guide lists this model as 126 layers
+        (processing stages). Each layer stores 8 note sets of 128 numbers per token, in two kinds (keys and
+        values), at 2 bytes each. Add about 10% for the server's own working memory (the video's rule).
+      plain: >-
+        Not at 16 bits: the model alone is bigger than a full 8-GPU server. At 8 bits it fits on one 8-GPU server
+        with room for everyone's notes. At 4 bits it fits on 4 GPUs only if the notes are stored in 8 bits too, and
+        only if the customer's quality test passes.
+      picture: >-
+        The model is furniture sold in three sizes, and each GPU is a van. The full-size set will not fit in the
+        whole fleet of 8. The middle size fits in the fleet with room for everyone's boxes (the notes). The smallest
+        fits in 3 vans, but the 4th van takes all the boxes only if you pack them tighter.
+      steps:
+        - "Weights at 16 bits: 405 billion × 2 bytes = 810 GB. A server of 8 H100s holds 8 × 80 = 640 GB. 810 is more than 640: no."
+        - "Weights at 8 bits (FP8): 405 × 1 = 405 GB, which leaves 640 − 405 = 235 GB on 8 GPUs."
+        - "Weights at 4 bits: 405 × 0.5 = 202.5 GB, about 203. That fits on 4 GPUs (320 GB)."
+        - "Notes per token: 2 × 126 layers × 8 note sets × 128 numbers × 2 bytes = 516,096 bytes, about 0.52 MB."
+        - "Per conversation at 8,192 tokens: 516,096 × 8,192 = 4.23 GB. For 32 people: 32 × 4.23 = 135 GB."
+        - "8 bits on 8 GPUs, adding the 10% (× 1.1): (405 + 135) × 1.1 = 594 GB, under 640. Yes."
+        - "4 bits on 4 GPUs: (203 + 135) × 1.1 = 372 GB, over 320. No."
+        - "4 bits with the notes in 8 bits too (135 ÷ 2 = 68 GB): (203 + 68) × 1.1 = 298 GB, under 320. Yes."
+        - "Answer: 8 H100s at 8 bits; or 4 H100s at 4 bits with 8-bit notes, if the customer's own quality test passes."
+      note: >-
+        The video's table puts the notes for 32 people at 8K at about 40 GB. Worked from the field guide's settings
+        for this model they come to about 135 GB, so the steps use 135. The 8-GPU answer holds either way; the 4-GPU
+        answer needs the 8-bit notes.
+      kit_q: "Worked example · can we run 405B?"
+      kit_a: "8×H100 at FP8 — or 4×H100 at 4-bit if quality holds"
+      more: >-
+        The video's table: FP16 weights 810 GB, no (8×H100 = 640 GB); FP8 405 GB, yes on 8×H100; 4-bit 203 GB, yes
+        on 4×H100; "KV at 8K, 32 users ≈ 40 GB on top". With the field guide's config for Llama 3.1 405B (126
+        layers, 8 KV heads, head dim 128) the KV cache is 504 KiB per token in FP16, 4.23 GB per 8,192-token session
+        and 135 GB for 32 sessions (68 GB in FP8), about 3.4 times the video's figure. The FP8 plan survives with
+        room to spare; the 4-bit plan on 4×H100 needs FP8 KV or fewer sessions. The 8 GPUs of one server share
+        NVLink, about 900 GB/s on H100, so tensor parallelism across them is the usual split.
+      words:
+        - term: "Parameters"
+          def: "the model's learned numbers. Example: 405 billion here."
+        - term: "Notes (KV cache)"
+          def: "the model's memory of each conversation, kept for every token. Example: about 0.52 MB per token for this model."
+        - term: "Precision"
+          def: "how many bits store each number. Example: 16, 8 or 4 here."
+        - term: "H100"
+          def: "NVIDIA's data-center GPU, with 80 GB of memory."
+
+    - video: 13-scale-out
+      q: >-
+        A draft model's guesses are kept 80% of the time (acceptance rate α = 0.8), and it guesses 4 tokens a round
+        (k = 4). How many tokens does the big model produce per pass, what speed-up is that in practice, and what
+        happens at α = 0.4?
+      given: >-
+        Tokens per big pass = (1 − α^(k+1)) ÷ (1 − α), where α^(k+1) means α multiplied by itself k + 1 times. It
+        is the same as 1 + α + α² + ... + α^k: one token of the big model's own, plus, for each guess, the chance
+        that it and every guess before it are kept. Each round costs one big pass plus 4 guesses by the draft
+        model. Lesson 13's calculator counts each guess as a
+        tenth of a big pass, a 1-billion-parameter draft for an 8-billion one.
+      plain: >-
+        About 3.4 tokens per big pass instead of 1. After paying for the draft model's guesses, that is about 2 to
+        2.4 times faster. At α = 0.4 it drops to about 1.2 times: barely worth it.
+      picture: >-
+        Autocomplete on a phone: when it guesses 8 of 10 words right, you accept whole runs of words with one tap.
+        When it guesses 4 of 10, you stop to correct so often that it barely saves time. Unlike autocomplete, a wrong
+        guess never changes the text: the big model writes that token itself.
+      steps:
+        - "0.8^5 = 0.8 × 0.8 × 0.8 × 0.8 × 0.8 = 0.328."
+        - "Tokens per big pass: (1 − 0.328) ÷ (1 − 0.8) = 0.672 ÷ 0.2 = 3.36, about 3.4 (the video rounds to 3.3)."
+        - "If guessing were free, that would be 3.4 times faster (the video's ideal 3.3×)."
+        - "Guessing costs 4 × 0.1 = 0.4 of a big pass, so each round takes 1.4 passes of time."
+        - "Real speed-up: 3.36 ÷ 1.4 = 2.4 times. The video calls it about 2 times in practice."
+        - "At α = 0.4: 0.4^5 = 0.01, so (1 − 0.01) ÷ (1 − 0.4) = 0.99 ÷ 0.6 = 1.65 tokens per pass. That is the video's 1.6 times, before guessing costs."
+        - "After guessing costs: 1.65 ÷ 1.4 = 1.18, about 1.2 times: barely worth it."
+      note: >-
+        The video's "1.6 times at α = 0.4" is the ideal figure, before the draft model's cost; with lesson 13's cost
+        rule it is about 1.2 times. The lesson's sample table (up to 8 guesses a round, so not the same case): α
+        0.78 on structured prompts gave 1.9 times.
+      kit_q: "Worked example · speculation maths"
+      kit_a: "With an acceptance rate of eighty percent and four drafted tokens, expected tokens per big model pass is one minus zero point eight to the fifth, over one minus zero point eight, which is about three point three. So you get three point three tokens for one verification pass plus four cheap draft passes. Call it a two times speed up in practice."
+      more: >-
+        E = (1 − α^(k+1)) / (1 − α) is the expected number of tokens per target pass when each drafted token is
+        accepted independently with probability α: the accepted run plus one token from the target. `spec_math.py`
+        divides by (1 + k·c), with c = 0.1 for a 1B draft on an 8B target: 3.36 ÷ 1.4 = 2.4×. E itself is 3.36,
+        which the lesson rounds to 3.4 and the video to 3.3. The video's row "at α = 0.4: 1.6×" matches E (1.65), not
+        the cost-adjusted 1.18×.
+      words:
+        - term: "Acceptance rate (α)"
+          def: "the share of guesses the big model keeps. Example: 0.8."
+        - term: "k"
+          def: "tokens guessed per round. Example: 4."
+        - term: "Draft model"
+          def: "the small model that guesses. Example: a 1-billion-parameter model for an 8-billion one."
+        - term: "Verification pass"
+          def: "one big-model pass that checks all the guesses at once."
+
+glossary:
+  # New on Day 9
+  # Acceptance rate, Active parameters, MoE and TP use the Day 10 file's exact term and text (one entry site-wide).
+  - term: "Acceptance rate"
+    def: "the share of a draft model's guessed tokens the big model keeps; speculative decoding only pays when it is high."
+    example: "α (alpha) = 0.78 on structured prompts and 0.41 on prose in lesson 13's sample."
+  - term: "Active parameters"
+    def: "the numbers a mixture-of-experts model actually uses for each token, as opposed to all the numbers it stores."
+    example: "3.6 of gpt-oss:20b's 21 billion (17%)."
+  - term: "Adaptive speculative decoding"
+    def: "Fireworks' option that trains the draft model on a customer's own traffic, so more guesses are kept."
+    example: "the Batching & Scheduling video: the drafter trained on each customer's own traffic."
+  - term: "All-reduce"
+    def: "a network step where every GPU combines its partial results with all the others, so each ends up with the total."
+    example: "tensor parallelism does this inside every layer."
+  - term: "All-to-all"
+    def: "a network step where every GPU sends a different piece of data to every other GPU."
+    example: "moving each token to the GPUs that hold its experts."
+  - term: "arm64"
+    def: "the chip design used by Apple silicon and by the DGX Spark's processor; software must be built for it."
+    example: "container images tagged for GB10/arm64."
+  - term: "Batch size"
+    def: "how many requests share one pass over the model."
+    example: "20.5 tokens a second at batch 1 and 368 in total at batch 32 on a Spark (lab book)."
+  - term: "Container image (tag)"
+    def: "the packaged software a container starts from; the tag names its version."
+    example: "`nvcr.io/nvidia/vllm:25.09-py3` in `1_vllm.sh`."
+  - term: "Docker"
+    def: "the common tool for building and running containers."
+    example: "`docker run --gpus all …` starts vLLM on the Spark."
+  - term: "Draft model"
+    def: "a small, fast model that guesses the next few tokens for a big model to check."
+    example: "Llama 3.2 1B drafting for Llama 3.1 8B in lesson 13."
+  - term: "Expert"
+    def: "one specialist block inside a mixture-of-experts model; only the few the router picks are read for a token."
+    example: "lesson 12's picture: 2 to 4 specialists out of dozens per token."
+  - term: "Expert parallelism"
+    def: "placing different experts on different GPUs, so tokens travel to whichever GPU holds their chosen experts."
+    example: "the field guide's 4 experts on 4 GPUs."
+  - term: "Fabric (interconnect)"
+    def: "the links that join GPUs or whole machines so they can work on one model."
+    example: "two DGX Sparks joined by a 200-gigabit cable."
+  - term: "Fragmentation"
+    def: "memory lost in gaps too small to use."
+    example: "part of the about 10% on top of weights and notes."
+  - term: "Gated model"
+    def: "a model you must request access to on Hugging Face before you can download it."
+    example: "why lesson 14 asks for `HF_TOKEN`."
+  - term: "GB10"
+    def: "the DGX Spark's chip: an NVIDIA Grace CPU and Blackwell GPU in one package, arm64, with 128 GB of shared memory."
+    example: "about 273 GB/s of memory speed."
+  - term: "Gigabit (Gb)"
+    def: "a billion bits; 8 gigabits make 1 GB."
+    example: "a 200-gigabit link moves about 25 GB a second."
+  - term: "GiB"
+    def: "1,073,741,824 bytes (1,024 MiB), a little more than a GB."
+    example: "59 GiB = 63.4 GB."
+  - term: "gpt-oss-20b, gpt-oss-120b"
+    def: "two open mixture-of-experts models with about 21 and 117 billion parameters, of which only about 3.6 and 5.1 billion are used for each token. On Fireworks, gpt-oss-120b is billed per token (serverless); gpt-oss-20b no longer is (its model page, checked 27 September 2026: 'Serverless: Not supported'), but batch jobs still take it."
+    example: "gpt-oss:20b: 21 billion parameters, 3.6 billion active, a 13.8 GB file."
+  - term: "HF_TOKEN (Hugging Face token)"
+    def: "a personal key that lets scripts download the models your Hugging Face account may use."
+    example: "set in `.env`; `remote.sh` passes it to the Spark."
+  - term: "k (draft length)"
+    def: "how many tokens the draft model guesses per round."
+    example: "up to 8 in lesson 13's llama.cpp server, 4 on Fireworks."
+  - term: "Latency-bound"
+    def: "a workload where what matters is how fast each reply arrives, typical of one or a few people at a time."
+    example: "where speculative decoding helps most."
+  - term: "Llama 3.1 405B"
+    def: "a 405-billion-parameter Llama model with 126 layers (field guide)."
+    example: "810 GB of weights at 16 bits."
+  - term: "Load generator"
+    def: "a tool that sends many requests at set rates to test a server."
+    example: "`vllm bench serve` in `2b_vllm_bench.sh`."
+  - term: "Maximum concurrency (vLLM log)"
+    def: "vLLM's startup estimate of how many full-length conversations fit in its memory for notes: cache tokens ÷ the length cap."
+    example: "8,234 blocks × 16 tokens ÷ 8,192 = about 16 in the Serving With vLLM video."
+  - term: "MoE (mixture of experts)"
+    def: "a model split into many expert parts, of which only a few run for each token."
+    example: "gpt-oss:20b reads 3.6 of its 21 billion parameters per token."
+  - term: "Multi-node (scale-out)"
+    def: "running one model across more than one machine, to get more memory than one machine has."
+    example: "a 235-billion-parameter model on two Sparks at 11.7 tokens a second."
+  - term: "MXFP4"
+    def: "a 4-bit number format for model weights, supported on Blackwell GPUs such as the Spark's."
+    example: "gpt-oss 120B in MXFP4 is 59 GiB on disk."
+  - term: "N-gram"
+    def: "a run of n tokens in a row."
+    example: "a 3-gram is 3 tokens."
+  - term: "N-gram speculation"
+    def: "guessing the next tokens by copying what followed the same words earlier in the prompt; no draft model."
+    example: "`--ngram-speculation-length=3` on Fireworks."
+  - term: "NCCL"
+    def: "NVIDIA's library for moving data between GPUs, including all-reduce."
+    example: "`all_reduce_perf` tests the link between two Sparks in lesson 14's TWO_BOX.md."
+  - term: "NGC"
+    def: "NVIDIA's catalogue of ready-made containers for its GPUs."
+    example: "the vLLM image `1_vllm.sh` starts on the Spark."
+  - term: "NVLink"
+    def: "NVIDIA's very fast direct link between GPUs inside one server."
+    example: "about 900 GB/s on H100 (field guide)."
+  - term: "p99"
+    def: "the value 99 out of 100 requests stay under."
+    example: "`P99 TTFT` in vLLM's own benchmark."
+  - term: "PCIe"
+    def: "the standard slot connection between a computer's main board and a plug-in card such as a GPU; far slower than the GPU's own memory."
+    example: "why moving layers off the GPU is slow (lesson 12)."
+  - term: "perf_metrics"
+    def: "timing and speculation figures Fireworks returns with a reply when the request asks for them (`perf_metrics_in_response`)."
+    example: "the `fireworks perf_metrics sample:` line in lesson 13."
+  - term: "Pipeline bubble"
+    def: "time a GPU in a pipeline sits idle, waiting for work from the stage before it."
+    example: "too few requests in flight leave gaps in the line."
+  - term: "PP (pipeline parallelism)"
+    def: "giving each GPU a block of consecutive layers, so each token passes from one GPU to the next; it tolerates slower links but adds waiting."
+    example: "PP=2 across two linked Sparks (TWO_BOX.md)."
+  - term: "Predicted outputs"
+    def: "a Fireworks option where you send the expected answer, such as the original text of an edit, as the draft."
+    example: "sending the original document when asking for a small change."
+  - term: "Prose traffic"
+    def: "open-ended, creative requests whose next words are hard to guess."
+    example: "\"Write a poem about latency in the voice of a tired sea captain.\""
+  - term: "PyTorch"
+    def: "the Python library for model math that vLLM and many other AI tools are built on."
+    example: "a PyTorch and CUDA version clash is why the lab book avoids `pip install vllm` on the Spark."
+  - term: "Router (MoE)"
+    def: "the small part of a mixture-of-experts model that picks which experts handle each token."
+    example: "the receptionist in lesson 12's picture."
+  - term: "SSH"
+    def: "a secure way to log in to another computer over the network and run commands there."
+    example: "`remote.sh` runs each script on the Spark over SSH."
+  - term: "Structured traffic"
+    def: "requests whose answers follow a predictable form, such as JSON data, lists, code or extraction."
+    example: "lesson 13's 5 structured prompts."
+  - term: "Target model"
+    def: "the big model whose answer you want; it checks the draft model's guesses and decides every token."
+    example: "Llama 3.1 8B in lesson 13."
+  - term: "TP (tensor parallelism)"
+    def: "splitting each layer of a model across several GPUs that work on every token together."
+    example: "TP=2 on two H100s joined by NVLink in one server; they sync inside every layer, so it needs very fast links."
+  - term: "Token ID"
+    def: "the number a tokenizer gives each token; models compare these numbers, not the text."
+    example: "the big model checks the draft's token ids."
+  - term: "Tokenizer"
+    def: "the part of a model that cuts text into tokens and numbers them."
+    example: "Llama 3.1 8B and Llama 3.2 1B share one."
+  - term: "Total parameters"
+    def: "every parameter a model has; all of them must sit in memory, whether or not they are read for a token."
+    example: "21 billion for gpt-oss:20b, a 13.8 GB file."
+  - term: "Trap (exit trap)"
+    def: "a shell instruction that runs a clean-up command whenever a script ends, even on Ctrl+C."
+    example: "`fireworks_spec.sh` deletes its deployment this way."
+  - term: "Verification pass"
+    def: "one pass of the big model that checks all the draft's guesses at once, the way it reads a prompt."
+    example: "3.36 tokens per pass at α 0.8 with 4 guesses."
+  - term: "Vocabulary"
+    def: "the full list of tokens a tokenizer knows, each with its own number."
+    example: "the draft and the big model must share one."
+  # Also defined on earlier days: text copied verbatim from the first day that defines each term
+  - term: "4-bit, 8-bit, 16-bit"
+    def: "how many bits store each number; fewer bits, smaller model."
+    example: "a 405B model is 810 GB at 16-bit, 405 GB at 8-bit, about 203 GB at 4-bit."
+  - term: "Bandwidth (memory bandwidth)"
+    def: "how many GB per second memory delivers to the chip."
+    example: "DGX Spark and M4 Pro 273 GB/s, H100 3,350 GB/s."
+  - term: "Batching"
+    def: "serving several people with one pass over the model."
+    example: "32 people on a Spark: 368 tokens a second in total."
+  - term: "Blackwell"
+    def: "the NVIDIA GPU generation after H100, with built-in 4-bit math."
+    example: "the GPU half of the Spark's GB10 chip."
+  - term: "Block (KV block)"
+    def: "a fixed-size piece of note memory holding the notes for a few tokens; vLLM hands blocks out as conversations grow."
+    example: "8,234 blocks of 16 tokens in the Serving With vLLM video."
+  - term: "Cached tokens (cached_tokens)"
+    def: "input tokens the server reused instead of reading again; Fireworks reports them and bills them at a discount."
+    example: "SGLang reports them too with `--enable-cache-report`."
+  - term: "Capacity (of one replica)"
+    def: "the most people one copy of the server serves at once while keeping the speed promise."
+    example: "the sweep's `Capacity line:` on the Spark."
+  - term: "Ceiling (speed limit)"
+    def: "the fastest a model can write: memory speed ÷ model size (for a mixture-of-experts model, only the part it reads per token)."
+    example: "273 ÷ 8 = 34 tokens a second for an 8 GB model on a Spark."
+  - term: "Compute-bound"
+    def: "slowed by calculation speed rather than memory."
+    example: "prefill."
+  - term: "Concurrency (people served at once)"
+    def: "how many conversations the server runs at the same moment."
+    example: "18 at 8,192 tokens in lesson 14's check."
+  - term: "Concurrency sweep"
+    def: "the same test run at 1, 2, 4, 8, 16 and 32 people at once, then drawn as a curve."
+    example: "on the Spark, up to 64."
+  - term: "Container"
+    def: "a sealed package holding a program and the exact software versions it needs, so it runs the same on any machine."
+    example: "vLLM and SGLang run in containers on the Spark."
+  - term: "Context length (context, ctx)"
+    def: "the most tokens one conversation may hold."
+    example: "8K = 8,192 tokens."
+  - term: "Continuous batching"
+    def: "letting requests join and leave the shared group at every writing step, instead of waiting for the whole group to finish."
+    example: "why the Spark's sweep keeps rising past the Mac's."
+  - term: "CPU"
+    def: "the computer's general-purpose processor, slower than the GPU for model math."
+    example: "offloading layers to it is the last resort."
+  - term: "CUDA"
+    def: "NVIDIA's software layer that lets programs run on its GPUs."
+    example: "must match the driver and the server exactly."
+  - term: "CUDA graphs"
+    def: "a GPU speed-up that records a sequence of work once and replays it, instead of launching each piece separately."
+    example: "the version-clash workaround loses them, and 20 to 30% of throughput."
+  - term: "Decode"
+    def: "the writing phase, one token at a time, fetching the whole model for each (a mixture-of-experts model fetches only the part it uses)."
+    example: "84 tokens a second for Llama 3.1 8B in lesson 12's sample."
+  - term: "Dedicated deployment"
+    def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not."
+    example: "lesson 13's speculative deployment, deleted by its script."
+  - term: "Dense model"
+    def: "a model that uses all of its numbers for every token."
+    example: "Llama 3.1 8B."
+  - term: "DGX Spark"
+    def: "NVIDIA's desktop AI computer, with 128 GB of memory shared by its CPU and GPU."
+    example: "about 273 GB/s of memory speed; Day 9's optional step runs vLLM and SGLang on it."
+  - term: "Driver"
+    def: "the software that lets the operating system use a piece of hardware such as a GPU."
+    example: "`0_check.sh` prints its version."
+  - term: "Efficiency %"
+    def: "measured writing speed ÷ ceiling."
+    example: "20.5 ÷ 34 = 60% for Llama 3.1 8B at 8 bits on a Spark."
+  - term: "Engine (inference server)"
+    def: "the program that loads a model and answers requests."
+    example: "llama.cpp, vLLM, SGLang."
+  - term: ".env file"
+    def: "the settings file in the `03-labs` folder, holding defaults and your Fireworks key; it never leaves your Mac."
+    example: "`SPARK_IP` and `HF_TOKEN` go here for lesson 14."
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "the customer's own quality test before a 4-bit recommendation."
+  - term: "firectl"
+    def: "Fireworks' command-line tool for your account, quotas and deployments."
+    example: "`firectl deployment list` at the end of `fireworks_spec.sh`."
+  - term: "Fireworks"
+    def: "a cloud service that runs AI models and charges per use; one platform used in this course."
+    example: "lesson 13 measures speculation on one of its deployments."
+  - term: "Flag"
+    def: "an option typed after a command that changes how the program runs."
+    example: "`--draft-max 8`."
+  - term: "FP8"
+    def: "an 8-bit number format, 1 byte per number, with built-in math on H100."
+    example: "a 405B model is 405 GB in FP8."
+  - term: "GB"
+    def: "1,000,000,000 bytes."
+    example: "59 GiB = 63.4 GB."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "H100; on a Mac it shares memory with everything else."
+  - term: "GPU memory utilization (--gpu-memory-utilization)"
+    def: "the share of the GPU's memory vLLM may claim for the model and its notes."
+    example: "0.8 of 128 GB = 102 GB on the Spark."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "8 of them hold 640 GB."
+  - term: "Harness"
+    def: "one test script you can point at any server, so the numbers compare fairly."
+    example: "`2_bench.sh` points three of them at the Spark."
+  - term: "Head dim"
+    def: "how many numbers each note set holds per token."
+    example: "128 in Llama 3.1 405B."
+  - term: "Health endpoint"
+    def: "an address that answers once the server is ready to take requests."
+    example: "`1_vllm.sh` waits for `/health`."
+  - term: "Hugging Face"
+    def: "the public website where most open model files are shared."
+    example: "llama.cpp downloads the draft model from it."
+  - term: "K (in 8K, 32K, 128K)"
+    def: "1,024 when counting tokens."
+    example: "8K = 8,192 tokens."
+  - term: "Keys and values (K and V)"
+    def: "the two kinds of notes the model stores per token, per layer."
+    example: "the 2 in 2 × 126 × 8 × 128 × 2 bytes."
+  - term: "KV cache"
+    def: "the model's notes on the conversation so far (keys and values), so it does not reread everything for each new word."
+    example: "4.23 GB per 8,192-token conversation for Llama 3.1 405B."
+  - term: "KV cache dtype"
+    def: "the number format the notes are stored in; 8-bit instead of 16-bit halves their memory."
+    example: "`--kv-cache-dtype fp8` doubles vLLM's maximum concurrency."
+  - term: "KV head (note set)"
+    def: "one set of notes kept in each layer."
+    example: "8 per layer in Llama 3.1 405B."
+  - term: "Latency"
+    def: "how long someone waits."
+    example: "time to the first token."
+  - term: "Layer"
+    def: "one of the stacked processing stages each token passes through; each keeps its own notes."
+    example: "126 in Llama 3.1 405B."
+  - term: "Llama 3.1 8B, Llama 3 70B"
+    def: "the open models used in the lessons and videos, with 8 and 70 billion parameters."
+    example: "lesson 13's big model is Llama 3.1 8B."
+  - term: "llama.cpp"
+    def: "the open-source engine used on the Mac; `llama-server` answers requests, `llama-bench` times the engine alone."
+    example: "lesson 13 runs it with and without a draft model."
+  - term: "M4 Max, M4 Pro"
+    def: "Apple chips whose memory moves 546 and 273 GB/s."
+    example: "lesson 12's sample Mac is like an M4 Max."
+  - term: "make"
+    def: "a tool that runs named shortcuts listed in a file called `Makefile`."
+    example: "`make fw-check`."
+  - term: "Matrix math"
+    def: "multiplying large grids of numbers, the core work of a model."
+    example: "what checking a draft's guesses uses."
+  - term: "Max model length (--max-model-len)"
+    def: "vLLM's limit on how many tokens one conversation may hold, which caps that conversation's notes."
+    example: "8,192 in `1_vllm.sh`."
+  - term: "Memory-bound (bandwidth-bound)"
+    def: "slowed by how fast memory delivers data."
+    example: "decode."
+  - term: "Notes"
+    def: "this course's plain word for the KV cache."
+    example: "about 0.52 MB of notes per token for Llama 3.1 405B."
+  - term: "NVFP4"
+    def: "NVIDIA's 4-bit number format with built-in math on Blackwell."
+    example: "the Qwen3 235B run on two Sparks."
+  - term: "NVIDIA"
+    def: "the company whose GPUs run most data-center AI."
+    example: "maker of the H100 and the DGX Spark."
+  - term: "Offload (-ngl)"
+    def: "choosing how many of the model's layers run on the GPU; the rest run on the slower CPU."
+    example: "the Fitting Big Models video: the last resort, about 10 times slower."
+  - term: "Ollama"
+    def: "a one-command model server built on llama.cpp that chooses most settings for you."
+    example: "`ollama pull gpt-oss:20b`."
+  - term: "Order of magnitude"
+    def: "about 10 times."
+    example: "how much slower offloading to the CPU is."
+  - term: "p95"
+    def: "the value 95 out of 100 requests stay under."
+    example: "the sweep's 1,000 ms promise is for p95 TTFT."
+  - term: "PagedAttention"
+    def: "vLLM's way of handing out note memory in small pages as a conversation grows, instead of reserving the maximum."
+    example: "why vLLM holds many users on the Spark."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "405B = 405 billion."
+  - term: "pip, wheel"
+    def: "pip installs Python packages; a wheel is a ready-built package file."
+    example: "never `pip install vllm` on the Spark itself."
+  - term: "Port"
+    def: "a numbered door on a computer where one server program listens for requests."
+    example: "vLLM 8000 and SGLang 30000 on the Spark; llama.cpp 8080 on the Mac."
+  - term: "Precision"
+    def: "how many bits each stored number gets."
+    example: "16, 8 or 4 bits for the 405B model."
+  - term: "Preamble"
+    def: "the long fixed opening sent with every request: instructions, tool list and rules."
+    example: "3,028 tokens in Day 5's script."
+  - term: "Prefill"
+    def: "the reading phase; the model reads the whole prompt at once."
+    example: "about 23,000 tokens a second for the 235B model on two Sparks."
+  - term: "Prefix caching (prompt caching)"
+    def: "the server keeps its notes on a prompt's opening and reuses them when the next request starts the same way."
+    example: "`--enable-prefix-caching` in `1_vllm.sh`."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "lesson 13's 10 test prompts."
+  - term: "Quantization (quantize)"
+    def: "storing numbers with fewer bits."
+    example: "the first option when a model does not fit."
+  - term: "RadixAttention"
+    def: "SGLang's prefix cache: it keeps saved notes in a tree of shared openings and orders requests to reuse them."
+    example: "why SGLang suits branching agent traffic."
+  - term: "RAM (memory)"
+    def: "the computer's working memory, where the model must sit while it runs."
+    example: "gpt-oss:20b needs its whole 13.8 GB file in it."
+  - term: "Request"
+    def: "one message sent to the model for an answer."
+    example: "64 made-up requests in `2b_vllm_bench.sh`."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "vLLM on the Spark."
+  - term: "SGLang"
+    def: "a fast open-source server for NVIDIA GPUs that reuses shared prompt openings."
+    example: "port 30000 on the Spark in lesson 14."
+  - term: "Speculative decoding"
+    def: "a small draft model guesses several tokens and the big model checks them all in one pass; the output does not change."
+    example: "Day 9 measures when it pays."
+  - term: "Speed-up (speedup_x)"
+    def: "how many times faster: the slow time divided by the fast one."
+    example: "118 ÷ 62 = 1.9 with speculation on structured prompts."
+  - term: "Startup log"
+    def: "the lines a server prints as it starts, including how much memory it set aside."
+    example: "vLLM's `Maximum concurrency` line."
+  - term: "Tensor cores"
+    def: "the parts of an NVIDIA GPU built for fast matrix math."
+    example: "the Spark's are 5th-generation."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "`kill %1` stops this terminal's first background job."
+  - term: "Throughput"
+    def: "total output across everyone at once."
+    example: "368 tokens a second at 32 people on a Spark."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "1,000 tokens is roughly 750 words."
+  - term: "Tokens per second (tok/s)"
+    def: "how many tokens are written each second."
+    example: "84 for Llama 3.1 8B in lesson 12's sample."
+  - term: "TTFT (time to first token)"
+    def: "how long until the first token (word piece) of the reply appears."
+    example: "`P99 TTFT` in vLLM's own benchmark."
+  - term: "Unified memory"
+    def: "one pool of memory shared by a Mac's CPU and GPU."
+    example: "the Spark works the same way, with 128 GB."
+  - term: "Usage block"
+    def: "the token counts a server returns with an answer."
+    example: "SGLang's `usage:` line with cached_tokens."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "`2_bench.sh` needs it on your Mac."
+  - term: "vLLM"
+    def: "an open-source engine for NVIDIA GPUs built for many users at once."
+    example: "port 8000 on the Spark in lesson 14."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "810 GB for a 405B model at 16 bits."

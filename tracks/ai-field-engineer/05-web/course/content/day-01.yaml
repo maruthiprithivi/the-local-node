@@ -1,0 +1,802 @@
+# Day 1 content: Guardrails and first calls. Plain-language text for the course pages (spec section 3).
+# Kit sources (paths from the kit root): 03-labs/README.md, README.md, 03-labs/Makefile, 03-labs/.env.example,
+# 03-labs/scripts/smoke_test.sh, 03-labs/felab/{mock_server,measure,hardware,targets}.py,
+# 03-labs/lessons/00-setup/*, 03-labs/lessons/01-latency-harness/*, 03-labs/pyproject.toml,
+# 03-labs/lessons/04-quantization/quant_bench.sh (line 6, about 4.8 bits per weight),
+# 04-video-source/src/narration.json ("inference-101", lines 2-159),
+# 02-lab-book/field-engineer-lab-book.html (deliverables 537-541, on-demand scale-to-zero 655, #cost 712-725,
+# guardrail items 1570-1577, prices 1600-1612), 02-lab-book/inference-field-guide.html (lines 624, 628, 632-635).
+# Live source, checked 2026-09-27: https://fireworks.ai/models/fireworks/gpt-oss-20b "Serverless: Not supported", so
+#   compare_models.sh's gpt-oss-20b row fails on its warm-up call (bench_ttft.py line 53) and the loop carries on.
+#   Requests: 3 models x (1 warm-up + 5) + long prompt (1 + 3) = 22; with that row failing 6 + 1 + 6 + 4 = 17.
+# Shared glossary terms use the same definition text as days 2, 3 and 5 to 11 (lowercase first letter).
+
+day: 1
+tile: "Put a spending cap in place, then time how fast models reply"
+
+overview:
+  today: >-
+    Get the course code running on your Mac with a practice server: a free stand-in for a real AI model that
+    gives made-up replies with realistic timing. Then put a spending cap on Fireworks, the cloud service that
+    runs AI models for a fee. Finally, time how fast models answer: the wait for the first word, and the pace
+    after it.
+  example: >-
+    Imagine asking a support assistant for help with a refund. Before answering, it reads the company rules and
+    your question; then it writes its reply piece by piece. In the video's example, you wait less than a second
+    for the reply to start, but more than six seconds for it to finish. Today you will measure those two waits
+    separately, so you can tell a customer which part needs speeding up.
+  deliverable: >-
+    Your own timing table, saved in `results/01-latency.csv`: how long a reply takes to start and how quickly
+    it appears after that, for a model on your Mac and for models on Fireworks. Step 3 explains a model in the
+    script that is no longer available there.
+  expected: >-
+    In the lesson's Mac test, a long message makes the reply take much longer to start than a short question.
+    Once the reply starts, its words appear at almost the same pace. Your numbers will differ, but that split
+    tells you whether to investigate the reading stage or the writing stage.
+  before:
+    - title: "An Apple-silicon Mac (M1 or later) with more than 5 GB of free disk space."
+      body: >-
+        Step 2 downloads your first real model, Llama 3.1 8B (8 billion learned numbers, each stored in about
+        4 bits, half a byte): about 4.9 GB. The tools installed in steps 1 and 2 need room on top of that. The
+        setup script is for Macs with Apple's own chips; on an older Intel Mac, MLX (Apple's tool for running
+        models on its chips) will not work.
+    - title: "Python 3.10 or newer, and Homebrew."
+      body: >-
+        The course code needs Python 3.10 or later. Step 2's setup script installs its tools with
+        Homebrew (the Mac's usual installer for developer tools) and stops if Homebrew is missing.
+      command: "python3 --version && brew --version"
+      after: >-
+        If `brew` is not found, install Homebrew from brew.sh, then run the 'Next steps' lines it prints at
+        the end; without them `brew` is still not found. If Python says 3.9 or older, run `brew install python`,
+        open a new Terminal window and check again.
+    - title: "A Fireworks account, for step 3."
+      body: >-
+        Until you add a payment method, Fireworks gives you $1 of credit and at most 10 requests a minute.
+        Step 3 sends about 17 requests in quick succession (22 if all three of its models answered), so step
+        2's checklist has you buy a small prepaid credit (item 5). Step 2 also sets the spending cap first;
+        step 3 costs about 1 to 2 cents.
+  feeds: >-
+    When someone says an AI feature is slow, your timing table helps you ask whether the wait is before or
+    after the reply starts. Day 3 adds how many people one server can handle. Together those measurements
+    become evidence for the hardware recommendation you will write on Day 10.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------
+  # Step 1: Get the code, run it offline (generated page get-the-code)
+  # ---------------------------------------------------------------------------------------------
+  d1-s1:
+    why: >-
+      Download the course code and check that it works on your Mac. A practice server (a free stand-in for a
+      real AI model) lets you test everything before any real model or money is involved.
+    why_example: >-
+      A quick check of everything (the smoke test) runs the code of 16 of the kit's 19 lessons in about
+      2 minutes. It is offline and free: the practice server stands in for a real model.
+    videos:
+      01-inference-101:
+        in_this_video: "Why every AI reply has two phases, reading the prompt and writing the answer, and the numbers customers feel, starting with the wait for the first word and the pace after it."
+        key_points:
+          - point: "The model reads your whole prompt in one pass, then writes its answer one token (word piece) at a time."
+            detail: >-
+              Reading is called prefill; writing is called decode. In the video's support assistant, reading
+              6,200 tokens takes 0.78 seconds and writing 300 tokens takes 6.6 seconds.
+          - point: "The wait for the first word comes from reading and from waiting in line. The pace after that comes from writing."
+            detail: >-
+              These are TTFT (time to first token) and ITL (inter-token latency, the gap between tokens). At
+              22 ms (thousandths of a second) per token, a reply types about 45 tokens a second:
+              1,000 ms ÷ 22 ms = 45.
+          - point: "Before you measure anything, agree with the customer on the request's shape and on which percentile counts (for example p95: the time 95 of 100 requests stay under)."
+            detail: >-
+              The shape is how many tokens go in and come out. A support assistant's 6,200-token prompt takes
+              0.78 s to read, and reusing its unchanging part (prompt caching) cuts that to about 0.12 s. A code
+              completion (an editor suggesting the next lines of code) reads its 200 tokens in 25 ms, so the
+              same trick saves almost nothing there.
+    plain:
+      lead: >-
+        The download is the course's code: a small shared toolkit and one folder of scripts per lesson. It
+        includes a practice server, a stand-in for a real AI model that runs on your Mac. It replies with
+        made-up words but copies a real model's timing: a wait before the first word, then a steady pace. So
+        you can check everything before you download a model or pay for one.
+      picture: >-
+        A flight simulator. The controls, the checklists and the timings work like the real plane, but
+        nothing leaves the ground and a crash costs nothing. Where it differs: its timings are set by hand,
+        so it teaches the pattern, not your Mac's real speed.
+      numbers_source: "the practice server's settings, felab/mock_server.py, and scripts/smoke_test.sh"
+      numbers:
+        - "It runs on your own Mac at the address `localhost:9000` (localhost means this computer; 9000 is the numbered door it listens on). Nothing leaves the machine and nothing is billed."
+        - "It writes one token (word piece) every 18 ms (thousandths of a second). A second is 1,000 ms, so 1,000 ÷ 18 = about 56 tokens per second."
+        - "It reads prompts at 2,500 tokens per second, plus a fixed 15 ms per request. An 8,000-token prompt: 8,000 ÷ 2,500 = 3.2 s = 3,200 ms, plus 15 ms, so about 3,200 ms before the first word."
+        - "It has 8 seats (slots): 8 requests are served at once, and a 9th waits in line. Day 3 uses that."
+        - "The smoke test runs 16 of the kit's 19 lessons offline with it, about 2 minutes in all."
+      words:
+        - { term: "Practice server (mock)", def: "the kit's stand-in server with realistic behaviour and made-up numbers. Example: it writes a token every 18 ms." }
+        - { term: "Virtual environment (venv)", def: "a private set of Python add-ons for one folder, so nothing else on your Mac changes. Example: the `.venv` folder inside `03-labs`." }
+        - { term: "Token", def: "a chunk of text, about three quarters of a word. 1,000 tokens is roughly 750 words." }
+        - { term: "Smoke test", def: "a quick run of everything to prove the setup works before real use. Example: `make smoke`, about 2 minutes." }
+    done: "`make smoke` finishes, after about 2 minutes, with the line 'smoke test passed'."
+    stuck:
+      - problem: "`make smoke` stops partway with an error."
+        fix: >-
+          Scroll up to the last heading it printed (for example '05 kv'): the error under it names the
+          problem, and the rows below cover the usual ones. `make smoke` starts the practice server itself when
+          none is running. If `make check` then shows mock down, start it with `make mock &` and read the error
+          it prints.
+      - problem: "'No module named felab', 'No module named openai' or 'python: command not found'."
+        fix: >-
+          The virtual environment is off, or the install did not finish. From the `03-labs` folder run
+          `source .venv/bin/activate`, then `pip install -r requirements.txt && pip install -e .` again. Every new
+          Terminal window needs the `source` line.
+      - problem: "pip says the package 'requires a different Python'."
+        fix: >-
+          Your `python3` is older than 3.10, the minimum the code needs. Install a current one with
+          `brew install python`, open a new Terminal window, delete the old environment with `rm -rf .venv`,
+          and repeat part 2 on this page (Create a virtual environment and install).
+      - problem: "'Address already in use' when you start the practice server."
+        fix: >-
+          One is already running, from earlier or in another window, and it keeps serving. Check with
+          `make check`: if mock says UP, carry on.
+      - problem: "`make` is not found, or a window asks to install command line developer tools."
+        fix: >-
+          Accept the install: Apple's command line tools include `make`. Or run `xcode-select --install`,
+          then try again.
+    body: |
+      Everything below runs in **Terminal**, the Mac app for typing commands (Applications, then Utilities). Copy each block, paste it and press Return.
+
+      ### Part 1. Download and unzip the code
+
+      [Download the code (03-labs.zip)](/downloads/03-labs.zip). Double-click the file in your Downloads folder: the Mac unzips it into a folder named `03-labs`. If a `03-labs` folder is already there (Safari often unzips downloads for you), skip the double-click. It holds code and small data files only. Models download later, in the steps that need them.
+
+      Open Terminal and move into the folder. `cd` (change directory) moves Terminal into a folder:
+
+      ```bash
+      cd ~/Downloads/03-labs
+      ```
+
+      Every command in this course runs from this folder, unless a lesson's own commands move into a lesson folder with `cd`. If you put the folder somewhere else, `cd` there instead.
+
+      ### Part 2. Create a virtual environment and install
+
+      ```bash
+      python3 -m venv .venv && source .venv/bin/activate
+      pip install -r requirements.txt && pip install -e .
+      ```
+
+      The first line creates a **virtual environment**: a private set of Python add-ons for this folder only, so nothing else on your Mac changes. While it is on, `(.venv)` shows at the start of the line where you type commands. The second line installs what the course needs:
+
+      - `openai`: code that sends requests to model servers.
+      - `jsonschema`: checks data against a format.
+      - `matplotlib`: draws charts.
+      - `mlx-lm`: Apple's tool for running models on its chips.
+
+      Then `pip install -e .` installs `felab`, the course's own toolkit that every lesson uses.
+
+      **While it installs, watch Inference 101** at the top of this page (3 minutes).
+
+      In every new Terminal window, turn the environment back on before you run anything:
+
+      ```bash
+      cd ~/Downloads/03-labs && source .venv/bin/activate
+      ```
+
+      ### Part 3. Create your settings file
+
+      ```bash
+      cp .env.example .env
+      ```
+
+      `.env` holds your settings. It already has the line `FIREWORKS_API_KEY=fw_xxxxxxxxxxxxxxxx`, where the x's are a placeholder. In today's third step, Measure TTFT and ITL, you replace everything after the `=` with your own Fireworks key. The file stays on your Mac: never share it or upload it anywhere.
+
+      ### Part 4. Start the practice server and run the smoke test
+
+      ```bash
+      make mock &          # the practice server, on port 9000 of this Mac
+      make smoke           # every offline lesson, end to end, about 2 minutes
+      ```
+
+      `make mock &` starts the practice server and keeps it running in the background: the `&` lets you type the next command in the same window. It prints a line starting `mock LLM on http://localhost:9000/v1`.
+
+      `make smoke` then runs 16 of the kit's 19 lessons, offline and free, with the practice server standing in for a real model. It prints a heading for each stage and should end with **smoke test passed**.
+
+      Leave the practice server running: the next step, Set up your Mac and the spend cap, uses it too. To stop it later, run `kill %1` in the same window, or close the window.
+
+  # ---------------------------------------------------------------------------------------------
+  # Step 2: lesson 00-setup (Set up your Mac and the spend cap)
+  # ---------------------------------------------------------------------------------------------
+  d1-s2:
+    why: >-
+      Install the programs that run models on your Mac, and read its two limits: memory size and memory
+      speed. Then cap your Fireworks spending before anything can bill.
+    why_example: >-
+      A dedicated GPU on Fireworks (a chip that runs AI models, reserved for you alone) bills about $8 an hour
+      while it is up, busy or idle. By default it stops billing only after a full hour with no requests. That
+      idle hour alone, $8, is more than half of the whole course's Fireworks budget (well under $15). All of
+      step 3 costs about 1 to 2 cents.
+    start_first:
+      command: |
+        bash lessons/00-setup/setup_mac.sh
+        source .venv/bin/activate
+        ollama serve & sleep 2 && ollama pull llama3.1:8b
+      note: >-
+        Run it from the `03-labs` folder. The script installs Ollama, llama.cpp and MLX (three programs that
+        run models on a Mac) and is safe to run twice. The last line starts Ollama and downloads Llama 3.1 8B,
+        about 4.9 GB. This window stays busy until the download ends: open a second Terminal window
+        (Command-N) for the spend-cap checklist on this page, and in it first run
+        `cd ~/Downloads/03-labs && source .venv/bin/activate`. The lesson's own commands below repeat these
+        lines: skip the ones you have already run.
+    plain:
+      lead: >-
+        On a Mac, the model shares one pool of memory with every app you have open, so plan on it using about
+        70% at most. How fast that memory delivers data sets how fast the model can write. The check script
+        prints both numbers. On Fireworks, a GPU reserved for you bills by the hour even when nobody uses it,
+        so the spending cap goes on first.
+      picture: >-
+        A kitchen with one storeroom shared by everyone. The cook's recipe book (the model) must fit there
+        next to everyone else's supplies (your other apps). Before every dish (every token), the whole book
+        comes over on a conveyor belt. So the belt's speed caps the pace, however quick the cook is.
+      numbers_source: "lesson 00's sample Mac (36 GB, 273 GB per second) and the lab book's spend-control section"
+      numbers:
+        - "Memory budget: 0.7 x 36 GB = 25.2 GB, about 25 GB for the model plus its notes (the running record it keeps of each conversation, which Day 4 measures)."
+        - "Your first model, Llama 3.1 8B stored at 4 bits: 4.9 GB, about a fifth of that budget."
+        - "Writing-speed limit: each token needs the whole 4.9 GB model moved from memory once. 273 GB per second ÷ 4.9 GB = about 56 tokens (word pieces) per second at most, about 42 words."
+        - "Fireworks, paid per token (serverless): all of step 3 costs about 1 to 2 cents."
+        - "Fireworks, a GPU reserved for you (a dedicated deployment): about $8 an hour while it is up, used or not. By default it stops after an hour with no requests; never count on that, delete it in the same sitting."
+        - "The whole course costs well under $15 on Fireworks if nothing is left running. One forgotten dedicated GPU, if it stays up, passes that in under 2 hours (15 ÷ 8 = 1.9)."
+      words:
+        - { term: "Unified memory", def: "one pool of memory shared by the Mac's main processor (CPU) and its graphics processor (GPU). Example: the model and your browser share the same 36 GB." }
+        - { term: "Bandwidth (memory bandwidth)", def: "how many GB per second memory delivers to the chip. Example: 273 GB/s in the lesson's sample." }
+        - { term: "Serverless", def: "Fireworks' shared, always-on models, billed per token you send and receive. Example: step 3 costs about 1 to 2 cents." }
+        - { term: "Dedicated deployment", def: "a GPU reserved for you, billed by the second at an hourly rate while it is up, used or not. Example: about $8 an hour." }
+    run:
+      - cmd: "bash lessons/00-setup/setup_mac.sh"
+        note: >-
+          Installs Ollama and llama.cpp with Homebrew, then the same virtual environment and add-ons as
+          step 1 (MLX among them). It skips anything already installed. **Look for** 'Done. Next:' at the end.
+      - cmd: "source .venv/bin/activate"
+        note: "Turns the virtual environment on in this window: `(.venv)` shows at the start of the line where you type. Needed in every new Terminal window."
+      - cmd: "python lessons/00-setup/check_env.py"
+        note: >-
+          Prints your chip, memory and memory speed, then which model servers answer. **Look for** your
+          bandwidth and the writing-speed limit after it (bandwidth ÷ 4.9 GB). Ollama says down until it runs.
+      - cmd: "ollama serve &"
+        note: >-
+          Starts Ollama, the easiest of the three programs, in the background; its log lines may scroll by.
+          If it says the address is already in use, Ollama is already running: carry on.
+      - cmd: "ollama pull llama3.1:8b"
+        note: "Downloads Llama 3.1 8B stored at 4 bits, about 4.9 GB. Do the spend-cap checklist in a second Terminal window while it runs."
+      - cmd: "python lessons/00-setup/check_env.py"
+        note: "The same check, after the download. **Look for** UP at the end of the ollama line."
+      - cmd: "python -m felab.mock_server &"
+        note: >-
+          Starts the practice server from step 1 in the background. If it is still running from step 1, you
+          see 'Address already in use': that is fine, the first one keeps serving.
+      - cmd: "bash lessons/00-setup/fireworks_guardrails.sh"
+        note: >-
+          Checks your Fireworks account: who you are signed in as, any dedicated deployments (they bill by the
+          hour) and any training jobs. It needs firectl, Fireworks' command-line tool, installed and signed in
+          (checklist item 2). **Look for** an empty deployment list. `make fw-check` runs the same script.
+    see: >-
+      You also see your chip's name and one row per model server. llamacpp and mlx say down until Day 2, and
+      spark (a separate NVIDIA machine) matters only on Day 9's optional step. fireworks already says 'key set',
+      but that is the placeholder in `.env`: your real key goes in at step 3. The bandwidth line ends with your
+      writing-speed limit, bandwidth ÷ 4.9 GB (56 tokens per second at 273 GB/s). A Mac sold as 36 GB shows
+      about 38.7 GB: the script counts a GB as 1,000,000,000 bytes, and Apple counts it as 1,073,741,824.
+    checks:
+      - q: "Your Mac has 36 GB of memory. Roughly how big a model, stored at 4 bits per number, can it run comfortably?"
+        plain: >-
+          About a 40-billion-number model (40B). That fills the whole budget of about 25 GB, so there is little
+          room left for the model's notes on each conversation.
+        picture: >-
+          Flatmates share one fridge. You can take about 70% of it before everyone else's food gets squeezed out.
+          Fill your whole share with one giant cake and there is no room for the leftovers each meal adds (the
+          model's notes).
+        numbers_source: "lesson 00, and the 4.9 GB model from Day 1's setup step"
+        numbers:
+          - "Budget: 0.7 x 36 GB = 25.2 GB, about 25 GB for the model and its notes."
+          - "Size per billion numbers at 4 bits: Llama 3.1 8B is 4.9 GB, so 4.9 ÷ 8 = about 0.61 GB per billion."
+          - "Biggest model: 25 ÷ 0.61 = about 41 billion numbers, so about a 40B model."
+          - "Room left for notes: almost none. Day 4 shows one long conversation's notes can outgrow the model itself."
+        words:
+          - { term: "Parameters (8B, 40B)", def: "the model's learned numbers, also called weights. Example: 8B = 8 billion." }
+          - { term: "4-bit", def: "each number stored in 4 bits, half a byte, plus a little extra. Example: an 8B model is 4.9 GB at 4-bit." }
+          - { term: "Dense model", def: "a model that uses all of its numbers for every token. Example: Llama 3.1 8B." }
+          - { term: "Notes (KV cache)", def: "the model's memory of each conversation so far, kept in the same memory as the model. Example: Day 4 measures it." }
+        more: >-
+          0.7 x 36 = 25.2 GB for weights and KV cache together. Real 4-bit files (Q4_K_M) carry per-block scales
+          and keep some tensors at higher precision, so Llama 3.1 8B at 4 bits is 4.9 GB (about 4.8 bits per
+          weight, lesson 04), not the 4.0 GB that 0.5 bytes x 8B would give. 25.2 ÷ 0.61 = about 41B parameters,
+          so about a 40B dense model, which leaves almost no KV-cache room. `check_env.py` prints memory in
+          billions of bytes (a 36 GB Mac shows 38.7), so the 70% rule is a rough budget either way.
+      - q: "Why does Day 1's check script (`check_env.py`) print memory speed (bandwidth) rather than how many GPU cores (the chip's calculating units) you have?"
+        plain: >-
+          Because memory speed caps how fast the model writes. For each token (word piece) the chip must fetch
+          the whole model from memory once, and that fetching is slower than the math.
+        picture: >-
+          A very fast cook needs the whole recipe book carried over on a conveyor belt before every dish.
+          More cooks (more cores) would stand waiting; only a faster belt gets dishes out sooner.
+        numbers_source: "lesson 00's sample Mac and felab/hardware.py"
+        numbers:
+          - "Each token needs the whole 4.9 GB model fetched once."
+          - "At 273 GB per second: 273 ÷ 4.9 = about 56 tokens per second, at most."
+          - "Real runs land at 60 to 85% of that limit (felab/hardware.py); Day 4 checks it on your Mac."
+          - "A Mac whose memory moves 546 GB per second (the faster M4 Max) has twice the limit: 546 ÷ 4.9 = about 111."
+        words:
+          - { term: "Decode", def: "the writing phase: one token at a time, fetching the whole model for each." }
+          - { term: "Bandwidth", def: "how many GB per second memory delivers to the chip. Example: 273 GB/s." }
+          - { term: "GPU cores", def: "the many small calculating units inside a GPU. Example: they do the math, but on a Mac they mostly wait for memory while writing." }
+          - { term: "Compute-bound", def: "slowed by calculation speed rather than memory. Example: reading the prompt (prefill)." }
+        more: >-
+          At batch size 1, each decode step streams every weight once and does only about two floating-point
+          operations per weight, far less than the GPU could compute in that time. So the ceiling is
+          bandwidth ÷ bytes read per token (felab/hardware.py), and measured decode typically reaches 60 to 85%
+          of it. Prefill is the opposite: it reuses each weight across many prompt tokens, so compute sets its pace.
+          Where a chip ships in two bandwidth versions (M3 Max, M4 Max), hardware.py lists the faster one.
+    say:
+      ask: "How big a model can this machine run, and how fast?"
+      means:
+        - phrase: "On unified memory"
+          meaning: "On a Mac, the main processor (CPU) and the graphics processor (GPU) share one pool of memory; the GPU has none of its own."
+        - phrase: "model size competes with everything else on the box"
+          meaning: "The model sits in the same memory as your browser and other apps ('the box' is the machine), so it cannot have all of it."
+        - phrase: "I size to about 70% of RAM"
+          meaning: "RAM is the computer's working memory. I plan for the model and its notes to use at most 70% of it: about 25 GB on a 36 GB Mac."
+        - phrase: "and check the bandwidth"
+          meaning: "I look up how fast memory delivers data, for example 273 GB per second."
+        - phrase: "before I promise a tokens-per-second number"
+          meaning: "Only then do I quote a writing speed. The ceiling is bandwidth ÷ model size: 273 ÷ 4.9 = about 56 tokens per second."
+    fields:
+      - id: d1-mac-ram-gb
+        label: "Your Mac's memory (GB)"
+        hint: "Apple menu, About This Mac, the Memory line. `check_env.py` prints a slightly bigger number (38.7 for a 36 GB Mac) because it counts a GB as a billion bytes."
+        unit: "GB"
+        meaning: "How much model fits: plan on about 70% of it for the model and its notes."
+        example: "36"
+      - id: d1-mac-bandwidth
+        label: "Memory speed, bandwidth (GB/s)"
+        hint: "The bandwidth line of `check_env.py`. M3 Max and M4 Max chips come in two memory speeds and the script shows the faster one, so confirm your exact model on Apple's tech specs page and write that figure. If it says unknown, look it up there too."
+        unit: "GB/s"
+        meaning: "How fast memory feeds the chip. It caps how fast any model can write."
+        example: "273"
+      - id: d1-ceiling-8b
+        label: "Writing-speed limit for Llama 3.1 8B at 4 bits (tokens/s)"
+        hint: "Work it out from the bandwidth you wrote down: bandwidth ÷ 4.9. The script prints it at the end of the bandwidth line, using the faster speed on an M3 Max or M4 Max."
+        unit: "tok/s"
+        meaning: "The fastest your Mac can write with the 4.9 GB model. Real runs reach 60 to 85% of it."
+        example: "56 (273 ÷ 4.9)"
+    done: >-
+      The check shows mock UP and ollama UP. All 7 spend-cap items are ticked (item 5 means buying a small
+      prepaid credit, which step 3 and later days spend from). `fireworks_guardrails.sh` shows an empty
+      deployment list.
+    stuck:
+      - problem: "`setup_mac.sh` stops with 'Install Homebrew first'."
+        fix: "Install Homebrew from brew.sh, run the 'Next steps' lines it prints at the end, then run the script again. It skips anything already installed."
+      - problem: "`check_env.py` says 'bandwidth unknown (not an Apple chip)' on an Apple Mac."
+        fix: >-
+          Your chip is newer than the kit's list (felab/hardware.py knows M1 to M4 and the base M5). Look up your
+          chip's memory bandwidth on Apple's tech specs page and work out the limit yourself: bandwidth ÷ 4.9.
+      - problem: "`ollama pull` says it could not connect."
+        fix: "The Ollama server is not running yet. Run `ollama serve &`, wait two seconds, then pull again."
+      - problem: "`fireworks_guardrails.sh` says 'firectl is not installed'."
+        fix: "Install it with `brew tap fw-ai/firectl && brew install firectl`, then run `firectl signin`, and run the script again."
+      - problem: "`firectl whoami` fails, or the script says 'Run: firectl signin'."
+        fix: "Run `firectl signin` (it opens a browser to log in), then run the script again."
+      - problem: "A firectl command rejects its options."
+        fix: >-
+          Commands change. Run it with `--help` (for example `firectl quota update --help`) and follow what it
+          shows. The Fireworks console's billing page also has usage limits.
+    replace:
+      - find: "# the offline mock (every lesson works against it)"
+        with: "# the offline practice server (most lessons can rehearse against it)"
+      - find: "# Fireworks — only when you reach lesson 01b"
+        with: "# Fireworks: run after the spend-cap checklist on this page (before step 3)"
+
+  # ---------------------------------------------------------------------------------------------
+  # Step 3: lesson 01-latency-harness (Measure TTFT and ITL)
+  # ---------------------------------------------------------------------------------------------
+  d1-s3:
+    why: >-
+      Build the stopwatch you will use all course: it times how long a model takes to start answering, and
+      how fast it writes after that. The two have different causes, so you always measure them apart.
+    why_example: >-
+      In the lesson's example run, an 8,000-token prompt instead of a 12-token one made the wait for the first
+      word 29 times longer (145 to 4,210 ms). The gap between tokens stayed about the same (22.4 to 24.1 ms).
+    plain:
+      lead: >-
+        Every reply has two phases. First the model reads your whole prompt, and you wait for the first word.
+        Then it writes one token (word piece) at a time, and you watch the text appear. Each phase has its own
+        number and its own causes, so you report both.
+      picture: >-
+        In a restaurant, the wait for your first dish is the kitchen reading your order and starting to cook:
+        a longer order, a longer wait. The pace of the next dishes is how fast the kitchen plates them, one by
+        one. A complaint about 'slow service' does not say which of the two to fix.
+      numbers_source: "the lesson's sample run: Llama 3.1 8B through Ollama on a Mac"
+      numbers:
+        - "Short prompt (12 tokens): the first word after 145 ms (thousandths of a second), then a new token every 22.4 ms."
+        - "Long prompt (8,000 tokens, about 6,000 words): the first word after 4,210 ms. 4,210 ÷ 145 = 29 times longer."
+        - "Gap between tokens with the long prompt: 24.1 ms, only 8% more (24.1 ÷ 22.4 = 1.08)."
+        - "Writing speed for one person: a second is 1,000 ms, so 1,000 ms ÷ 22.4 ms = 44.6 tokens per second, about 33 words."
+        - "So a long prompt delays the start; it barely slows the typing."
+      words:
+        - { term: "TTFT (time to first token)", def: "how long until the first token of the reply appears. Example: 145 ms in the sample." }
+        - { term: "ITL (inter-token latency)", def: "the gap between one token of the reply and the next. Example: 22.4 ms, 44.6 tokens per second." }
+        - { term: "Prefill", def: "the reading phase: the model reads the whole prompt at once. It sets most of TTFT." }
+        - { term: "Decode", def: "the writing phase: one token at a time. It sets ITL." }
+    run:
+      - cmd: "python bench_ttft.py --target mock"
+        note: >-
+          Times 10 requests to the practice server, one after another. A first warm-up request is never
+          counted. **Look for** a first word after roughly 20 to 30 ms and a gap of about 18 ms: the practice
+          server is set that way.
+      - cmd: "python bench_ttft.py --target mock --prompt-tokens 8000"
+        note: >-
+          The same, with filler text making the prompt about 8,000 tokens long. **Look for** a first word after
+          about 3,200 ms (the practice server reads 2,500 tokens a second). The gap stays about 18 ms.
+      - cmd: "python bench_ttft.py --target ollama"
+        note: >-
+          The same stopwatch on a real model: Llama 3.1 8B through Ollama, still running from step 2. The
+          uncounted warm-up is when Ollama loads the model, which can take seconds. The lesson's example run: 145 ms to the
+          first word, 22.4 ms between tokens.
+      - cmd: "python bench_ttft.py --target ollama --prompt-tokens 8000"
+        note: >-
+          The real model with the long prompt. The lesson's example run: 4,210 ms to the first word (29 times longer) and
+          24.1 ms between tokens (about the same). Your Mac's numbers will differ; the pattern is the lesson. If
+          Ollama's log says 'truncating input prompt', see Stuck? below.
+      - cmd: "bash compare_models.sh"
+        note: >-
+          Paid, about 1 to 2 cents: times three Fireworks models (5 requests each), then the first one with the
+          long prompt. **Expect one failed row, and that is fine.** The second model in the list, gpt-oss-20b,
+          is no longer offered per token: on 27 September 2026
+          [its model page](https://fireworks.ai/models/fireworks/gpt-oss-20b) said "Serverless: Not
+          supported". So the script prints `failed — check the id in the model library` for it and carries on.
+          The other rows still count: gpt-oss-120b (short and long prompt) and, if its id is still current, the
+          Llama 3.1 8B row. Optional:
+          for a third row, open your copy of `compare_models.sh` and, in the `MODELS` list at the top, replace
+          the gpt-oss-20b line with another model the Fireworks model library (app.fireworks.ai/models) marks
+          as serverless. Before you run it, add your key: create it at app.fireworks.ai, on the API keys page.
+          Run `open -e ../../.env` to open your settings file in TextEdit (`../..` is the `03-labs` folder;
+          Finder hides files whose names start with a dot). Replace the placeholder after `FIREWORKS_API_KEY=`
+          with your key and save. Afterwards, go back with `cd ../..` and run `make fw-check`.
+    see: >-
+      Each command prints its timed runs, then one summary row, also saved to `results/01-latency.csv`. In the
+      row, `ttft_p50_ms` and `ttft_p95_ms` are the typical and the slowest waits for the first word, `itl_ms`
+      is the gap between tokens and `tok_per_s` is 1,000 ÷ that gap. Compare the short and long rows: the first-word
+      columns jump (145 to 4,210 ms in the sample) while the gap barely moves.
+    checks:
+      - q: "A customer says their AI feature is 'slow'. Which number do you ask for first, the wait for the first word or the pace after it, and why?"
+        plain: >-
+          Both, because each points to a different cause. Slow to start means a long prompt or requests waiting
+          in line; slow to type means memory speed, or a model too big for it.
+        picture: >-
+          A patient says 'I feel unwell'. The doctor takes both temperature and blood pressure, because each
+          points to different illnesses. 'Slow' is the symptom; the two numbers are the tests.
+        numbers_source: "the support assistant in the Inference 101 video"
+        numbers:
+          - "A customer asks the support bot about a refund. It reads the company rules and question before it can reply: 6,200 tokens (word pieces) take 0.78 s."
+          - "The bot then writes a 300-token answer, one piece every 22 ms: 300 x 22 ms = 6.6 s."
+          - "The customer waits about 7.4 s in all. Of that, 6.6 s is spent watching the reply appear: about 9 of every 10 seconds of this wait."
+          - "Even if reading became instant, the customer would save less than 0.78 s. To shorten this whole reply much more, its writing needs to speed up."
+        words:
+          - { term: "Prefill", def: "the reading phase: the whole prompt at once. Example: 6,200 tokens in 0.78 s." }
+          - { term: "Decode", def: "the writing phase, one token at a time. Example: 300 tokens x 22 ms = 6.6 s." }
+          - { term: "Queueing", def: "requests waiting in line because the server is busy with others." }
+          - { term: "Bandwidth", def: "how many GB per second memory delivers to the chip; it caps decode." }
+        more: >-
+          TTFT is roughly queue time plus prefill time, so a high TTFT sends you to prompt length, prefix caching,
+          cold starts and queueing. ITL is one decode step, bound by memory bandwidth and the bytes read per token,
+          so a high ITL sends you to model size, quantization, speculative decoding or batch size (bigger batches
+          raise total throughput but slow each user a little). Ask for both, at p50 and p95, on the customer's
+          real prompt and output lengths.
+      - q: "Why report p95 (the time 95 out of 100 requests stay under) and not the average?"
+        plain: >-
+          An average hides the few very slow requests, and those are the ones users remember and complain about.
+        picture: >-
+          A bus that is on time 19 days out of 20 and an hour late on the 20th has an average delay of only
+          3 minutes. The rider remembers the day they missed a meeting.
+        numbers_source: "Day 1's stopwatch script (felab/measure.py) and its sample run"
+        numbers:
+          - "The stopwatch script times 10 requests. p50 is the middle one; with only 10, p95 is the slowest one."
+          - "Lesson sample, short prompt: p50 is 145 ms, p95 is 190 ms."
+          - "So the worst request waited 31% longer than the typical one (190 ÷ 145 = 1.31)."
+          - "Inference 101: a fine p50 with an ugly p95 almost always means waiting in line or servers waking up (cold starts), not the model."
+        words:
+          - { term: "p50 (median)", def: "the middle value: half the requests are faster, half slower. Example: 145 ms." }
+          - { term: "p95", def: "the value 95 out of 100 requests stay under. Example: 190 ms." }
+          - { term: "Tail", def: "the slowest few requests, the ones p95 describes." }
+          - { term: "Cold start", def: "a slow request while a server that was idle or newly started loads the model." }
+        more: >-
+          `felab.percentile` uses the nearest-rank method, so with 10 samples p95 is the maximum: deliberately
+          pessimistic, because tails are what customers complain about. Agree the percentile and the traffic
+          profile with the customer before you benchmark (Inference 101 recap).
+      - q: "With the long 8,000-token prompt, the gap between tokens grows a little (22.4 to 24.1 ms in the lesson's sample). Why?"
+        plain: >-
+          For each new token the model also rereads its notes on everything it has read so far. A longer prompt
+          means more notes to fetch, so each step takes a little longer.
+        picture: >-
+          Before every dish, the cook glances at the notes on this table's order. For a long order the notes run
+          to several pages, so each glance takes a moment longer. The recipe book, fetched every time too, is
+          still the big load.
+        numbers_source: "the lesson's sample run, and Llama 3.1 8B's notes size from Day 4"
+        numbers:
+          - "The model: 4.9 GB, fetched once for every token written."
+          - "The notes (the KV cache) for Llama 3.1 8B: 128 KB per token."
+          - "12-token prompt: 12 x 128 KB = about 1.6 MB (million bytes) of notes, next to nothing."
+          - "8,000-token prompt: 8,000 x 128 KB = about 1.05 GB of notes, about a fifth more to fetch on top of the 4.9 GB model (1.05 ÷ 4.9 = 0.21)."
+          - "Counting bytes alone, each step could take up to a fifth longer. In the sample the gap grew 8% (22.4 to 24.1 ms): a little, because the model is still most of what is fetched."
+        words:
+          - { term: "KV cache", def: "the model's notes on the conversation so far (keys and values), so it does not reread everything for each new word." }
+          - { term: "Context", def: "everything the model has read and written so far in one conversation. Example: an 8,000-token prompt." }
+          - { term: "KB", def: "1,024 bytes in this course. Example: 128 KB = 131,072 bytes." }
+          - { term: "Decode step", def: "one pass through the model that writes one token; it fetches the weights and the notes." }
+        more: >-
+          Each decode step reads all the weights plus the K and V entries of every earlier token (attention).
+          At 128 KiB per token for Llama 3.1 8B (2 x 32 layers x 8 KV heads x 128 x 2 bytes, lesson 05), 8,000
+          tokens add about 1.05 GB per step against 4.9 GB of weights, so ITL rises. Bytes alone predict about
+          21% ((4.9 + 1.05) ÷ 4.9 = 1.21); the sample's 8% is lower, and the kit does not explain the gap. Its
+          sample figures are illustrative, the padded prompt may hold fewer than 8,000 real tokens (the script
+          assumes 4 characters per token), or Ollama may have cut it to its context setting (see Stuck?). With
+          many users at long context those reads add up, which is why Day 4 caps context and quantizes the cache.
+    say:
+      ask: "The customer says 'it's slow'. What do you measure first?"
+      means:
+        - phrase: "I measure TTFT and ITL separately"
+          meaning: >-
+            I time how long until the first token appears (time to first token, 145 ms in the sample), and
+            separately the gap between the tokens after it (inter-token latency, 22.4 ms).
+        - phrase: "at p50 and p95"
+          meaning: "For each, I report the typical request (p50: half are faster) and the slow tail (p95: 95 of 100 are faster)."
+        - phrase: "on the customer's own prompt shape"
+          meaning: "I test with prompts and answers as long as theirs: 12 tokens gave 145 ms to the first word, 8,000 tokens gave 4,210 ms."
+        - phrase: "One latency number hides two different bottlenecks"
+          meaning: "Latency is how long someone waits; a bottleneck is the slowest part, the one that holds everything up. A single 'response time' mixes reading and writing, which have different bottlenecks and different fixes."
+    fields:
+      - id: d1-ttft-p50-short
+        label: "Wait for the first word, short question (ms, p50)"
+        hint: "Your ollama row with prompt_tok 12, column ttft_p50_ms."
+        unit: "ms"
+        meaning: "How long a typical person waits before the reply starts, after a one-line question."
+        example: "145"
+      - id: d1-ttft-p50-long
+        label: "Wait for the first word, 8,000-token prompt (ms, p50)"
+        hint: "Your ollama row with prompt_tok 8000, column ttft_p50_ms."
+        unit: "ms"
+        meaning: "The same wait when the prompt is about 6,000 words long: reading time grows with the prompt."
+        example: "4,210"
+      - id: d1-itl-ms
+        label: "Gap between tokens while writing (ms)"
+        hint: "itl_ms on your short-prompt ollama row; tok_per_s next to it is 1,000 ÷ this."
+        unit: "ms"
+        meaning: "The typing pace after the first word. It barely changes with prompt length."
+        example: "22.4 (44.6 tokens per second)"
+      - id: d1-fw-ttft-p50
+        label: "Wait for the first word on each Fireworks model (ms, p50)"
+        hint: >-
+          The fireworks rows with prompt_tok 12 from compare_models.sh, one value per model. Expect two:
+          gpt-oss-20b fails and saves no row.
+        unit: "ms"
+        meaning: "How hosted models compare on the same question, timed by your own stopwatch."
+        example: "The lesson has no example here: write the model, then ms, for each model that answered."
+    done: >-
+      `results/01-latency.csv` has your Ollama rows (short and long prompt) and a row for each Fireworks model
+      that answered (two, with gpt-oss-20b's expected failure), and `make fw-check` lists no deployments.
+    stuck:
+      - problem: "The script prints 'failed — check the id in the model library' for gpt-oss-20b."
+        fix: >-
+          Expected, nothing is wrong with your setup. On 27 September 2026
+          [gpt-oss-20b's model page](https://fireworks.ai/models/fireworks/gpt-oss-20b) said "Serverless: Not
+          supported": Fireworks no longer runs it per token, so the call fails at once. The script carries on,
+          and your other Fireworks rows still count. Optional: replace the gpt-oss-20b line in the `MODELS`
+          list at the top of your copy of `compare_models.sh` with another model the model library
+          (app.fireworks.ai/models) marks as serverless, and run it again.
+      - problem: "Every model says 'failed — check the id in the model library', and the error above mentions 401 or an invalid API key."
+        fix: >-
+          `.env` still holds the placeholder key `fw_xxxxxxxxxxxxxxxx`. From the lesson folder run
+          `open -e ../../.env`, replace the placeholder after `FIREWORKS_API_KEY=` with your key from
+          app.fireworks.ai (API keys page), save, and run `bash compare_models.sh` again.
+      - problem: "'FIREWORKS_API_KEY is not set'."
+        fix: >-
+          The `FIREWORKS_API_KEY=` line is missing from `.env`, or has nothing after the `=`. From the lesson
+          folder run `open -e ../../.env`, add the line with your key after the `=` (create the key at
+          app.fireworks.ai, API keys page), and save. Never commit or share that file.
+      - problem: "The script prints 'failed — check the id in the model library' for another model too."
+        fix: >-
+          Model names change. Copy a current id from the Fireworks model library (app.fireworks.ai/models) into
+          the list at the top of `compare_models.sh`, or pass it to `bench_ttft.py` with `--model`. If all three
+          fail and the error mentions 401, it is the key, not the ids: see the first row.
+      - problem: "Fireworks errors with code 429 (too many requests)."
+        fix: >-
+          Until a payment method is added, the account allows 10 requests a minute. `compare_models.sh` sends
+          about 17: 6 per model that answers (5 timed plus a warm-up), 1 for gpt-oss-20b's failed call and 4
+          for the long prompt (6 + 1 + 6 + 4). Running it again hits the same limit. Add a small prepaid credit
+          (spend-cap checklist item 5), or time one model at a time, a minute apart, for example
+          `python bench_ttft.py --target fireworks --model accounts/fireworks/models/gpt-oss-120b --runs 5`
+          (6 requests, counting the warm-up).
+      - problem: "During the long-prompt Ollama run, Ollama's log (in the window where it runs) says 'truncating input prompt'."
+        fix: >-
+          Ollama cut the prompt to its context setting (the most tokens it accepts), so the row timed a shorter
+          prompt. Stop it with `pkill ollama`, start it with room for the long prompt,
+          `OLLAMA_CONTEXT_LENGTH=16384 ollama serve &`, and run the long-prompt line again.
+      - problem: "'Connection refused'."
+        fix: >-
+          That server is not running. From the `03-labs` folder, `make check` shows which are up. Start the
+          practice server with `make mock &`, and Ollama with `ollama serve &`.
+      - problem: "`make fw-check` says 'No rule to make target'."
+        fix: "You are still in the lesson folder. Run `cd ../..` to get back to `03-labs`, then run it again."
+    replace:
+      - find: "# 01b — Fireworks (≈ $0.01). Needs FIREWORKS_API_KEY in .env"
+        with: "# 01b: Fireworks (about 1 to 2 cents). Needs your key in .env and the spend cap from step 2"
+      - find: "← TTFT ×30, ITL ~same"
+        with: "← TTFT ×29, ITL about the same"
+
+wrapup:
+  done: >-
+    You have your own timing table: the wait for the first word and the gap between tokens. It covers Llama
+    3.1 8B on your Mac, with a short and a long prompt, and the Fireworks models that answered (gpt-oss-20b's
+    row is expected to fail). And `make fw-check` lists nothing still billing.
+  whiteboards:
+    - video: 01-inference-101
+      q: >-
+        A support assistant sends the model 6,000 tokens of standing instructions (the system prompt) plus a
+        200-token customer question, and gets a 300-token answer. The model reads about 8,000 tokens per second
+        and writes one token every 22 ms. How long does the customer wait, and where does the time go?
+      given: >-
+        Tokens are word pieces, about three quarters of a word each: 6,200 tokens in is about 4,650 words, and
+        300 out is about 225 words. Reading speed (prefill): about 8,000 tokens per second. Writing pace
+        (inter-token latency): 22 ms (thousandths of a second) per token. One request at a time, no waiting in line.
+      plain: >-
+        Picture a customer waiting for a support answer. The bot first reads its instructions and the question;
+        the customer sees nothing for about 0.78 seconds. Then the answer appears piece by piece for 6.6 more
+        seconds. The whole wait is about 7.4 seconds, and most of it happens after the reply has started.
+      picture: >-
+        A kitchen reads a long order in one glance but plates the dishes one at a time. Here the glance takes
+        under a second and the plating over six. The long order looks like the problem; the one-by-one plating is.
+      steps:
+        - "Tokens in: 6,000 (instructions) + 200 (question) = 6,200."
+        - "Wait for the first word (TTFT): 6,200 ÷ 8,000 tokens per second = 0.775 s, about 0.78 s."
+        - "Writing time: 300 tokens x 22 ms = 6,600 ms = 6.6 s."
+        - "Total: 0.775 + 6.6 = 7.375 s, about 7.4 s."
+        - "Share that is writing: 6.6 ÷ 7.375 = 0.89, so 89%."
+        - "The video's fix is for the start: the 6,000-token instructions never change, so prompt caching reuses them and the first word comes after about 120 ms instead of 780. The writing (6.6 s) is still most of the wait; the lever for it is faster memory or speculative decoding (a small model drafts, the big one checks)."
+      note: "With many users at once, requests can also wait in line before reading starts, which adds to the wait for the first word."
+      kit_q: "A support assistant sends a six thousand token system prompt, a two hundred token question, and gets a three hundred token answer."
+      kit_a: "Total 7.4 s — and 89% of it is decode"
+      more: >-
+        TTFT here is prefill alone (no queue): 6,200 ÷ 8,000 = 0.775 s. Decode: 300 x 22 ms = 6.6 s. Total
+        7.375 s, of which 6.6 ÷ 7.375 = 89.5% is decode. The video files this case under 'long prompt, short
+        answer: prefill dominates', but its own numbers put 89% of the time in decode: prompt caching fixes the
+        first-word wait (p95 TTFT 780 ms to 120 ms) and the input bill, not the total. The narration also lists
+        batching as a decode fix; batching raises total throughput but can slow each user (field guide: 'Bigger
+        batches raise throughput but can slow each user'), so it does not shorten this customer's wait. The
+        screen shows input cost per 1,000 calls falling from $0.93 to $0.09. $0.93 for 6.2 million tokens
+        implies $0.15 per million, the lab book's gpt-oss 120B input price. At its cached price ($0.015 per
+        million), $0.09 matches either the 6 million cached tokens alone ($0.09) or all 6.2 million at the cached
+        price ($0.093); charging each call's 200 fresh tokens at the full price gives about $0.12.
+      words:
+        - { term: "System prompt", def: "standing instructions sent at the start of every request. Example: the support assistant's 6,000 tokens." }
+        - { term: "TTFT", def: "time to first token: how long until the reply starts. Example: 0.78 s here." }
+        - { term: "Decode", def: "the writing phase, one token at a time. Example: 300 x 22 ms = 6.6 s." }
+        - { term: "Prompt caching", def: "reusing the server's work on a prompt opening that repeats in every request. Example: 780 ms to about 120 ms here." }
+    - video: 01-inference-101
+      q: >-
+        Same model, same hardware, a different job: code completion, where a code editor suggests the next few
+        lines. 200 tokens go in and 30 come out. Reading runs at the same 8,000 tokens per second, writing at
+        22 ms per token. Which phase takes the time, and what would you speed up?
+      given: >-
+        200 tokens in (about 150 words of code around the cursor), 30 tokens out. Reading (prefill): about 8,000
+        tokens per second. Writing: 22 ms per token.
+      plain: >-
+        Writing still takes almost all the time: 25 ms to read, 660 ms to write, 96% of the 685 ms total. So you
+        speed up the writing, and you always ask for the request's shape before you promise a speed.
+      picture: >-
+        A short order for a few dishes. The kitchen reads it instantly, so any delay is at the plating station.
+        Reading orders faster would change nothing.
+      steps:
+        - "Reading (prefill): 200 ÷ 8,000 = 0.025 s = 25 ms."
+        - "Writing (decode): 30 x 22 ms = 660 ms = 0.66 s."
+        - "Total: 25 + 660 = 685 ms, about 0.7 s."
+        - "Share that is writing: 660 ÷ 685 = 96%."
+        - "Compare the support assistant: its reading took 780 ms, 31 times this one's 25 ms (6,200 ÷ 200 = 31)."
+        - "So the fix is on the writing side: speculative decoding (a small model drafts, the big one checks; Day 9) or faster memory. Prompt caching, the video's fix for the support assistant's slow start, would save almost nothing here."
+      note: "The video's lesson: ask for the token shape (how many tokens in and out) before you promise a latency number."
+      kit_q: "Now change the shape. A code completion request: two hundred tokens in, thirty tokens out."
+      kit_a: "Prefill is twenty five milliseconds, decode is under a second. Same model, same GPU, a completely different performance problem, and a completely different fix."
+      more: >-
+        Prefill 200 ÷ 8,000 = 25 ms; decode 30 x 22 = 660 ms; decode is 96% of 685 ms. The screen lists
+        'speculation, faster memory' as what to optimise, and its takeaway is 'Ask for the token shape before you
+        promise a latency number'. The 'completely different fix' is relative to the video's fix for the support
+        assistant, prompt caching; both workloads are mostly decode.
+      words:
+        - { term: "Code completion", def: "an editor feature that suggests the next few lines of code. Example: 200 tokens in, 30 out." }
+        - { term: "Traffic profile (token shape)", def: "how many tokens go in and come out per request, and how many requests arrive at once." }
+        - { term: "Speculative decoding", def: "a small, fast model drafts a few tokens and the big model checks them in one pass. Example: Day 9." }
+        - { term: "Prefill", def: "the reading phase: the whole prompt at once. Example: 25 ms for 200 tokens." }
+
+glossary:
+  # Terms other days also define use the same definition text as days 2, 3 and 5 to 11 (one definition per term).
+  - { term: "4-bit, 8-bit, 16-bit", def: "how many bits store each number; fewer bits, smaller model.", example: "an 8B model is 8.5 GB at 8-bit, 4.9 GB at 4-bit." }
+  - { term: "Attention (the look-back step)", def: "the step where each new token looks back at the notes on earlier tokens.", example: "each writing step reads every earlier token's notes, which is why a long prompt slows it a little." }
+  - { term: "Bandwidth (memory bandwidth)", def: "how many GB per second memory delivers to the chip.", example: "M4 Max 546 GB/s, H100 3,350 GB/s." }
+  - { term: "Batching", def: "serving several people with one pass over the model.", example: "8 people share each fetch of the weights." }
+  - { term: "Ceiling (speed limit)", def: "the fastest a model can write: memory speed ÷ model size (for a mixture-of-experts model, only the part it reads per token).", example: "546 ÷ 4.9 = 111 tokens/s." }
+  - { term: "Chip", def: "the processor that does the model's math.", example: "an Apple M4 Max, or an NVIDIA H100 (a GPU)." }
+  - { term: "Compute-bound", def: "slowed by calculation speed rather than memory.", example: "prefill." }
+  - { term: "Context length (context, ctx)", def: "the most tokens one conversation may hold.", example: "8K = 8,192 tokens." }
+  - { term: "Decode", def: "the writing phase, one token at a time, fetching the whole model for each (a mixture-of-experts model fetches only the part it uses).", example: "86 tokens/s at 4-bit." }
+  - { term: "Engine (inference server)", def: "the program that loads a model and answers requests.", example: "llama.cpp, vLLM." }
+  - { term: "Fetch", def: "move data from memory to the chip that does the math.", example: "the whole 4.9 GB model is fetched once for every token written." }
+  - { term: "Floating-point", def: "a way of storing numbers with a sign, a size and a precise part, like scientific notation.", example: "FP16 and FP8." }
+  - { term: "GB", def: "1,000,000,000 bytes.", example: "16,384 MiB = 17.18 GB." }
+  - { term: "GPU", def: "the chip that runs the model.", example: "H100; on a Mac it shares memory with everything else." }
+  - { term: "H100", def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s.", example: "about $8 an hour on a dedicated Fireworks deployment (lab book)." }
+  - { term: "KB, KiB", def: "1,024 bytes in this course (the videos write KB, `kv_calc.py` prints KiB).", example: "128 KB = 131,072 bytes." }
+  - { term: "KV cache", def: "the model's notes on the conversation so far (keys and values), so it does not reread everything for each new word.", example: "17.18 GB for one 131,072-token conversation." }
+  - { term: "Latency", def: "how long someone waits.", example: "time to the first token." }
+  - { term: "llama.cpp", def: "the open-source engine used on the Mac; `llama-server` answers requests, `llama-bench` times the engine alone.", example: "Day 2's server." }
+  - { term: "Llama 3.1 8B, Llama 3 70B", def: "the open models used in the lessons and videos, with 8 and 70 billion parameters.", example: "4.9 GB at 4-bit for the 8B." }
+  - { term: "M4 Max, M4 Pro", def: "Apple chips whose memory moves 546 and 273 GB/s.", example: "546 ÷ 4.9 = 111 tokens/s on an M4 Max; 273 ÷ 4.9 = about 56 on an M4 Pro." }
+  - { term: "MB", def: "1,000,000 bytes.", example: "about 1.6 MB of notes for a 12-token prompt on Llama 3.1 8B." }
+  - { term: "Memory-bound (bandwidth-bound)", def: "slowed by how fast memory delivers data.", example: "decode." }
+  - { term: "ms (millisecond)", def: "a thousandth of a second.", example: "500 ms is half a second." }
+  - { term: "Notes", def: "this course's plain word for the KV cache.", example: "128 KB of notes per token for Llama 3.1 8B." }
+  - { term: "p95", def: "the value 95 out of 100 requests stay under.", example: "95 of 100 prompts under 3,000 tokens." }
+  - { term: "Parameters (8B, 70B)", def: "the model's learned numbers (weights).", example: "8B = 8 billion." }
+  - { term: "Practice server (mock)", def: "the kit's stand-in server with realistic behaviour and made-up numbers.", example: "it has 8 slots." }
+  - { term: "Prefill", def: "the reading phase; the model reads the whole prompt at once.", example: "`pp512`." }
+  - { term: "Prompt", def: "the text you send the model.", example: "a 3,000-token support question." }
+  - { term: "Quantization (quantize)", def: "storing numbers with fewer bits.", example: "16 to 8 to 4 bits, like saving a photo at lower quality." }
+  - { term: "Request", def: "one message sent to the model for an answer.", example: "95 of 100 requests under 3,000 tokens." }
+  - { term: "Server", def: "a program that waits for requests and answers them.", example: "llama.cpp's `llama-server`." }
+  - { term: "Slot", def: "one seat on the server, a conversation it can serve at the same time.", example: "`--parallel 8` gives 8." }
+  - { term: "Throughput", def: "total output across everyone at once.", example: "275.1 tokens/s with 8 people." }
+  - { term: "Token", def: "a chunk of text, about three quarters of a word.", example: "1,000 tokens is roughly 750 words." }
+  - { term: "Tokens per second (tok/s)", def: "how many tokens are written each second.", example: "38.9 per person with 8 people." }
+  - { term: "TTFT (time to first token)", def: "how long until the first token (word piece) of the reply appears.", example: "41.4 ms (p95) at 8 people." }
+  - { term: "Weights", def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses).", example: "4.9 GB for Llama 3.1 8B at 4-bit." }
+  - { term: "API", def: "the agreed format one program uses to send requests to another and get answers back.", example: "`/v1/chat/completions` is where a chat request goes." }
+  - { term: "CPU", def: "the computer's general-purpose processor, slower than the GPU for model math.", example: "model layers not placed on the GPU run here." }
+  - { term: "felab", def: "the kit's small shared Python toolkit that every lesson script imports.", example: "`felab/targets.py` lists every server's address." }
+  - { term: "Goodput", def: "the requests per second that met the speed promise; late ones do not count.", example: "2.5 per second at 8 people on the practice server, 0.4 at 16." }
+  - { term: "Harness", def: "one test script you can point at any server, so the numbers compare fairly.", example: "`bench_ttft.py`, built on Day 1 and reused on Day 2." }
+  - { term: "Homebrew (brew)", def: "a Mac tool that installs programs from the command line.", example: "`brew install llama.cpp`." }
+  - { term: "Inference", def: "running a trained model to get answers, as opposed to training it.", example: "an inference server answers requests." }
+  - { term: "ITL (inter-token latency)", def: "the gap between one token and the next while a reply is being written.", example: "22.4 ms in Day 1's sample Ollama row: 1,000 ÷ 22.4 = 44.6 tokens per second." }
+  - { term: "Localhost", def: "your own computer, used as an address.", example: "`http://localhost:8080/v1` is llama.cpp on your Mac." }
+  - { term: "matplotlib", def: "the Python library that draws the kit's charts.", example: "without it, `plot_sweep.py` prints a text chart instead." }
+  - { term: "MLX", def: "Apple's own software for running and training models on Apple chips; `mlx_lm.server` is its model server.", example: "port 8081; the same library fine-tunes a model on Day 8." }
+  - { term: "Ollama", def: "a one-command model server built on llama.cpp that chooses most settings for you.", example: "`ollama serve` answers on port 11434." }
+  - { term: "p50 (median)", def: "the middle value: half the requests are faster, half slower.", example: "`ttft_p50_ms` in the comparison table." }
+  - { term: "Percentile", def: "the value a given share of requests stay under: p50 is half of them, p95 is 95 of 100.", example: "p95 TTFT of 41.4 ms at 8 people on the practice server." }
+  - { term: "pip, wheel", def: "pip installs Python packages; a wheel is a ready-built package file.", example: "a prebuilt wheel can expect a different CUDA than the machine has." }
+  - { term: "Port", def: "a numbered door on a computer where one server program listens for requests.", example: "Ollama 11434, llama.cpp 8080, MLX 8081." }
+  - { term: "Prefix caching (prompt caching)", def: "the server keeps its notes on a prompt's opening and reuses them when the next request starts the same way.", example: "740 ms for call 1, 36 ms for the rest in Day 5's sample." }
+  - { term: "Queueing", def: "waiting in line for a free seat on the server.", example: "at 16 people on the practice server, 8 wait." }
+  - { term: "Speculative decoding", def: "a small draft model guesses several tokens and the big model checks them all in one pass; the output does not change.", example: "Day 9 measures when it pays." }
+  - { term: "System prompt", def: "the fixed instructions at the start of every request that set how the model behaves.", example: '"You are the support agent for Acme Cloud."' }
+  - { term: "Terminal", def: "the window where you type commands.", example: "Day 2 uses four at once: one per server, plus one to compare." }
+  - { term: "Traffic profile", def: "the shape of the load a test uses: tokens in, tokens out, requests per second, and the speed promise with its percentile.", example: "1,024 in, 256 out, 200 requests per crowd size." }
+  - { term: "Virtual environment (venv)", def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`.", example: "`mlx_lm.server` and `felab` live inside it." }
+  - { term: "Dedicated deployment", def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not.", example: "about $8 an hour for one H100 (lab book); by default it stops only after a full hour with no requests." }
+  - { term: "Fine-tune", def: "further training of an existing model on your own examples.", example: "a LoRA fine-tune on Day 7." }
+  - { term: "firectl", def: "Fireworks' command-line tool for your account, quotas and deployments.", example: "`firectl deployment list` shows what is billing by the hour." }
+  - { term: "Fireworks", def: "a cloud service that runs AI models and charges per use; one platform used in this course.", example: "Day 1's step 3 times its models for about 1 to 2 cents; one of the three, gpt-oss-20b, is expected to fail." }
+  - { term: "LoRA", def: "a cheap way to customise a model: train a small add-on instead of changing the whole model.", example: "on Fireworks it can only be served on a dedicated deployment." }
+  - { term: "RAM (memory)", def: "the computer's working memory, where the model must sit while it runs.", example: "36 GB on the sample Mac in Day 1's setup step." }
+  - { term: "Cold start", def: "a slow request while a server that was idle or newly started loads the model.", example: "why Day 1's stopwatch never counts its first call." }
+  - { term: "Code completion", def: "an editor feature that suggests the next few lines of code.", example: "200 tokens in, 30 out, in the Inference 101 video." }
+  - { term: "Dense model", def: "a model that uses all of its numbers for every token.", example: "Llama 3.1 8B." }
+  # Mostly Day 1 terms (some also defined, identically, on later days).
+  - { term: ".env file", def: "the settings file in the `03-labs` folder, holding defaults and your Fireworks key; it never leaves your Mac.", example: "`cp .env.example .env` creates it in Day 1's first step, with a placeholder key." }
+  - { term: "API key", def: "a secret code that proves a request comes from your account, so it can be billed.", example: "`FIREWORKS_API_KEY` in `.env`." }
+  - { term: "Auto Reload", def: "Fireworks' setting that tops up your prepaid credit automatically when it runs low.", example: "leave it off while you are learning." }
+  - { term: "Bottleneck", def: "the slowest part of a process, the one that holds everything up.", example: "memory speed while the model writes." }
+  - { term: "CSV file", def: "a plain table file: one row per line, commas between the columns.", example: "`results/01-latency.csv`." }
+  - { term: "GPU cores", def: "the many small calculating units inside a GPU.", example: "on a Mac they mostly wait for memory while the model writes." }
+  - { term: "make", def: "a tool that runs named shortcuts listed in a file called `Makefile`.", example: "`make smoke`, `make fw-check`." }
+  - { term: "Quota", def: "a limit Fireworks sets on your account, such as how many GPUs you may use.", example: "`firectl quota list` shows them." }
+  - { term: "RAG (retrieval-augmented generation)", def: "an app that first looks up relevant documents and puts them in the prompt, then asks the question.", example: "Day 1's long test prompt puts the context first and the question last." }
+  - { term: "RPM (requests per minute)", def: "how many requests an account may send each minute.", example: "10 on a new Fireworks account until a payment method is added." }
+  - { term: "Serverless", def: "Fireworks' shared, always-on models, billed per token you send and receive.", example: "Day 1's step 3 measurements cost about 1 to 2 cents." }
+  - { term: "Smoke test", def: "a quick run of everything to prove the setup works before real use.", example: "`make smoke`, 16 lessons in about 2 minutes." }
+  - { term: "Spend cap", def: "a monthly limit on your Fireworks spending; at 100% Fireworks pauses the API.", example: "set with `firectl quota update monthly-spend-usd`." }
+  - { term: "Tail (latency tail)", def: "the slowest few requests.", example: "p95 describes the tail." }
+  - { term: "Unified memory", def: "one pool of memory shared by a Mac's CPU and GPU.", example: "the model and your browser share the same 36 GB." }
+  - { term: "VRAM", def: "the memory built into a separate graphics card. A Mac has none: its shared memory plays that role.", example: "'RAM is your VRAM', in Day 1's setup step." }
+  - { term: "Warm-up request", def: "one request sent first and never counted, so loading the model does not skew the timings.", example: "Day 1's stopwatch sends 'Say hi.' first." }

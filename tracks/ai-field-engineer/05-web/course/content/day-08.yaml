@@ -1,0 +1,725 @@
+# Day 8 · Training day, local. Plain-language content for the guided course (course-spec.md section 3).
+# One step (d8-s1, lesson 11-lora-local-mlx). Its only video, QLoRA On Your Own Box, is optional here (it is
+# a mode-all video on Day 7), so the step has no videos block. The one whiteboard comes from that video's
+# "Data quality decides it" scene (Day 7 already works its 8B-on-a-Mac scene).
+# Every number traces to a kit file: lesson 11's README and scripts (qlora_memory.py outputs worked by hand:
+# 121.6 GB, 1.8 M params by the script's rough count, 0.024%, 4.3 + 0.03 + 2.0 = 6.3 GB, 3.7 MB; rank 16:
+# 3.7 M, 7.3 MB), lesson 17's peft_params.py (the 16-byte split; Qwen2.5 7B's 3,584 x 512 key and value
+# grids, so 1,441,792 at rank 8 on 8 layers), data/make_tickets.py (800/100/100), lessons/09-eval-harness/
+# evaluate.py (n = 60, table printed only after every candidate), felab/measure.py (nearest-rank p95: the
+# 57th of 60), felab/results.py (rows in results/09-eval.csv), lesson 10's README (Day 7 sample), the lab
+# book ($8 an hour, 730 h, BYOC, 1.5x region pin) and narration.json (Full Fine-Tuning line 1861; qlora
+# scenes 5 and 7). du prints 7.1M in MiB: 7.1 x 1.048576 = 7.4 MB.
+day: 8
+tile: "Retrain Day 7's model on your Mac, then compare with the cloud"
+
+overview:
+  today: >-
+    Train Day 7's small add-on for a model (a LoRA adapter) again, from scratch, this time on your own Mac, for
+    free. Then put the two side by side: accuracy, time, cost and privacy. That comparison is your answer when a
+    customer asks whether to build it themselves or buy a service.
+  example: >-
+    Imagine the support team from Day 7 cannot send its customer tickets to a cloud service. It still wants the
+    model to learn to sort them better. Changing every number in a large model needs more memory than its Mac
+    has; training a small add-on while leaving the model alone fits. Today you will try that local route and
+    compare its accuracy, cost and privacy with the cloud route.
+  deliverable: >-
+    A filled-in build-versus-buy page (`COMPARISON.md`): the same fine-tune on Fireworks and on your Mac, side
+    by side, with your own numbers.
+  expected: >-
+    In the lesson's sample, the Mac's fine-tune puts 96% of test tickets in the right category, up from 78%
+    before training, for $0; Day 7's Fireworks sample went from 80% to 97% for about $5 of rented GPU time.
+  before:
+    - title: "Day 7's Fireworks results at hand."
+      body: >-
+        Today you set your Mac's results next to Day 7's cloud run on Fireworks. You compare how often each model
+        put tickets in the right category, before and after training. You also compare how often it rated their
+        urgency (severity) exactly right, how fast it replied and what it cost. Day 7's scores are in
+        `03-labs/results/09-eval.csv`; today's test adds its own rows below them, with `mlx` in the model name.
+        If you skipped Day 7, use its sample: right category 80% before training, 97% after, about $5 of rented
+        GPU time.
+    - title: "About 9 GB of free disk and 6 to 10 GB of free memory."
+      body: >-
+        The starting model, stored at 4 bits per number, downloads once: about 4.3 GB (the lesson's estimate).
+        `2_fuse_and_serve.sh` then writes a second full copy with the add-on baked in, about as big again:
+        4.3 + 4.3 = 8.6, so about 9 GB. Training uses about 6 to 10 GB of memory, so close video calls and heavy
+        browser tabs first.
+    - title: "The Python environment from Day 1."
+      body: >-
+        Every command today runs with it on, because it holds `mlx_lm`, Apple's tool that trains and serves
+        models on your Mac. In each new terminal window, from the `03-labs` folder:
+      command: "source .venv/bin/activate"
+      after: "`(.venv)` appears at the start of the prompt."
+  feeds: >-
+    When a team asks whether to train locally or use a managed service, you can compare the same ticket task
+    both ways. Day 7 gives you the cloud result and bill; today adds the Mac result and its privacy tradeoff.
+    Use both to recommend a route instead of relying on a product claim.
+
+steps:
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Step 1 · The same LoRA on your Mac (lesson 11-lora-local-mlx)
+  # ---------------------------------------------------------------------------------------------------------
+  d8-s1:
+    why: >-
+      You repeat Day 7's fine-tune (extra training on your own examples) on the same 800 support tickets, but on
+      your own Mac, for free. Doing it both ways gives you the build-versus-buy comparison (do it yourself or pay
+      a service), with your own numbers, that you can explain to a customer.
+    why_example: >-
+      The lesson's sample: after training, the Mac's model names the right ticket category 96% of the time, up
+      from 78% before, at $0. Day 7's Fireworks sample went from 80% to 97%, plus about $5 for the rented cloud
+      GPU that ran the test.
+    start_first:
+      command: "cd lessons/11-lora-local-mlx && bash 1_train_mlx.sh"
+      note: >-
+        Run it from the `03-labs` folder with the Python environment on (`source .venv/bin/activate`). The first
+        time, it downloads the 4-bit starting model (about 4.3 GB by the lesson's estimate), then trains for
+        about 15 to 40 minutes. Read on while it runs. Keep this window for training and, later, the server. The
+        first command below, `python qlora_memory.py`, needs a second terminal window: go to `03-labs`, run
+        `source .venv/bin/activate`, then `cd lessons/11-lora-local-mlx`.
+    plain:
+      lead: >-
+        Today you train Day 7's small add-on for a model (a LoRA adapter) again, from scratch, on your own Mac.
+        The model's own 7.6 billion numbers stay frozen (unchanged), stored at 4 bits, about half a byte each.
+        Only the add-on learns. That is QLoRA, and it is why this model can be trained on a laptop.
+      picture: >-
+        The model is a heavy printed textbook you cannot write in. The adapter is a pad of sticky notes you can
+        write on. You carry, ship and swap only the notes; the book stays on the shelf. Today's second script
+        does glue the notes into a photocopy of the book (a fused model), because one self-contained copy is
+        simplest to hand over.
+      numbers_source: >-
+        Qwen2.5 7B Instruct (7.6 billion numbers): lesson 11's memory script `qlora_memory.py` and sample run,
+        and the Full Fine-Tuning video (Day 11) for the 16 bytes
+      numbers:
+        - >-
+          Retraining every number (a full fine-tune) needs about 16 bytes per number. That is 2 for the number,
+          2 for its correction (gradient), 8 for the optimizer's two running averages and 4 for a more precise
+          (32-bit) master copy of the number. 7.6 billion x 16 bytes = 121.6 GB, one and a half times what an
+          80 GB data-center GPU holds (121.6 ÷ 80 = 1.5).
+        - >-
+          QLoRA stores the frozen model at 4 bits, half a byte per number, plus small shared helper numbers
+          (scales): 0.5625 bytes per number in all. 7.6 billion x 0.5625 bytes = 4.3 GB.
+        - >-
+          The add-on sits on the model's last 8 layers (processing stages): about 1.8 million numbers by the
+          script's rough count, 0.024% of the model, about 1 in every 4,000. Training it takes 1.8 million x
+          16 bytes = 0.03 GB, about 30 MB.
+        - >-
+          Plus about 2 GB of working memory (the script's rough allowance): 4.3 + 0.03 + 2 = 6.3 GB in all,
+          about a nineteenth of 121.6 GB (121.6 ÷ 6.3 = 19).
+        - >-
+          The add-on file you keep: the script estimates 3.7 MB (1.8 million x 2 bytes). The lesson's sample run
+          printed `7.1M`, about 7.4 MB (that M is 1,048,576 bytes). The lesson does not say why that is twice the
+          estimate. Either way the model is hundreds of times bigger: 4,300 MB ÷ 7.4 MB = about 580.
+      words:
+        - term: "Adapter (LoRA adapter)"
+          def: >-
+            The small set of extra numbers LoRA (low-rank adaptation) trains and saves; the base model stays
+            unchanged. Example: `7.1M` (about 7.4 MB) in the lesson's sample run.
+        - term: "QLoRA"
+          def: >-
+            LoRA on a base model stored in 4 bits, so training fits in far less memory. Example: about 6.3 GB
+            for today's model.
+        - term: "Gradient"
+          def: >-
+            The correction worked out for each trainable number at each training step. Example: a full fine-tune
+            keeps one for all 7.6 billion numbers.
+        - term: "Optimizer state"
+          def: >-
+            The two running averages the training method (Adam) keeps per trainable number to size each
+            correction. Example: 8 of the 16 bytes per number in a full fine-tune.
+    run:
+      - cmd: "python qlora_memory.py"
+        note: >-
+          Prints the memory budget for today's model (7.6 billion numbers, add-ons on the last 8 layers) in about
+          a second, with no download. **Look for** full fine-tune about 121.6 GB against QLoRA about 6.3 GB, and
+          an adapter file of about 3.7 MB. Then add `--rank 16` to this command. (Rank is how wide the add-on's
+          small grids are; today's is 8.) The add-on doubles, from 1.8 to 3.7 million numbers and from 3.7 to
+          7.3 MB, while the QLoRA total stays at 6.3 GB.
+      - cmd: "bash 1_train_mlx.sh"
+        note: >-
+          Trains the add-on: 300 steps of 2 tickets each, 600 of the 800 training tickets (three quarters of one
+          pass). It takes about 15 to 40 minutes. If you started it at the top of the page, let that run finish
+          instead of starting a second one. **Look for** `Val loss` every 50 steps: how wrong the model still is
+          on practice tickets it never trains on. It should fall fast, then flatten. If it flattens early, press
+          Ctrl+C. The last save is kept, but the size line does not print: run `ls -lh adapters` to see the
+          files. At the end, **look for** `adapter saved:` with the size of the add-on's folder (sample: `7.1M`).
+      - cmd: "bash 2_fuse_and_serve.sh"
+        note: >-
+          In the first window, once training has finished. It bakes the add-on into a full copy of the model
+          (the `fused` folder), then starts a server on port 8081 (a numbered door on your Mac). Day 2's MLX
+          server used the same port, so stop that one first. Leave this window running. **Look for** the line
+          ending `serving on :8081 (Ctrl-C to stop)`. It prints just before the model loads, so wait a few
+          seconds before the next command.
+      - cmd: "bash 3_eval_local.sh"
+        note: >-
+          Run it in the second window, the one you used for `qlora_memory.py`; a new window first needs
+          `source .venv/bin/activate` from `03-labs`, then `cd lessons/11-lora-local-mlx`. It tests your
+          fine-tune, then the original model without the add-on, on the same 60 test tickets. It uses Day 7's
+          test script (the eval harness). The server switches models in between, so the original model's first
+          answer is slow. **Look for** the `mlx fused` row's `category_%` well above the other row's (sample:
+          96.0 against 78.0). Your table has more columns than the sample. Read `category_%`, `severity_%` and
+          `p95_ms`; `judge_1to5` shows `nan` (not a number) because no judge runs today. One ticket is worth
+          1.67 points (100 ÷ 60), so real scores land on steps like 95.0 or 96.7. The sample's 96.0 and 78.0 are
+          not possible with 60 tickets, so treat them as rough examples.
+    see: >-
+      `Val loss` scores how wrong the model still is on practice tickets it never trains on (the validation
+      set); lower is better, and only the trend matters. In the sample it halves from step 50 to 100 (0.412 to
+      0.198), then drops only 0.077 more by step 300: that slowdown is the flattening. In the score table,
+      `category_%` and `severity_%` are the share of 60 test tickets each model got right: in the sample, 96.0
+      and 94.0 for the fine-tune (`fused`), 78.0 and 66.0 for the model without it.
+    checks:
+      - q: >-
+          Day 8's lesson keeps two sets of tickets out of training: 100 validation tickets, checked during training,
+          and 100 test tickets. Why is the final score taken on the test tickets (`test.jsonl`) and not the
+          validation ones (`valid.jsonl`)?
+        plain: >-
+          You used the validation tickets to decide when to stop training, so they helped pick the model and can
+          flatter it. The test tickets played no part in any decision, so their score is honest.
+        picture: >-
+          A coach decides when the team has practised enough by watching its scores on one practice test. A good
+          score on that same test afterwards proves little. The fair check is a fresh test nobody has looked at.
+        numbers_source: "the kit's ticket data (`data/make_tickets.py`) and Day 8's training script"
+        numbers:
+          - >-
+            1,000 tickets, split three ways: 800 to train on, 100 to check progress during training
+            (validation), 100 kept back for the final grade (test).
+          - >-
+            Training checks the validation tickets every 50 steps, and you stop where their loss flattens: in
+            the sample, 0.198 at step 100 and 0.121 at step 300.
+          - >-
+            That stopping point was chosen by looking at the validation tickets, so they are no longer neutral.
+          - >-
+            The test tickets never touch training or the stop decision. No test ticket repeats a training
+            ticket, and 30 of the 100 use wordings training never saw.
+          - >-
+            The final grade uses the first 60 test tickets, so each one is worth 1.67 points (100 ÷ 60).
+        words:
+          - term: "Validation set"
+            def: >-
+              Examples kept out of training and checked during it, to decide when to stop. Example:
+              `valid.jsonl`, 100 tickets.
+          - term: "Test set (held-out set)"
+            def: >-
+              Examples kept out of training and out of every decision, used only for the final score. Example:
+              `test.jsonl`, 100 tickets; the eval uses 60.
+          - term: "Validation loss"
+            def: >-
+              A score of how wrong the model still is on the validation set; lower is better. Example: 0.412,
+              0.198 and 0.121 at steps 50, 100 and 300.
+          - term: "Leak (data leakage)"
+            def: >-
+              Data used to judge a model has also shaped it, so the score looks better than it is. Example: the
+              validation tickets, once they set the stopping point.
+        more: >-
+          Early stopping on validation loss is a form of model selection, so the validation score is optimistic;
+          the test split stays untouched for the final number. `make_tickets.py` de-duplicates across all splits
+          and keeps one phrasing per category for the test set only, so the test score measures generalisation,
+          not memory. One caution: the lab book's standalone snippet builds its validation file with
+          `head -50 train.jsonl` after copying all of `train.jsonl` into training, so those 50 rows are also
+          training rows and its validation loss would look better than it is. Day 8's script uses the
+          separate `data/tickets/valid.jsonl`.
+      - q: >-
+          When would you tell a customer to fine-tune on their own machines (a laptop, or AI chips called GPUs
+          that they own) rather than on a managed platform such as Fireworks?
+        plain: >-
+          When their data is not allowed to leave their own machines. Or when they want fast, free experiments
+          first, before paying a managed platform to train the final version and serve it to real users.
+        picture: >-
+          A chef tests new recipes in their own kitchen: it costs nothing, and the secret sauce stays secret. For
+          a 500-guest wedding, they hire a caterer with the staff and ovens to serve everyone at once.
+        numbers_source: >-
+          Day 8's lesson, Day 7's Fireworks run (lesson sample figures and its summary line), and the lab
+          book's GPU price
+        numbers:
+          - >-
+            On the Mac: $0 to train, and the 800 tickets never leave the machine. Training takes about 15 to 40
+            minutes.
+          - >-
+            But one Mac serves one person at a time with no uptime promise: `COMPARISON.md` answers "no" for 100
+            users at once.
+          - >-
+            On Fireworks (Day 7's sample): training cost cents to about a dollar, but answering requests
+            (serving) needs a GPU reserved by the hour. 38 minutes cost $5.07: $5.07 ÷ 38 x 60 = about $8 an
+            hour, the lab book's price.
+          - >-
+            Accuracy is close either way in the samples: category 78% to 96% on the Mac, 80% to 97% on
+            Fireworks.
+          - >-
+            The usual pattern, from `COMPARISON.md`: try ideas on your own machine first (prototype locally),
+            then run the real service on a managed platform (ship managed).
+        words:
+          - term: "Managed platform"
+            def: >-
+              A service that runs everything between the GPUs and the customer's app: the engine, scaling,
+              routing and the models. Example: Fireworks on Day 7.
+          - term: "Endpoint"
+            def: >-
+              A web address that answers requests for one model. Example: `http://localhost:8081/v1` for Day 8's
+              fine-tune.
+          - term: "Dedicated deployment"
+            def: >-
+              A GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not.
+              Example: about $8 an hour.
+          - term: "SLA (service level agreement)"
+            def: >-
+              A written promise to a customer about uptime or speed. Example: `COMPARISON.md` says the Mac has
+              none.
+        more: >-
+          Local or self-hosted training fits data that must stay inside the customer's environment, and cheap,
+          fast iteration. Managed wins on time to a scalable endpoint, autoscaling and an SLA. On Fireworks a LoRA
+          cannot run on serverless (shared, pay-per-token) models; it needs a dedicated deployment, so the serving
+          hours, not the training, are the cost to plan (the lab book). Day 7's lesson calls training "a few
+          cents" in its sample and "about a dollar" in its summary line; the QLoRA On Your Own Box video says
+          about a dollar. If data residency is the only blocker, the lab book notes that Fireworks can also run
+          inside the customer's own cloud account (BYOC), or pin a dedicated deployment to a region at 1.5 times
+          the rate. The QLoRA On Your Own Box video puts it this way: "the local versus managed trade-off is a
+          conversation, not a religion."
+      - q: >-
+          The add-on you trained (the adapter) is about 7 MB. Why does that small size matter when the model runs
+          as a service?
+        plain: >-
+          One copy of the base model can keep hundreds of these small add-ons in memory and apply the right one
+          to each request. So every customer can have their own tuned model for about the price of one shared
+          server.
+        picture: >-
+          One base recipe, a different spice packet per customer (the field guide's comparison). The kitchen
+          cooks one big pot and adds a small packet to each order, instead of running a separate kitchen for
+          every customer.
+        numbers_source: >-
+          Day 7's lesson (12 business units), Day 8's sample run and memory script, and the lab book's
+          $8-an-hour GPU price
+        numbers:
+          - >-
+            Adapter: `7.1M` in Day 8's sample, about 7.4 MB. Base model: about 4.3 GB, which is 4,300 MB.
+            4,300 ÷ 7.4 = about 580, so the base is hundreds of times bigger.
+          - >-
+            100 adapters: 100 x 7.4 MB = 740 MB, about a sixth of one base model (740 ÷ 4,300 = 0.17).
+          - >-
+            Day 7's example customer wants 12 tuned models, one per business unit (department). Each on its own
+            dedicated GPU at $8 an hour: 12 x $8 = $96 an hour.
+          - >-
+            The same 12 as adapters on one shared base: about $8 an hour, if one deployment can carry all their
+            traffic.
+          - >-
+            Running all month (730 hours): $8 x 730 = $5,840 for one deployment, against 12 x $5,840 = $70,080
+            for twelve.
+        words:
+          - term: "Adapter (LoRA adapter)"
+            def: >-
+              The small set of extra numbers LoRA trains and saves; the base model stays unchanged. Example:
+              about 7 MB in Day 8's sample.
+          - term: "Base model"
+            def: >-
+              The model a fine-tune starts from and leaves unchanged. Example: Qwen2.5 7B Instruct at 4 bits,
+              about 4.3 GB.
+          - term: "Multi-LoRA"
+            def: >-
+              One server keeps one base model and many adapters, applying the right adapter to each request.
+              Example: 12 business units on one deployment.
+          - term: "Tenant"
+            def: >-
+              One customer, or business unit, sharing a platform with others. Example: per-tenant fine-tunes, one
+              adapter each.
+        more: >-
+          Multi-LoRA servers keep one base in GPU memory and apply the right adapter per request, batching
+          requests for different adapters together; the field guide says Fireworks serves hundreds of fine-tunes
+          on one base model at the base model's price. Fusing the adapter into the weights, as Day 8's
+          `2_fuse_and_serve.sh` does for simplicity, gives that up: each fused model is a full copy. The size is
+          the script's estimate: 8 layers x 4 grids x 2 x 3,584 x rank 8 = 1,835,008 numbers, 3.7 MB at 2 bytes
+          each. It treats all four grids as 3,584 x 3,584; Qwen2.5 7B's key and value grids are 3,584 x 512
+          (lesson 17's `peft_params.py`), which gives 1,441,792, and mlx-lm's own defaults decide which grids get
+          an add-on. Lesson 11's README says about 4 MB, its sample prints `7.1M`, and it does not say why they
+          differ. `du -sh adapters` measures
+          the whole folder, which also keeps copies saved during training, so quote your own
+          `ls -lh adapters/adapters.safetensors` figure.
+    say:
+      ask: "Should we fine-tune on our own hardware, or pay for a managed platform?"
+      means:
+        - phrase: "I ran the same LoRA locally and managed"
+          meaning: >-
+            I trained the same small add-on (a LoRA adapter) on the same 800 support tickets twice. Once on my
+            own Mac, once on Fireworks, a managed platform that runs the hardware for you.
+        - phrase: "Local is free and private"
+          meaning: >-
+            Training on my Mac cost $0, and the tickets never left it.
+        - phrase: "managed got me to a scalable endpoint in minutes"
+          meaning: >-
+            Fireworks put the add-on behind a live web address other programs can call (an endpoint). It was
+            ready within minutes, and it can add copies as more people use it. My Mac serves one person at a
+            time.
+        - phrase: "The adapter is a few megabytes"
+          meaning: >-
+            The trained add-on is about 7 MB in the lesson's sample, against about 4.3 GB for the model it sits
+            on.
+        - phrase: "so multi-LoRA makes per-customer tuning economical"
+          meaning: >-
+            Multi-LoRA: one server keeps one copy of the model and many add-ons, one per customer, and uses the
+            right add-on for each request. Twelve tuned models then cost about one rented GPU, $8 an hour,
+            instead of twelve ($96 an hour).
+    fields:
+      - id: d8-category
+        label: "Right category on your Mac, before → after training (%)"
+        hint: >-
+          From `3_eval_local.sh`, the `category_%` column. The table shows the `mlx fused` row (after) first and
+          the `mlx Qwen2.5-7B-Instruct-4bit` row (before) second. Write before first, for example "78.0 → 96.0".
+        unit: "%"
+        meaning: >-
+          The share of the 60 test tickets whose category (billing, outage, how-to or abuse) the model got right,
+          before and after training. One ticket is worth 1.67 points.
+        example: "78.0 → 96.0 (the lesson's sample; Day 7's Fireworks sample: 80.0 → 97.0)"
+      - id: d8-severity
+        label: "Right severity on your Mac, before → after training (%)"
+        hint: "The `severity_%` column, same two rows: write the second row (before) first."
+        unit: "%"
+        meaning: >-
+          The share of test tickets whose urgency score (1 to 5) the model got exactly right.
+        example: "66.0 → 94.0 (the lesson's sample; Day 7's Fireworks sample: 70.0 → 95.0)"
+      - id: d8-p95
+        label: "Reply time of your fine-tune on the Mac, p95 (ms)"
+        hint: "The `p95_ms` column of the `mlx fused` row."
+        unit: "ms"
+        meaning: >-
+          How long a reply took: of the 60 test tickets, sent one at a time, 57 got theirs within this time and 3
+          took longer. ms means thousandths of a second, so 380 ms is 0.38 seconds. It goes in the p95 latency
+          row of `COMPARISON.md`, next to Fireworks.
+        example: "No Mac sample in the lesson; Day 7's Fireworks sample was 380 ms."
+      - id: d8-adapter
+        label: "Adapter size on disk"
+        hint: >-
+          The `adapter saved:` line at the end of `1_train_mlx.sh` gives the size of the whole `adapters` folder.
+          That folder also keeps copies saved during training. For the one file you would ship, run
+          `ls -lh adapters/adapters.safetensors` in the lesson folder and write its size. The same command works
+          if you stopped training with Ctrl+C.
+        unit: "MB"
+        meaning: >-
+          The whole trained add-on: the file you would send, keep versions of and swap. Compare it with the
+          4.3 GB model.
+        example: "`7.1M` on the sample's `adapter saved:` line, about 7.4 MB (the lesson's sample)"
+      - id: d8-time
+        label: "Time from starting training to your Mac answering requests (minutes)"
+        hint: >-
+          From starting `1_train_mlx.sh` to the server answering: training, then fusing and loading.
+        unit: "min"
+        meaning: >-
+          The real time that passes (wall-clock row of `COMPARISON.md`): how long a customer waits for a working
+          tuned model.
+        example: "Training alone takes about 15 to 40 minutes, the lesson's range."
+      - id: d8-recommendation
+        label: "Your recommendation: local, managed, or both"
+        hint: >-
+          Pick one kind of customer, for example a bank whose data may not leave its own machines, and write one
+          sentence for them. It is the last line of `COMPARISON.md`.
+        meaning: >-
+          Your build-versus-buy answer, in a sentence a customer can use.
+        example: "Prototype locally, free and private; ship on Fireworks once it must serve many users."
+    done: >-
+      Validation loss has flattened and training has stopped. Your score table has a row for the fine-tune and
+      one for the original model, on the same 60 test tickets. `COMPARISON.md` has your Mac column filled in next
+      to Day 7's Fireworks column.
+    stuck:
+      - problem: "Training stops with an out-of-memory error, or the Mac slows to a crawl."
+        fix: >-
+          Close big apps first. Then in `1_train_mlx.sh` change `--batch-size 2` to `--batch-size 1` (the
+          script's own advice) and run it again. If it still fails, also change `--num-layers 8` to 4: fewer
+          layers with add-ons need less memory, but the add-on can learn less.
+      - problem: "`mlx_lm.lora: command not found`"
+        fix: >-
+          The Python environment from Day 1 is not on. From the `03-labs` folder run
+          `source .venv/bin/activate`, then `cd lessons/11-lora-local-mlx` and run the script again.
+      - problem: "`2_fuse_and_serve.sh` fails with 'Address already in use'."
+        fix: >-
+          Another server already uses port 8081, most likely Day 2's MLX server. Stop it with Ctrl+C in its
+          window, then run the script again.
+      - problem: "`3_eval_local.sh` says `Connection refused`."
+        fix: >-
+          The server is not up yet: fusing comes first and takes a while. Wait for the line ending
+          `serving on :8081 (Ctrl-C to stop)` in the server window, give it a few seconds to load, then run the
+          eval again. Keep that window open.
+      - problem: >-
+          The eval gets through the fine-tune, then stops with an error at
+          `evaluating mlx mlx-community/Qwen2.5-7B-Instruct-4bit`.
+        fix: >-
+          Your copy of the MLX tools will not switch models on one server. No table prints, but the fine-tune's
+          scores are already saved: the last row of `03-labs/results/09-eval.csv`, named `mlx fused`. Copy its
+          `category_%`, `severity_%` and `p95_ms` from there. Stop the server with Ctrl+C in its window to free
+          memory. In that window, start the original model on a second port:
+          `mlx_lm.server --model mlx-community/Qwen2.5-7B-Instruct-4bit --port 8082`. Then in the eval window
+          (still in the lesson folder) run
+          `MLX_URL=http://localhost:8082/v1 python ../09-eval-harness/evaluate.py "mlx:mlx-community/Qwen2.5-7B-Instruct-4bit" --n 60`.
+          It prints the original model's row.
+      - problem: "Validation loss starts rising again before step 300."
+        fix: >-
+          The model has begun memorising the training tickets. Stop with Ctrl+C; the last save is kept. For a
+          rerun, lower `--iters 300` in `1_train_mlx.sh` to about the step where the loss was lowest.
+    replace:
+      - find: "This is the same dataset and task as lesson 10, trained locally."
+        with: "This is the same dataset and task as Day 7's fine-tune on Fireworks, trained locally."
+      - find: "# other terminal"
+        with: "# second terminal: activate .venv, cd to this folder first"
+      - find: "# then fill in COMPARISON.md"
+        with: "# then fill in COMPARISON.md next to your Day 7 Fireworks numbers"
+
+wrapup:
+  done: >-
+    Your build-versus-buy page (`COMPARISON.md`) is filled in. It shows the same fine-tune on Fireworks (Day 7)
+    and on your Mac (today), side by side. It covers accuracy before and after, reply time, time to a working
+    model, cost and privacy. The last line is your one-sentence recommendation.
+  whiteboards:
+    - video: 12-qlora
+      q: >-
+        Two fine-tunes of the same model. One learned from 200 messy examples, the other from 2,000 clean ones.
+        On their own training examples they score 97% and 93%. Which one do you ship, and why?
+      given: >-
+        Training accuracy is how often the model is right on the examples it learned from. Held-out accuracy is
+        how often it is right on examples it never saw, set aside before training: 74% for the messy run, 89% for
+        the clean run.
+      plain: >-
+        Ship the one trained on 2,000 clean examples. It scores a little lower on its own homework but much
+        higher on new questions, and new questions are what customers send.
+      picture: >-
+        One student memorises last year's answer sheet and aces the practice quiz, then stumbles on the real
+        exam. Another learns the material: slightly lower on the quiz, far higher on the exam.
+      steps:
+        - "Messy run: 97% on its training examples, 74% on new ones. Gap: 97 - 74 = 23 points."
+        - "Clean run: 93% on its training examples, 89% on new ones. Gap: 93 - 89 = 4 points."
+        - "A big gap means the model memorised its examples instead of learning the task: that is overfitting."
+        - "On new examples the clean run wins by 89 - 74 = 15 points, though it looks 4 points worse on its own examples (97 - 93)."
+        - "Per 100 new examples: 100 - 89 = 11 wrong instead of 100 - 74 = 26, less than half the mistakes."
+        - "So judge a fine-tune only on held-out examples, and stop training when validation loss stops improving."
+      note: >-
+        Set the held-out examples aside before training starts. That is why today's final grade uses
+        `test.jsonl`, which training never touches.
+      kit_q: "Data quality decides it · 200 noisy examples · 2,000 clean examples"
+      kit_a: "What matters is the data, not the hardware. Two hundred examples overfit fast, and the model got worse on anything slightly different. Two thousand cleaner examples, with a held out set to tell you when to stop, gave the improvement. The most common fine tuning failure is not compute, it is training on data nobody checked. Hold out the eval set before you start; stop when validation loss stops improving."
+      more: >-
+        Rising training accuracy with falling held-out accuracy is the overfitting signature, and a LoRA on a
+        small, noisy set memorises fast. Today's lesson has all three defences: a held-out split made before
+        training (`make_tickets.py`), validation loss reported every 50 steps (`--steps-per-eval 50`) so you can
+        stop by hand, and a final score on the untouched test split. The video does not say what made the 200
+        examples noisy; its point is to check the data before you train.
+      words:
+        - term: "Overfitting"
+          def: "learning the training examples by heart instead of the task, so new examples go worse. Example: 97% on training examples, 74% on new ones."
+        - term: "Held-out accuracy"
+          def: "how often the model is right on examples set aside before training and never trained on. Example: 74% for the messy run, 89% for the clean run."
+        - term: "Training accuracy"
+          def: "how often the model is right on the examples it learned from. Example: 97% for the messy run."
+        - term: "Generalise"
+          def: "do well on new examples, not only the ones trained on. Example: 89% held out for the clean run."
+
+glossary:
+  # Shared with earlier days (same text)
+  - term: "4-bit, 8-bit, 16-bit"
+    def: "how many bits store each number; fewer bits, smaller model."
+    example: "today's base model is frozen at 4 bits."
+  - term: "Autoscaling"
+    def: "adding or removing copies of a model as traffic rises and falls."
+    example: "why `COMPARISON.md` says the managed side scales to 100 users at once."
+  - term: "Byte"
+    def: "8 bits."
+    example: "a full fine-tune keeps about 16 bytes per number."
+  - term: "Chip"
+    def: "the processor that does the model's math."
+    example: "an Apple M4 Max, or an NVIDIA H100 (a GPU)."
+  - term: "Eval (eval harness)"
+    def: "a repeatable test of a model on a fixed set of prompts."
+    example: "Day 7's `evaluate.py`, run on Day 8 on 60 test tickets."
+  - term: "GB"
+    def: "1,000,000,000 bytes."
+    example: "about 4.3 GB for Day 8's 4-bit base model."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "H100; on a Mac it shares memory with everything else."
+  - term: "H100"
+    def: "NVIDIA's data-center GPU, 80 GB of memory at 3,350 GB/s."
+    example: "a full fine-tune of a 7.6B model (121.6 GB) does not fit on one."
+  - term: "Held-out prompts"
+    def: "test prompts the model was never trained on."
+    example: "`test.jsonl`, 100 tickets; Day 8's eval uses the first 60."
+  - term: "Hugging Face"
+    def: "the public website where most open model files are shared."
+    example: "`1_train_mlx.sh` downloads the 4-bit base model from there."
+  - term: "JSONL"
+    def: "a file with one JSON record per line."
+    example: "`train.jsonl` holds 800 tickets."
+  - term: "Latency"
+    def: "how long someone waits."
+    example: "the `p95_ms` column of the eval table."
+  - term: "Layer"
+    def: "one of the stacked processing stages each token passes through; each keeps its own notes."
+    example: "Day 8's add-ons sit on the last 8 layers."
+  - term: "Localhost"
+    def: "your own computer, used as an address."
+    example: "`http://localhost:8081/v1` is your fine-tune on your Mac."
+  - term: "Master copy"
+    def: "a 32-bit copy of every weight kept during training, so many tiny nudges add up accurately."
+    example: "4 of the 16 bytes per number in a full fine-tune."
+  - term: "MB"
+    def: "1,000,000 bytes."
+    example: "the adapter file is about 7 MB."
+  - term: "MiB"
+    def: "1,048,576 bytes (about a million), the unit llama.cpp prints; 1,000 MiB is about 1 GB."
+    example: "`du` and `ls -lh` print it as M: `7.1M` is about 7.4 MB."
+  - term: "MLX"
+    def: "Apple's own software for running and training models on Apple chips; `mlx_lm.server` is its model server."
+    example: "`mlx_lm.lora` trains Day 8's adapter."
+  - term: "ms (millisecond)"
+    def: "a thousandth of a second."
+    example: "380 ms, the p95 of Day 7's Fireworks sample."
+  - term: "p95"
+    def: "the value 95 out of 100 requests stay under."
+    example: "the `p95_ms` column: of 60 test tickets, 57 got their reply within it."
+  - term: "Parameters (8B, 70B)"
+    def: "the model's learned numbers (weights)."
+    example: "8B = 8 billion; Day 8's model has 7.6 billion."
+  - term: "Port"
+    def: "a numbered door on a computer where one server program listens for requests."
+    example: "your fine-tune is served on 8081, like Day 2's MLX server."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "one support ticket."
+  - term: "Quantization (quantize)"
+    def: "storing numbers with fewer bits."
+    example: "the frozen base stored in 4 bits for QLoRA."
+  - term: "Replica"
+    def: "one complete running copy of the server and model."
+    example: "a managed platform adds replicas as traffic grows."
+  - term: "Request"
+    def: "one message sent to the model for an answer."
+    example: "one ticket sent to the eval's server."
+  - term: "Scale"
+    def: "one shared number stored with a small block of numbers so they can be squeezed into fewer bits."
+    example: "why the 4-bit base takes 0.5625 bytes per number, not 0.5."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "`mlx_lm.server` serving your fine-tune."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "Day 8 uses two: one for training and then the server, one for the tests."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "1,000 tokens is roughly 750 words."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "`mlx_lm.server` and `felab` live inside it."
+  - term: "Wall-clock time"
+    def: "the real time that passes from start to finish."
+    example: "from the ticket data to a working local endpoint."
+  - term: "Weights"
+    def: "the model's learned numbers, fetched in full for every token written (a mixture-of-experts model fetches only the part it uses)."
+    example: "frozen during QLoRA; only the adapter changes."
+  # New on Day 8
+  - term: "Adam"
+    def: "the usual training method for adjusting a model's numbers; it keeps two running averages per trainable number."
+    example: "its two averages take 8 bytes per number in a full fine-tune."
+  - term: "Adapter (LoRA adapter)"
+    def: "the small set of extra numbers LoRA trains and saves; the base model stays unchanged."
+    example: "about 7 MB in Day 8's sample run."
+  - term: "Base model"
+    def: "the model a fine-tune starts from and leaves unchanged."
+    example: "Qwen2.5 7B Instruct at 4 bits, about 4.3 GB."
+  - term: "Batch size (training)"
+    def: "how many examples the model learns from in one training step."
+    example: "2 in `1_train_mlx.sh`; lower it to 1 if memory runs out."
+  - term: "Build versus buy"
+    def: "doing a job with your own hardware and people, or paying a service to do it."
+    example: "`COMPARISON.md`: the same fine-tune on your Mac and on Fireworks."
+  - term: "BYOC (bring your own cloud)"
+    def: "a managed service's software running inside the customer's own cloud account, so the data stays there."
+    example: "the lab book's answer to \"Can we keep data in-region?\""
+  - term: "Accuracy (category accuracy)"
+    def: "the share of replies with the right answer, checked against each test example's known label."
+    example: "`category_%`: 78.0 to 96.0 on the Mac in Day 8's sample."
+  - term: "Dedicated deployment"
+    def: "a GPU reserved for you on Fireworks, billed by the second at an hourly rate from the moment it is created, used or not."
+    example: "about $8 an hour: Day 7's sample paid $5.07 for 38 minutes."
+  - term: "Endpoint"
+    def: "a web address that answers requests for one model."
+    example: "`http://localhost:8081/v1` for Day 8's fine-tune."
+  - term: "Epoch"
+    def: "one full pass through all the training examples."
+    example: "300 steps x 2 tickets = 600 of 800, three quarters of an epoch."
+  - term: "Fine-tune"
+    def: "further training of an existing model on your own examples."
+    example: "the ticket-triage model on Days 7 and 8."
+  - term: "Frozen"
+    def: "left unchanged during training."
+    example: "the 4-bit base in QLoRA."
+  - term: "Full fine-tune"
+    def: "fine-tuning that changes every number in the model."
+    example: "about 121.6 GB of memory for a 7.6B model, by Day 8's memory script."
+  - term: "Fuse (fused model)"
+    def: "baking the adapter into the base model's numbers to make one self-contained model."
+    example: "`mlx_lm.fuse` writes the `fused` folder."
+  - term: "Generalise"
+    def: "do well on new examples, not only the ones trained on."
+    example: "89% on held-out examples for the clean run in the QLoRA On Your Own Box video."
+  - term: "Gradient"
+    def: "the correction worked out for each trainable number at each training step."
+    example: "a full fine-tune keeps one for all 7.6 billion numbers."
+  - term: "Held-out accuracy"
+    def: "how often the model is right on examples set aside before training and never trained on."
+    example: "74% for the messy run, 89% for the clean run in the QLoRA On Your Own Box video."
+  - term: "Hot-swap"
+    def: "change which adapter a running server applies, without restarting it."
+    example: "what small adapter files make easy in multi-LoRA serving."
+  - term: "Iteration (training step)"
+    def: "one update: the model sees a small batch of examples and adjusts."
+    example: "300 iterations in `1_train_mlx.sh`."
+  - term: "Leak (data leakage)"
+    def: "data used to judge a model has also shaped it, so the score looks better than it is."
+    example: "the validation tickets, once they set the stopping point."
+  - term: "LoRA"
+    def: "a cheap way to customise a model: train a small add-on instead of changing the whole model."
+    example: "LoRA (low-rank adaptation): about 1.8 million trained numbers on Day 8 by the memory script's rough count, against 7.6 billion in the model."
+  - term: "Loss (training loss)"
+    def: "a score of how wrong the model's guesses are on the examples it trains on; lower is better."
+    example: "it keeps falling even after the model starts memorising."
+  - term: "Multi-LoRA"
+    def: "one server keeps one base model and many adapters, applying the right adapter to each request."
+    example: "12 business units on one $8-an-hour deployment instead of twelve."
+  - term: "Optimizer state"
+    def: "the running averages the training method (Adam) keeps per trainable number to size each correction."
+    example: "8 of the 16 bytes per number in a full fine-tune."
+  - term: "Overfitting"
+    def: "learning the training examples by heart instead of the task, so new examples go worse."
+    example: "97% on training examples but 74% on new ones in the QLoRA On Your Own Box video."
+  - term: "Peak memory"
+    def: "the most memory a job uses at any moment."
+    example: "about 11 GB for the 8B fine-tune in the QLoRA On Your Own Box video."
+  - term: "QLoRA"
+    def: "LoRA on a base model stored in 4 bits, so training fits in far less memory."
+    example: "about 6.3 GB for Day 8's 7.6B model, by the memory script."
+  - term: "Qwen2.5 7B Instruct"
+    def: "an open model with 7.6 billion numbers, already trained to follow instructions; Days 7 and 8 fine-tune it."
+    example: "`mlx-community/Qwen2.5-7B-Instruct-4bit` is its 4-bit MLX version."
+  - term: "Rank (LoRA rank)"
+    def: "how wide the adapter's small grids are; a higher rank means more capacity and a bigger file."
+    example: "rank 8 on Day 8; `python qlora_memory.py --rank 16` doubles the adapter estimate (1.8 to 3.7 million numbers)."
+  - term: "Serverless"
+    def: "Fireworks' shared, always-on models, billed per token you send and receive."
+    example: "a LoRA fine-tune cannot be served this way (the lab book)."
+  - term: "Severity (severity_%)"
+    def: "how urgent a ticket is, from 1 to 5; `severity_%` is the share rated correctly."
+    example: "66.0 to 94.0 on the Mac in Day 8's sample."
+  - term: "SLA (service level agreement)"
+    def: "a written promise to a customer about uptime or speed."
+    example: "`COMPARISON.md` says the Mac has none."
+  - term: "Tenant"
+    def: "one customer, or business unit, sharing a platform with others."
+    example: "per-tenant fine-tunes: one adapter each."
+  - term: "Test set (held-out set)"
+    def: "examples kept out of training and out of every decision, used only for the final score."
+    example: "`test.jsonl`, 100 tickets; the eval uses 60."
+  - term: "Training accuracy"
+    def: "how often the model is right on the examples it learned from."
+    example: "97% for the messy run in the QLoRA On Your Own Box video."
+  - term: "Training set"
+    def: "the examples the model learns from."
+    example: "`train.jsonl`, 800 tickets."
+  - term: "Validation loss"
+    def: "a score of how wrong the model still is on the validation set; lower is better."
+    example: "0.412, 0.198 and 0.121 at steps 50, 100 and 300 in Day 8's sample."
+  - term: "Validation set"
+    def: "examples kept out of training and checked during it, to decide when to stop."
+    example: "`valid.jsonl`, 100 tickets."

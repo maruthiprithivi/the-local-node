@@ -1,0 +1,26 @@
+{
+  "name": "fireworks-explainers",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Narrated explainer videos for LLM inference, training and infrastructure concepts (Remotion + Kokoro TTS).",
+  "scripts": {
+    "dev": "remotion studio",
+    "tts": "python3 scripts/tts.py",
+    "tts:node": "node scripts/tts.mjs",
+    "render": "bash scripts/render-all.sh",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.527",
+    "@remotion/media": "4.0.527",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.527"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "kokoro-js": "1.2.1",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,1928 @@
+<meta charset="utf-8">
+<title>Inference Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+:root{
+  --ground:#F1F2EE; --surface:#FFFFFF; --surface2:#E7E9E3; --ink:#161A1F; --muted:#59606A; --rule:#D3D7CE;
+  --accent:#0E7A6B; --accent-soft:#D5ECE6; --copper:#B4531A; --copper-soft:#F6E3D5;
+  --fw:#BF3F0E; --fw-soft:#F8E0D4; --rp:#5140C9; --rp-soft:#E4E1FA;
+  --good:#1E7A3B; --good-soft:#DDF0E2; --warn:#9A6100; --warn-soft:#F7EACC; --bad:#B42318; --bad-soft:#F8DCD8;
+  --shadow:0 1px 2px rgba(22,26,31,.05),0 10px 30px -18px rgba(22,26,31,.28);
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1115; --surface:#161A20; --surface2:#1E232B; --ink:#E6E9E3; --muted:#9BA3AC; --rule:#2B313A;
+    --accent:#3CC4AE; --accent-soft:#123630; --copper:#EC955B; --copper-soft:#3A2517;
+    --fw:#F4834F; --fw-soft:#3B2016; --rp:#A093FF; --rp-soft:#26213F;
+    --good:#52C77F; --good-soft:#143322; --warn:#E6AD3E; --warn-soft:#352A12; --bad:#F37563; --bad-soft:#3A1A16;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -18px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1115; --surface:#161A20; --surface2:#1E232B; --ink:#E6E9E3; --muted:#9BA3AC; --rule:#2B313A;
+  --accent:#3CC4AE; --accent-soft:#123630; --copper:#EC955B; --copper-soft:#3A2517;
+  --fw:#F4834F; --fw-soft:#3B2016; --rp:#A093FF; --rp-soft:#26213F;
+  --good:#52C77F; --good-soft:#143322; --warn:#E6AD3E; --warn-soft:#352A12; --bad:#F37563; --bad-soft:#3A1A16;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -18px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,.card-flip:focus-visible,.tok:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.12;text-wrap:balance;margin:0}
+h2{font-size:clamp(1.7rem,3.4vw,2.45rem);font-weight:700;letter-spacing:-.02em}
+h3{font-size:1.28rem;font-weight:650;letter-spacing:-.01em}
+h4{font-size:1.02rem;font-weight:650}
+p{margin:0}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:1fr;max-width:1320px;margin:0 auto;padding-inline:16px}
+.rail{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--ground);border-bottom:1px solid var(--rule);margin-inline:-16px;padding:8px 16px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.rail .brand{display:none}
+.rail nav{display:flex;gap:4px}
+.rail a{display:inline-block;text-decoration:none;color:var(--muted);font-size:.84rem;padding:6px 10px;border-radius:999px;font-weight:500}
+.rail a:hover{color:var(--ink);background:var(--surface2)}
+.rail a.on{color:var(--ink);background:var(--surface)}
+.rail .grp{display:none}
+main{min-width:0;padding-block:8px 80px}
+@media (min-width:1100px){
+  .shell{grid-template-columns:230px minmax(0,1fr);gap:40px;padding-inline:24px}
+  .rail{top:env(safe-area-inset-top,0px);height:100vh;margin:0;padding:28px 0 28px;border:0;overflow-y:auto;white-space:normal;background:transparent}
+  .rail .brand{display:block;font-family:var(--display);font-weight:750;font-size:1.05rem;letter-spacing:-.01em;margin-bottom:20px;line-height:1.2}
+  .rail .brand small{display:block;font-family:var(--mono);font-weight:400;font-size:.7rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:6px}
+  .rail nav{flex-direction:column;gap:1px}
+  .rail a{border-radius:6px;padding:5px 10px;font-size:.88rem}
+  .rail a.on{background:var(--surface);box-shadow:var(--shadow)}
+  .rail .grp{display:block;font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:16px 10px 4px}
+}
+
+/* ---------- sections ---------- */
+section{padding-block:56px 8px;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.eyebrow .step{color:var(--accent);font-weight:600}
+.lede{font-size:1.1rem;color:var(--muted);max-width:66ch;margin-top:12px}
+.prose{max-width:68ch}
+.prose p+p{margin-top:12px}
+.stack{display:flex;flex-direction:column;gap:18px}
+.sec-body{display:flex;flex-direction:column;gap:28px;margin-top:28px}
+
+/* ---------- hero ---------- */
+.hero{display:grid;gap:28px;padding-block:36px 40px;align-items:center}
+@media (min-width:900px){.hero{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+.hero h1{font-size:clamp(2.3rem,5.4vw,4rem);font-weight:780;letter-spacing:-.035em}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .sub{margin-top:16px;font-size:1.12rem;color:var(--muted);max-width:52ch}
+.hero .meta{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.74rem;padding:4px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--rule);color:var(--muted)}
+.chip.fw{color:var(--fw);border-color:color-mix(in srgb,var(--fw) 35%,var(--rule))}
+.chip.rp{color:var(--rp);border-color:color-mix(in srgb,var(--rp) 35%,var(--rule))}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+
+.stage3d{position:relative;background:var(--surface);border:1px solid var(--rule);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.stage3d canvas{display:block;width:100%;height:400px;cursor:grab;touch-action:pan-y}
+.stage3d canvas:active{cursor:grabbing}
+@media (max-width:600px){.stage3d canvas{height:300px}}
+.stage3d .lbl{position:absolute;left:0;top:0;pointer-events:none;font-family:var(--mono);font-size:.7rem;line-height:1.3;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--rule);padding:3px 7px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-120%);color:var(--ink)}
+.stage3d .lbl b{font-weight:600}
+.stage3d .hud{position:absolute;left:12px;top:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none;flex-wrap:wrap}
+.stage3d .hud .pill{pointer-events:none}
+.stage-foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid var(--rule);background:var(--surface)}
+.stage-foot p{font-size:.88rem;color:var(--muted);max-width:60ch}
+.hint{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+
+/* ---------- controls ---------- */
+.seg{display:inline-flex;background:var(--surface2);border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:transparent;color:var(--muted);font:500 .84rem var(--body);padding:6px 12px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.btn{border:1px solid var(--rule);background:var(--surface);color:var(--ink);font:500 .86rem var(--body);padding:7px 14px;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.field label output{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select{font:inherit;font-size:.9rem;padding:7px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);width:100%}
+.check{display:flex;align-items:center;gap:8px;font-size:.88rem;cursor:pointer}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+
+/* ---------- panels ---------- */
+.lab{background:var(--surface);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.lab-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:16px 18px 0}
+.lab-head .t{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.lab-head h3{margin-top:4px}
+.lab-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:16px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.ro{background:var(--surface2);border-radius:8px;padding:10px 12px}
+.ro .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ro .v{font-family:var(--mono);font-size:1.25rem;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.ro .v small{font-size:.75rem;color:var(--muted);font-weight:400}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.pill.cu{background:var(--copper-soft);color:var(--copper)}
+.scroll-x{overflow-x:auto}
+.note{font-size:.82rem;color:var(--muted)}
+
+/* plain-words analogy */
+.plain{position:relative;border:1.5px dashed color-mix(in srgb,var(--copper) 55%,var(--rule));border-radius:12px;padding:18px 18px 16px;background:color-mix(in srgb,var(--copper-soft) 45%,var(--surface))}
+.plain .tag{position:absolute;top:-11px;left:14px;background:var(--copper);color:var(--surface);font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:4px;font-weight:600}
+.plain p{max-width:68ch}
+.plain p+p{margin-top:8px}
+
+/* concept grid */
+.concepts{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.concept{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.concept h4{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.concept .def{font-size:.92rem}
+.concept .an{font-size:.88rem;color:var(--copper);font-style:italic}
+.concept .why{font-size:.84rem;color:var(--muted);border-top:1px solid var(--rule);padding-top:6px;margin-top:auto}
+
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--surface2)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:.86rem}
+.tablewrap{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow-x:auto}
+.tablewrap table{min-width:640px}
+.fwc{color:var(--fw);font-weight:600}
+.rpc{color:var(--rp);font-weight:600}
+
+/* companies */
+.duo{display:grid;gap:16px}
+@media (min-width:820px){.duo{grid-template-columns:1fr 1fr}}
+.co{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;border-top:4px solid var(--c)}
+.co.fw{--c:var(--fw)} .co.rp{--c:var(--rp)}
+.co h3{font-size:1.6rem;color:var(--c)}
+.co .one{font-size:1.02rem;font-weight:500}
+.co dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:.9rem}
+.co dt{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.co dd{margin:0}
+.co ul{margin:0;padding-left:18px;font-size:.92rem}
+.co ul li+li{margin-top:4px}
+
+/* stack diagram */
+.stackgrid{display:grid;grid-template-columns:minmax(150px,1.3fr) repeat(3,minmax(92px,1fr));gap:6px;min-width:560px;padding:16px 18px}
+.stackgrid .h{font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;align-self:end;padding-bottom:4px}
+.stackgrid .h.l{text-align:left}
+.stackgrid .layer{font-size:.88rem;font-weight:500;display:flex;flex-direction:column;justify-content:center;padding:6px 0}
+.stackgrid .layer small{font-weight:400;color:var(--muted);font-size:.76rem}
+.cell{border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.72rem;min-height:44px;text-align:center;padding:4px}
+.cell.them-fw{background:var(--fw);color:var(--surface)}
+.cell.them-rp{background:var(--rp);color:var(--surface)}
+.cell.you{border:1.5px dashed var(--rule);color:var(--muted)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);padding:0 18px 16px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+
+/* loop track */
+.track{display:flex;gap:6px;flex-wrap:wrap;align-items:stretch}
+.track .st{flex:1 1 140px;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;position:relative}
+.track .st b{display:block;font-size:.9rem}
+.track .st span{font-size:.8rem;color:var(--muted)}
+.track .st .i{font-family:var(--mono);font-size:.68rem;color:var(--c);font-weight:600;letter-spacing:.06em}
+.track.fw{--c:var(--fw)} .track.rp{--c:var(--rp)}
+
+/* token player */
+.tokrow{display:flex;flex-wrap:wrap;gap:4px;min-height:30px}
+.tk{width:22px;height:22px;border-radius:4px;background:var(--surface2);border:1px solid var(--rule);transition:background .15s,transform .15s}
+.tk.pf{background:var(--copper);border-color:var(--copper)}
+.tk.cached{background:var(--accent-soft);border-color:var(--accent);border-style:dashed}
+.tk.out{background:var(--accent);border-color:var(--accent);animation:pop .22s ease-out}
+@keyframes pop{from{transform:scale(.4)}to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.tk.out{animation:none}}
+.timeline{height:30px;display:flex;border-radius:6px;overflow:hidden;background:var(--surface2);font-family:var(--mono);font-size:.7rem}
+.timeline div{display:flex;align-items:center;padding:0 8px;white-space:nowrap;overflow:hidden;color:var(--surface);min-width:0}
+.timeline .a{background:var(--copper)} .timeline .b{background:var(--accent)}
+.phase-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+
+/* attention */
+.sentence{display:flex;flex-wrap:wrap;gap:8px}
+.tok{position:relative;font-family:var(--mono);font-size:.95rem;padding:10px 12px 20px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);cursor:pointer;color:var(--ink);min-width:56px;text-align:center}
+.tok .w{position:absolute;left:6px;right:6px;bottom:5px;height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.tok .w i{display:block;height:100%;background:var(--copper);width:0;transition:width .25s}
+.tok .pct{position:absolute;right:5px;top:2px;font-size:.62rem;color:var(--muted)}
+.tok.q{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}
+.tok.future{opacity:.35}
+.qkv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.qkv div{border-radius:10px;padding:12px;background:var(--surface2)}
+.qkv b{font-family:var(--mono);font-size:1.3rem;display:block;color:var(--accent)}
+
+/* svg charts */
+svg text{font-family:var(--mono)}
+.chart-wrap{overflow-x:auto}
+.chart-wrap svg{display:block;width:100%;min-width:520px;height:auto}
+
+/* paged sim */
+.paged{display:grid;gap:16px}
+@media (min-width:720px){.paged{grid-template-columns:1fr 1fr}}
+.pgrid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.pgrid div{aspect-ratio:1;border-radius:3px;background:var(--surface2);max-width:100%}
+.pgrid div.waste{background:repeating-linear-gradient(45deg,var(--surface2) 0 3px,color-mix(in srgb,var(--bad) 45%,var(--surface2)) 3px 5px)}
+.pcol h4{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px}
+.pstats{display:flex;gap:14px;font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.pstats b{color:var(--ink);font-weight:600}
+
+/* spec decode */
+.specline{display:flex;flex-wrap:wrap;gap:5px;min-height:34px;align-items:center}
+.sw-tok{font-family:var(--mono);font-size:.84rem;padding:4px 8px;border-radius:5px;border:1px solid var(--rule);background:var(--surface)}
+.sw-tok.acc{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.sw-tok.tgt{background:var(--copper-soft);border-color:var(--copper)}
+.sw-tok.rej{text-decoration:line-through;color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.sw-tok.draft{border-style:dashed;color:var(--muted)}
+.rowlbl{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+
+/* engines */
+.engines{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
+.eng{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;transition:border-color .2s,box-shadow .2s}
+.eng.pick{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.eng h4{font-family:var(--mono);font-size:1rem}
+.eng p{font-size:.88rem}
+.eng .tr{font-size:.82rem;color:var(--muted)}
+.eng .ana{font-size:.84rem;color:var(--copper);font-style:italic}
+
+/* calc bar */
+.membar{position:relative;height:44px;border-radius:8px;background:var(--surface2);overflow:hidden;display:flex}
+.membar div{height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.7rem;color:var(--surface);white-space:nowrap;overflow:hidden;transition:width .3s}
+.membar .w{background:var(--accent)} .membar .kv{background:var(--copper)} .membar .o{background:var(--muted)}
+.gpuTicks{position:relative;height:18px;font-family:var(--mono);font-size:.66rem;color:var(--muted)}
+.gpuTicks span{position:absolute;top:0;transform:translateX(-100%);padding-right:3px;border-right:2px solid var(--ink);height:18px;white-space:nowrap}
+.formula{font-family:var(--mono);font-size:.82rem;background:var(--surface2);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:pre;line-height:1.7}
+
+/* scenarios */
+details.case{background:var(--surface);border:1px solid var(--rule);border-radius:12px}
+details.case+details.case{margin-top:10px}
+details.case summary{cursor:pointer;list-style:none;padding:14px 18px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+details.case summary::-webkit-details-marker{display:none}
+details.case summary h4{font-size:1.05rem}
+details.case summary .plus{font-family:var(--mono);color:var(--muted);transition:transform .2s;flex-shrink:0}
+details.case[open] summary .plus{transform:rotate(45deg)}
+.case-body{padding:0 18px 18px;display:grid;gap:14px}
+@media (min-width:760px){.case-body{grid-template-columns:repeat(3,1fr)}}
+.case-body .col h5{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;margin:0 0 6px;color:var(--accent)}
+.case-body .col ul{margin:0;padding-left:18px;font-size:.9rem}
+.case-body .col li+li{margin-top:4px}
+.case-body .say{grid-column:1/-1;background:var(--surface2);border-radius:8px;padding:12px 14px;font-size:.92rem}
+.case-body .say b{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--copper);display:block;margin-bottom:4px}
+
+/* bridge */
+.bridge{display:grid;gap:8px}
+.bridge .row{display:grid;grid-template-columns:1fr 36px 1fr;gap:8px;align-items:stretch}
+.bridge .row>div{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;font-size:.9rem}
+.bridge .row>div b{display:block;font-size:.94rem}
+.bridge .row>div span{color:var(--muted);font-size:.84rem}
+.bridge .arr{display:flex;align-items:center;justify-content:center;font-family:var(--mono);color:var(--accent);border:0!important;background:none!important;padding:0!important}
+.bridge .hd{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:none!important;border:0!important;padding:0 2px!important}
+@media (max-width:560px){.bridge .row{grid-template-columns:1fr}.bridge .arr{transform:rotate(90deg);height:20px}}
+.qs{display:grid;gap:16px}
+@media (min-width:760px){.qs{grid-template-columns:1fr 1fr}}
+.qs ul{margin:8px 0 0;padding-left:18px;font-size:.92rem}
+.qs li+li{margin-top:6px}
+
+/* flashcards */
+.cardbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card-flip{perspective:900px;height:190px;cursor:pointer;background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit}
+.card-in{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}
+.card-flip.flipped .card-in{transform:rotateY(180deg)}
+@media (prefers-reduced-motion:reduce){.card-in{transition:none}}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;border:1px solid var(--rule);overflow:auto}
+.face.front{background:var(--surface)}
+.face.back{background:var(--accent-soft);transform:rotateY(180deg);border-color:var(--accent)}
+.face .c{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.face .qq{font-family:var(--display);font-weight:600;font-size:1.08rem;line-height:1.25}
+.face .aa{font-size:.9rem}
+.face .flip{margin-top:auto;font-family:var(--mono);font-size:.66rem;color:var(--muted)}
+
+/* plan */
+.plan{display:grid;gap:10px}
+.day{display:grid;grid-template-columns:64px 1fr;gap:14px;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;align-items:start}
+.day .d{font-family:var(--display);font-weight:750;font-size:1.6rem;line-height:1;color:var(--accent)}
+.day .d small{display:block;font-family:var(--mono);font-size:.64rem;font-weight:400;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:4px}
+.day h4{margin-bottom:4px}
+.day p{font-size:.9rem;color:var(--muted)}
+.day .check{margin-top:8px}
+.day.done{opacity:.6}
+.progress{height:6px;border-radius:3px;background:var(--surface2);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+
+/* cheat */
+.cheat{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.cheat .cc{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.cheat .cc .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cheat .cc .v{font-family:var(--display);font-weight:700;font-size:1.35rem;margin-top:2px;font-variant-numeric:tabular-nums}
+.cheat .cc p{font-size:.82rem;color:var(--muted);margin-top:2px}
+.sources{columns:2 300px;column-gap:28px;font-size:.86rem;padding-left:18px}
+.sources li{break-inside:avoid;margin-bottom:6px}
+footer{padding-block:40px;color:var(--muted);font-size:.84rem;border-top:1px solid var(--rule);margin-top:48px}
+.caution{background:var(--warn-soft);color:var(--ink);border-radius:10px;padding:12px 14px;font-size:.88rem}
+.caution b{color:var(--warn)}
+
+/* roadmap nav (hero) */
+.roadmap{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:16px 16px 10px;box-shadow:var(--shadow)}
+.rm-h{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px 4px}
+.roadmap a{position:relative;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;padding:8px 6px;border-radius:8px;text-decoration:none;color:var(--ink)}
+.roadmap a:hover{background:var(--surface2)}
+.roadmap a:not(:last-child)::after{content:"";position:absolute;left:22px;top:40px;bottom:-8px;width:2px;background:var(--rule)}
+.roadmap .n{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:.85rem;background:var(--accent-soft);color:var(--accent);position:relative;z-index:1}
+.roadmap a.after .n{background:var(--copper-soft);color:var(--copper)}
+.roadmap b{display:block;font-size:.95rem}
+.roadmap small{display:block;color:var(--muted);font-size:.82rem;line-height:1.35}
+/* narrated 3D stories */
+.stage3d.story canvas{height:430px}
+@media (max-width:600px){.stage3d.story canvas{height:320px}}
+.stage3d .lbl.lo{transform:translate(-50%,10%)}
+.stage3d .lbl.side{transform:translate(0,-50%)}
+.stage3d .lbl.tok{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.story-foot{border-top:1px solid var(--rule);background:var(--surface);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.story-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.ctrls{display:flex;gap:6px}
+.ctrls .btn:disabled{opacity:.4;cursor:default}
+.prog{height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--accent)}
+.cap{font-size:1rem;line-height:1.5;min-height:3em;max-width:80ch}
+.stepno{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-right:10px;vertical-align:1px}
+.meter{display:grid;gap:6px;background:var(--surface2);border-radius:10px;padding:10px 12px}
+.mrow{display:grid;grid-template-columns:120px 1fr 56px;gap:10px;align-items:center;font-size:.84rem}
+.mrow b{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+.mtrack{height:12px;border-radius:6px;background:var(--surface);overflow:hidden}
+.mtrack i{display:block;height:100%;width:0}
+.mtrack .mv{background:var(--copper)} .mtrack .cp{background:var(--accent)}
+.mfoot{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);align-items:baseline}
+.mfoot b{color:var(--ink);font-family:var(--mono)}
+@media (max-width:520px){.mrow{grid-template-columns:92px 1fr 48px}}
+
+/* extra visuals */
+textarea{font:inherit;font-size:.95rem;padding:10px 12px;border-radius:8px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);width:100%;resize:vertical}
+.tokpills{display:flex;flex-wrap:wrap;gap:4px}
+.tp{display:inline-flex;flex-direction:column;align-items:center;padding:4px 6px 3px;border-radius:6px;font-family:var(--mono);font-size:.88rem;line-height:1.2;white-space:pre;color:var(--ink)}
+.tp small{font-size:.6rem;color:var(--muted)}
+.qbits{display:flex;gap:10px;flex-wrap:wrap}
+.qgrp{display:flex;flex-direction:column;gap:4px}
+.qgrp .cells{display:flex;gap:3px}
+.qgrp .cells i{width:26px;height:34px;border-radius:5px;display:block}
+.qgrp span{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+.q-s .cells i{background:var(--muted)} .q-e .cells i{background:var(--copper)} .q-m .cells i{background:var(--accent)} .q-i .cells i{background:var(--rp)}
+@media (max-width:520px){.qgrp .cells i{width:15px;height:26px}}
+.matrix td{font-size:.86rem}
+.matrix code{font-family:var(--mono);font-size:.78rem;background:var(--surface2);padding:1px 5px;border-radius:4px}
+.sb{display:inline-block;font-family:var(--mono);font-size:.66rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;margin-right:4px;white-space:nowrap}
+.sb.ok{background:var(--good-soft);color:var(--good)} .sb.mid{background:var(--warn-soft);color:var(--warn)} .sb.old{background:var(--surface2);color:var(--muted)} .sb.na{background:transparent;color:var(--muted);border:1px dashed var(--rule)}
+.dg-detail{background:var(--surface2);border-radius:8px;padding:10px 12px;font-size:.92rem;min-height:3.2em}
+.fwinfo{display:grid;gap:12px}
+@media (min-width:760px){.fwinfo{grid-template-columns:repeat(3,1fr)}}
+.fwinfo h5{margin:0 0 4px;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.fwinfo p{font-size:.9rem}
+pre.code{margin:0;font-family:var(--mono);font-size:.8rem;line-height:1.6;background:var(--surface2);border-radius:8px;padding:12px 14px;overflow-x:auto;white-space:pre;color:var(--ink)}
+.fwtabs{max-width:100%}
+ol.flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;counter-reset:f}
+ol.flow li{counter-increment:f;position:relative;background:var(--surface2);border-radius:10px;padding:32px 12px 12px;font-size:.84rem;color:var(--muted)}
+ol.flow li::before{content:counter(f);position:absolute;left:12px;top:8px;width:20px;height:20px;border-radius:50%;background:var(--c);color:var(--surface);font-family:var(--mono);font-size:.72rem;font-weight:600;display:flex;align-items:center;justify-content:center}
+ol.flow.rp{--c:var(--rp)} ol.flow.fw{--c:var(--fw)}
+ol.flow li{overflow-wrap:anywhere}
+.lab-body>*,.sec-body>*,.stack>*{min-width:0}
+ol.flow li b{display:block;color:var(--ink);font-size:.9rem;margin-bottom:2px}
+</style>
+
+<div class="shell">
+<aside class="rail" aria-label="Chapters">
+  <div class="brand">Inference<br>Field Guide<small>Fireworks AI · Runpod · Sept 2026</small></div>
+  <nav id="railnav">
+    <span class="grp">The companies</span>
+    <a href="#top">Start</a>
+    <a href="#companies">Two companies</a>
+
+    <span class="grp">The roadmap</span>
+    <a href="#ch1">1 · Foundations</a>
+    <a href="#ch2">2 · Transformers</a>
+    <a href="#ch3">3 · GPU hardware</a>
+    <a href="#ch4">4 · Optimizations</a>
+    <a href="#ch5">5 · Frameworks</a>
+    <a href="#ch6">6 · Scale out</a>
+    <span class="grp">Practice</span>
+    <a href="#lab">Sizing &amp; cost lab</a>
+    <a href="#scenarios">Customer scenarios</a>
+
+    <a href="#cards">Flashcards</a>
+    <a href="#plan">7-day plan</a>
+    <a href="#cheat">Cheat sheet</a>
+    <a href="#sources">Sources</a>
+  </nav>
+</aside>
+
+<main>
+<!-- ================= HERO ================= -->
+<section id="top" class="hero">
+  <div>
+    <div class="eyebrow"><span class="step">Solutions Architect · Forward Deployed Engineer</span></div>
+    <h1>From prompt to token, <em>visually</em>.</h1>
+    <p class="sub">A study guide for building and explaining AI inference systems. It follows the LLM inference roadmap step by step, explains each idea in plain words, and ends with labs, customer scenarios and flashcards.</p>
+    <div class="meta">
+      <span class="chip fw"><span class="dot"></span>Fireworks AI · managed inference</span>
+      <span class="chip rp"><span class="dot"></span>Runpod · GPU cloud</span>
+      <span class="chip">Researched Sept 2026</span>
+    </div>
+  </div>
+  <nav class="roadmap" aria-label="The roadmap">
+    <div class="rm-h">The roadmap this guide follows</div>
+    <a href="#ch1"><span class="n">1</span><span><b>Foundations</b><small>What happens in one LLM call: prefill, decode, KV cache</small></span></a>
+    <a href="#ch2"><span class="n">2</span><span><b>Transformers</b><small>Attention and Q/K/V, the math inside every layer</small></span></a>
+    <a href="#ch3"><span class="n">3</span><span><b>GPU hardware</b><small>Why inference waits on memory, not math</small></span></a>
+    <a href="#ch4"><span class="n">4</span><span><b>Optimizations</b><small>PagedAttention, batching, speculative decoding</small></span></a>
+    <a href="#ch5"><span class="n">5</span><span><b>Engines &amp; frameworks</b><small>vLLM, SGLang, Ollama, TensorRT-LLM, and what each platform runs</small></span></a>
+    <a href="#ch6"><span class="n">6</span><span><b>Scale out</b><small>Splitting a model across GPUs</small></span></a>
+    <a href="#lab" class="after"><span class="n">→</span><span><b>Then practise</b><small>Sizing lab, customer scenarios, flashcards</small></span></a>
+  </nav>
+</section>
+
+<!-- ================= COMPANIES ================= -->
+<section id="companies">
+  <div class="eyebrow">Know the room</div>
+  <h2>Two companies, two layers of the same stack</h2>
+  <p class="lede">Both sell "run AI models on GPUs", but at different heights. Fireworks hands you an API and runs everything underneath. Runpod hands you the GPU and lets you run whatever you like on it. You should be able to say that in one sentence, in a customer conversation.</p>
+  <div class="sec-body">
+    <div class="duo">
+      <article class="co fw">
+        <h3>Fireworks AI</h3>
+        <p class="one">A managed inference and fine-tuning cloud for open and custom models. You call an API, pay per token, and Fireworks runs the engine, the GPUs and the scaling.</p>
+        <dl>
+          <dt>Founded</dt><dd>2022, Redwood City. CEO Lin Qiao, previously led PyTorch at Meta, with six co-founders.</dd>
+          <dt>Funding</dt><dd class="num">Series D of $1.5B at a $17.5B valuation (July 2026). Series C of $250M at $4B (Oct 2025).</dd>
+          <dt>Scale</dt><dd>Reported &gt;$1B annualised revenue; tens of trillions of tokens served per day.</dd>
+          <dt>Customers</dt><dd>Cursor, Notion, Perplexity, Sourcegraph, Uber, DoorDash, Shopify and others.</dd>
+        </dl>
+        <ul>
+          <li><b>Serverless &amp; on-demand</b>: OpenAI-compatible API per token, or dedicated GPUs by the hour.</li>
+          <li><b>FireAttention</b>: their own CUDA attention kernels and quantization (FP8/FP4).</li>
+          <li><b>FireOptimizer</b>: adaptive speculative decoding tuned to each customer's traffic.</li>
+          <li><b>Post-training</b>: SFT, LoRA, reinforcement fine-tuning, and serving many LoRA adapters on one base model.</li>
+          <li><b>Compound AI</b>: function calling, JSON/grammar-constrained output, agent workflows.</li>
+        </ul>
+        <p class="note"><b>The pitch:</b> "Own your specialized model. Fast, cheap, and your data stays yours." They say most tokens they serve come from customer-specialized models.</p>
+      </article>
+      <article class="co rp">
+        <h3>Runpod</h3>
+        <p class="one">A developer-first GPU cloud. Rent a GPU by the second, deploy a serverless endpoint that scales to zero, or spin up a multi-node cluster.</p>
+        <dl>
+          <dt>Founded</dt><dd>2022. CEO Zhen Lu and CTO Pardeep Singh. Remote-first, with people in APAC.</dd>
+          <dt>Funding</dt><dd class="num">$100M led by Summit Partners at a $1B valuation (June 2026). Reportedly turned down $500M+ buyout offers.</dd>
+          <dt>Scale</dt><dd>Reported ~$240M annualised revenue and 1M+ developers.</dd>
+          <dt>Customers</dt><dd>Indie developers up to enterprises spending millions a year.</dd>
+        </dl>
+        <ul>
+          <li><b>Pods</b>: dedicated GPU containers (H100, H200, B200, A100, RTX 4090 and more). SSH, Jupyter, your own stack.</li>
+          <li><b>Secure vs Community Cloud</b>: vetted data centres vs a cheaper marketplace of hosts.</li>
+          <li><b>Serverless</b>: autoscaling workers, per-second billing, scale to zero, FlashBoot for faster cold starts, an official vLLM worker.</li>
+          <li><b>Instant Clusters</b>: multi-node GPUs with fast interconnect for models too big for one box.</li>
+          <li><b>Network volumes &amp; templates</b>: persistent storage and one-click vLLM, SGLang and ComfyUI images.</li>
+        </ul>
+        <p class="note"><b>The pitch:</b> "Cheapest, fastest path to a GPU. No sales calls, no lock-in, pay by the second, free egress."</p>
+      </article>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Who runs what</div><h3>The inference stack, layer by layer</h3></div></div>
+      <div class="scroll-x">
+        <div class="stackgrid" role="table" aria-label="Which layers each offering manages">
+          <div class="h l" role="columnheader">Layer</div><div class="h fwc" role="columnheader">Fireworks serverless</div><div class="h rpc" role="columnheader">Runpod Serverless</div><div class="h rpc" role="columnheader">Runpod Pod</div>
+          <div class="layer">Your app<small>prompts, RAG, agents</small></div><div class="cell you">you</div><div class="cell you">you</div><div class="cell you">you</div>
+          <div class="layer">Model choice &amp; tuning<small>which model, LoRA, evals</small></div><div class="cell them-fw">shared*</div><div class="cell you">you</div><div class="cell you">you</div>
+          <div class="layer">Serving engine<small>vLLM / SGLang / FireAttention</small></div><div class="cell them-fw">Fireworks</div><div class="cell you">you (template)</div><div class="cell you">you</div>
+          <div class="layer">Batching &amp; kernels<small>quantization, spec decoding</small></div><div class="cell them-fw">Fireworks</div><div class="cell you">you (engine config)</div><div class="cell you">you</div>
+          <div class="layer">Autoscaling<small>workers up and down</small></div><div class="cell them-fw">Fireworks</div><div class="cell them-rp">Runpod</div><div class="cell you">you</div>
+          <div class="layer">GPUs &amp; data centre<small>hardware, network, power</small></div><div class="cell them-fw">Fireworks</div><div class="cell them-rp">Runpod</div><div class="cell them-rp">Runpod</div>
+        </div>
+      </div>
+      <div class="legend"><span><i class="sw" style="background:var(--fw)"></i>Fireworks runs it</span><span><i class="sw" style="background:var(--rp)"></i>Runpod runs it</span><span><i class="sw" style="border:1.5px dashed var(--muted)"></i>The customer runs it</span><span>* pick from their library or bring your own weights; fine-tuning is a managed service</span></div>
+    </div>
+
+    <div class="plain"><span class="tag">Plain words</span>
+      <p><b>Fireworks is a restaurant.</b> You order from the menu (or bring a family recipe), and the kitchen, chefs and ovens are theirs. You pay per plate.</p>
+      <p><b>Runpod rents you a professional kitchen by the second.</b> You bring the recipe and the chef (vLLM, SGLang), and you get the ovens cheaper. Serverless is a kitchen that switches its lights off when nobody is ordering.</p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Competitor</th><th>What it is</th><th>How to position against it</th></tr></thead>
+        <tbody>
+          <tr><td><b>Together AI</b></td><td>Open-model inference and training on its own clusters</td><td>Closest like-for-like for Fireworks: compare latency, fine-tuning depth, enterprise controls</td></tr>
+          <tr><td><b>Baseten</b></td><td>Managed inference with strong developer tooling</td><td>Fireworks rival on dedicated deployments; Runpod is cheaper if the customer can run their own engine</td></tr>
+          <tr><td><b>Modal</b></td><td>Serverless GPUs for any Python function</td><td>Direct Runpod Serverless rival: compare cold starts, price per second, GPU choice</td></tr>
+          <tr><td><b>Groq · Cerebras</b></td><td>Custom silicon, very high tokens per second</td><td>Fastest raw decode, but narrower model catalogues and limited fine-tuning</td></tr>
+          <tr><td><b>CoreWeave · Lambda · Vast.ai</b></td><td>GPU clouds and marketplaces</td><td>Runpod's direct rivals: CoreWeave for big enterprise HPC, Vast for bargain marketplace</td></tr>
+          <tr><td><b>AWS · GCP · Azure</b></td><td>Hyperscaler managed AI (Bedrock, Vertex, SageMaker)</td><td>Both: faster access to new open models, better price-performance, less lock-in</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CH1 ================= -->
+<section id="ch1">
+  <div class="eyebrow"><span class="step">Roadmap step 1</span> Foundations</div>
+  <h2>What happens when you make an LLM call</h2>
+  <p class="lede">Every request has two phases. <b>Prefill</b> reads your whole prompt at once. <b>Decode</b> writes the answer one token at a time. Almost every optimization in this guide targets one of the two.</p>
+  <div class="sec-body">
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Walkthrough · tap any box</div><h3>The life of one request</h3></div><div class="ctrls"><button class="btn" type="button" id="lifePrev">‹ Back</button><button class="btn primary" type="button" id="lifePlay">Play</button><button class="btn" type="button" id="lifeNext">Next ›</button></div></div>
+      <div class="lab-body">
+        <div class="chart-wrap"><svg id="lifeDiag" viewBox="0 0 780 200" role="img" aria-label="Diagram of a request moving from client through gateway, queue, scheduler, prefill, decode and streaming"></svg></div>
+        <p class="cap" aria-live="polite"><span class="stepno" id="lifeNo"></span><span id="lifeCap"></span></p>
+      </div>
+    </div>
+    <div class="lab" id="player">
+      <div class="lab-head"><div><div class="t">Interactive</div><h3>Play a request</h3></div><button class="btn primary" type="button" id="playBtn">Play request</button></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="pLen">Prompt length <output id="pLenO">4,096 tok</output></label><input type="range" id="pLen" min="0" max="100" value="60"></div>
+          <div class="field"><label for="oLen">Answer length <output id="oLenO">300 tok</output></label><input type="range" id="oLen" min="16" max="1200" step="4" value="300"></div>
+          <label class="check" for="pCache"><input type="checkbox" id="pCache"> Prompt cache hit (80% of prompt reused)</label>
+        </div>
+        <div>
+          <div class="rowlbl">Prompt tokens (each square ≈ many tokens)</div>
+          <div class="tokrow" id="promptRow"></div>
+        </div>
+        <div>
+          <div class="rowlbl">Output tokens</div>
+          <div class="tokrow" id="outRow"></div>
+        </div>
+        <div>
+          <div class="timeline" id="tl"><div class="a" id="tlA">prefill</div><div class="b" id="tlB">decode</div></div>
+          <div class="phase-lbl"><span>0 s</span><span id="tlEnd">–</span></div>
+        </div>
+        <div class="readouts">
+          <div class="ro"><div class="k">TTFT</div><div class="v" id="rTTFT">–</div></div>
+          <div class="ro"><div class="k">ITL / TPOT</div><div class="v" id="rITL">–</div></div>
+          <div class="ro"><div class="k">Total time</div><div class="v" id="rTot">–</div></div>
+          <div class="ro"><div class="k">Share in decode</div><div class="v" id="rShare">–</div></div>
+        </div>
+        <p class="note">Illustrative numbers for a 70B model on one modern GPU: prefill ≈ 8,000 tokens/s, decode ≈ 22 ms per token. Try a long prompt with a short answer (RAG, classification), then the reverse (writing, code).</p>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Interactive · toy tokenizer</div><h3>What the model actually sees</h3></div></div>
+      <div class="lab-body">
+        <div class="field"><label for="tokIn">Type anything</label><textarea id="tokIn" rows="2">Fireworks and Runpod both bill by usage, but tokenization is where the counting starts!</textarea></div>
+        <div class="tokpills" id="tokOut"></div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Characters</div><div class="v" id="tkChars">–</div></div>
+          <div class="ro"><div class="k">Words</div><div class="v" id="tkWords">–</div></div>
+          <div class="ro"><div class="k">Tokens</div><div class="v" id="tkToks">–</div></div>
+          <div class="ro"><div class="k">Chars per token</div><div class="v" id="tkRatio">–</div></div>
+          <div class="ro"><div class="k">At $0.90 / 1M tokens</div><div class="v" id="tkCost">–</div></div>
+        </div>
+        <p class="note">A toy splitter for illustration. Real tokenizers (BPE) learn their splits from data, but the idea is the same: long or rare words break into pieces. A · marks a leading space, and the small numbers stand in for token IDs.</p>
+      </div>
+    </div>
+    <div class="plain"><span class="tag">Plain words</span>
+      <p><b>Prefill</b> is a chef reading the whole order ticket in one glance. <b>Decode</b> is plating dishes one at a time. The <b>KV cache</b> is the chopped ingredients kept on the counter, so the chef never re-chops for the next dish. <b>TTFT</b> is how long until the first bite arrives, and <b>ITL</b> is the rhythm of the rest of the meal.</p>
+    </div>
+
+    <div class="concepts">
+      <div class="concept"><h4>Tokenization</h4><p class="def">Text is cut into sub-word pieces with numeric IDs. About ¾ of an English word per token.</p><p class="an">Snapping a sentence into LEGO bricks.</p><p class="why">Customers pay per token, so tokens are both the cost and the latency unit.</p></div>
+      <div class="concept"><h4>Forward pass</h4><p class="def">One trip of the input through every layer of the model, producing next-token probabilities.</p><p class="an">One run down an assembly line.</p><p class="why">In decode, every output token costs one forward pass.</p></div>
+      <div class="concept"><h4>Autoregressive</h4><p class="def">Generate a token, append it, feed everything back in, repeat.</p><p class="an">Writing one word at a time, re-reading the sentence before each word.</p><p class="why">Why long answers are slow: the steps can't run in parallel.</p></div>
+      <div class="concept"><h4>KV cache</h4><p class="def">Stored key and value vectors for every past token, so they aren't recomputed each step.</p><p class="an">Mise en place on the counter.</p><p class="why">Grows with context × users. After weights, it's the biggest user of GPU memory.</p></div>
+      <div class="concept"><h4>TTFT</h4><p class="def">Time to first token. Roughly queue time plus prefill time.</p><p class="an">How long until the waiter brings the first bite.</p><p class="why">Drives how responsive chat and agents feel.</p></div>
+      <div class="concept"><h4>ITL / TPOT</h4><p class="def">Inter-token latency, or time per output token, in decode.</p><p class="an">How smoothly words stream onto the screen.</p><p class="why">Voice agents and live coding need low ITL; 20–40 ms feels fluid.</p></div>
+      <div class="concept"><h4>Throughput vs latency</h4><p class="def">Total tokens/s for all users vs speed for one user.</p><p class="an">Cars per hour on the highway vs your own trip time.</p><p class="why">Bigger batches raise throughput but can slow each user. This is the core serving trade-off.</p></div>
+      <div class="concept"><h4>Goodput</h4><p class="def">Throughput that still meets the latency target (e.g. p95 TTFT &lt; 500 ms).</p><p class="an">Deliveries that arrive on time, not just deliveries made.</p><p class="why">The number to agree with a customer before a benchmark.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CH2 ================= -->
+<section id="ch2">
+  <div class="eyebrow"><span class="step">Roadmap step 2</span> Transformer basics</div>
+  <h2>Attention: every token decides who to listen to</h2>
+  <p class="lede">A transformer is a stack of identical blocks. In each block, <b>self-attention</b> lets every token look back at the earlier tokens and pull in what's relevant. Tap a word below to make it the one asking.</p>
+  <div class="sec-body">
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Interactive</div><h3>Who does "it" refer to?</h3></div><span class="pill acc" id="attnQ">query: it</span></div>
+      <div class="lab-body">
+        <div class="sentence" id="sentence"></div>
+        <p class="note" id="attnNote">The copper bar under each word is its attention weight. Later words are greyed out: a decoder only looks backwards (a "causal mask").</p>
+        <div class="qkv">
+          <div><b>Q</b>Query: "what am I looking for?" The current word's question.</div>
+          <div><b>K</b>Key: "what do I contain?" A label on every earlier word.</div>
+          <div><b>V</b>Value: the actual information passed along once Q matches K.</div>
+        </div>
+      </div>
+    </div>
+    <div class="plain"><span class="tag">Plain words</span>
+      <p>A library. Your <b>query</b> is what you type into the search box. The <b>keys</b> are the titles on every spine. The <b>values</b> are what's inside the books. Attention compares your query with every title and blends the contents of the best matches.</p>
+      <p>The <b>KV cache</b> exists because the keys and values of earlier words never change, so there's no need to re-shelve the library every time you add a word.</p>
+    </div>
+    <div class="concepts">
+      <div class="concept"><h4>Embeddings</h4><p class="def">Each token becomes a vector: a long list of numbers encoding meaning.</p><p class="an">GPS coordinates for words; similar words live nearby.</p><p class="why">Also sold as embedding endpoints for search and RAG.</p></div>
+      <div class="concept"><h4>Transformer block</h4><p class="def">Attention, then a feed-forward network, with normalization. Stacked 32–126 times.</p><p class="an">One floor of an office tower; the model is the whole tower.</p><p class="why">Layer count sets KV-cache size and compute per token.</p></div>
+      <div class="concept"><h4>Multi-head &amp; GQA</h4><p class="def">Many attention "heads" run in parallel. Grouped-query attention shares K/V across heads.</p><p class="an">Several readers skimming for different things, sharing one card catalogue.</p><p class="why">GQA shrinks the KV cache 4–8×. It's why Llama 3 70B needs only ~0.3 MB per token.</p></div>
+      <div class="concept"><h4>Context window</h4><p class="def">The maximum number of tokens the model can attend over (8K to 1M+).</p><p class="an">How big a desk the reader has.</p><p class="why">Long context = large KV cache = fewer users per GPU.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CH3 ================= -->
+<section id="ch3">
+  <div class="eyebrow"><span class="step">Roadmap step 3</span> GPU &amp; hardware</div>
+  <h2>Inference is mostly a memory problem</h2>
+  <p class="lede">A GPU has huge compute (FLOPS) but it can only use it if data arrives fast enough from memory (bandwidth). In decode, every token needs all the weights read once. Watch one token go through the model, then switch to 32 tokens.</p>
+  <div class="sec-body">
+    <div class="stage3d story" id="mem3d">
+      <div class="hud"><span class="pill cu">Walkthrough · one pass through the model</span><span class="hint">drag to tilt</span></div>
+      <canvas aria-label="3D walkthrough: weights for each layer travel from HBM memory over the memory bus to the GPU cores, which then compute briefly"></canvas>
+    <div class="story-foot">
+      <div class="story-top">
+        <div class="seg" role="group" aria-label="Scenario"><button type="button" data-mode="decode" aria-pressed="true">1 token (decode)</button><button type="button" data-mode="batch" aria-pressed="false">32 tokens (batch / prefill)</button></div>
+        <div class="ctrls"><button class="btn" type="button" data-act="prev">‹ Back</button><button class="btn primary" type="button" data-act="play">Play</button><button class="btn" type="button" data-act="next">Next ›</button></div>
+      </div>
+      <div class="prog" aria-hidden="true"><i></i></div>
+      <p class="cap" aria-live="polite"><span class="stepno">Step 1</span><span class="cap-text"></span></p>
+      <div class="meter">
+        <div class="mrow"><span>Fetching weights</span><div class="mtrack"><i class="mv" id="memMvB"></i></div><b id="memMv">0.0 s</b></div>
+        <div class="mrow"><span>Computing</span><div class="mtrack"><i class="cp" id="memCpB"></i></div><b id="memCp">0.0 s</b></div>
+        <div class="mfoot"><span>Cores busy <b id="memBusy">–</b></span><span>Tokens finished <b id="memTok">0 / 1</b></span><span class="note">Slowed down, not to scale: on a real H100 at batch 1, fetching takes over 100× longer than computing.</span></div>
+      </div>
+    </div>
+    </div>
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Interactive · roofline</div><h3>Where does your workload sit?</h3></div><span class="pill cu" id="rfState">memory-bound</span></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="rfGpu">GPU</label><select id="rfGpu"></select></div>
+          <div class="field"><label for="rfPrec">Weight precision</label><select id="rfPrec"><option value="2">BF16 (2 bytes)</option><option value="1" selected>FP8 (1 byte)</option></select></div>
+          <div class="field"><label for="rfB">Decode batch size <output id="rfBO">8</output></label><input type="range" id="rfB" min="0" max="10" step="1" value="3"></div>
+        </div>
+        <div class="chart-wrap"><svg id="roof" viewBox="0 0 680 340" role="img" aria-label="Roofline chart: achievable TFLOPS versus arithmetic intensity"></svg></div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Arithmetic intensity</div><div class="v" id="rfAI">–</div></div>
+          <div class="ro"><div class="k">Achievable</div><div class="v" id="rfAch">–</div></div>
+          <div class="ro"><div class="k">GPU busy</div><div class="v" id="rfUtil">–</div></div>
+          <div class="ro"><div class="k">70B tokens/s (all users)</div><div class="v" id="rfTok">–</div></div>
+        </div>
+        <p class="note">Simplified: counts weight reads only (≈2 FLOPs per parameter per token) and ignores KV-cache reads, which grow with context. Peak numbers are dense vendor specs. The lesson holds: batching is how you buy back idle compute.</p>
+      </div>
+    </div>
+    <div class="plain"><span class="tag">Plain words</span>
+      <p>The cooks (<b>SMs</b>) chop incredibly fast, but ingredients come from a fridge down the hall (<b>HBM</b>) through one pipe (<b>bandwidth</b>). The cutting board in front of them (<b>SRAM</b>) is tiny but instant. Cooking one plate at a time, the cooks mostly wait for the pipe. Cook 200 plates from the same trip to the fridge, and now the cooks are the bottleneck. That's batching.</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>GPU</th><th class="n">Memory</th><th class="n">Bandwidth</th><th class="n">BF16 dense</th><th class="n">FP8 dense</th><th>Why a customer picks it</th></tr></thead>
+        <tbody>
+          <tr><td><b>RTX 4090</b></td><td class="n">24 GB</td><td class="n">1.0 TB/s</td><td class="n">~165 TF</td><td class="n">~330 TF</td><td>Cheap dev and small models (Runpod Community Cloud)</td></tr>
+          <tr><td><b>L40S</b></td><td class="n">48 GB</td><td class="n">0.86 TB/s</td><td class="n">~362 TF</td><td class="n">~733 TF</td><td>Image/video models, mid-size LLMs on a budget</td></tr>
+          <tr><td><b>A100 80GB</b></td><td class="n">80 GB</td><td class="n">2.0 TB/s</td><td class="n">312 TF</td><td class="n">no FP8</td><td>Proven workhorse, cheaper per hour; use INT8/AWQ instead of FP8</td></tr>
+          <tr><td><b>H100 SXM</b></td><td class="n">80 GB</td><td class="n">3.35 TB/s</td><td class="n">989 TF</td><td class="n">1,979 TF</td><td>Default for production LLM serving; FP8 tensor cores</td></tr>
+          <tr><td><b>H200</b></td><td class="n">141 GB</td><td class="n">4.8 TB/s</td><td class="n">989 TF</td><td class="n">1,979 TF</td><td>Same compute as H100, more and faster memory: 70B on one GPU, long context</td></tr>
+          <tr><td><b>B200</b></td><td class="n">192 GB</td><td class="n">8.0 TB/s</td><td class="n">~2,250 TF</td><td class="n">~4,500 TF</td><td>Newest NVIDIA; adds FP4. Biggest models, highest throughput</td></tr>
+          <tr><td><b>MI300X</b></td><td class="n">192 GB</td><td class="n">5.3 TB/s</td><td class="n">~1,307 TF</td><td class="n">~2,615 TF</td><td>AMD alternative with lots of memory; ROCm software</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="caution"><b>Explain the tradeoff this way:</b> "H100 and H200 have the same compute. The H200 only wins on memory: 141 GB at 4.8 TB/s instead of 80 GB at 3.35. So for decode-heavy traffic, or a 70B that won't fit in 80 GB, it's the better buy, even though its FLOPS are identical."</div>
+    <div class="concepts">
+      <div class="concept"><h4>SM</h4><p class="def">Streaming multiprocessor: one of 100+ parallel compute units on the GPU, each with tensor cores.</p><p class="an">One cook in a very large kitchen.</p><p class="why">Why GPUs beat CPUs at the matrix multiplies inside every layer.</p></div>
+      <div class="concept"><h4>HBM vs SRAM</h4><p class="def">HBM: large, fast off-chip memory (the "VRAM"). SRAM: tiny, much faster on-chip memory.</p><p class="an">The fridge vs the cutting board.</p><p class="why">FlashAttention's whole trick is fewer fridge trips.</p></div>
+      <div class="concept"><h4>Arithmetic intensity</h4><p class="def">FLOPs done per byte moved. Below the "ridge point" you're memory-bound; above it, compute-bound.</p><p class="an">Plates cooked per trip to the fridge.</p><p class="why">Decode at batch 1 ≈ 1–2 FLOP/byte; H100's ridge ≈ 300. Huge headroom.</p></div>
+      <div class="concept"><h4>NVLink / InfiniBand</h4><p class="def">NVLink joins GPUs inside a server (~900 GB/s on H100). InfiniBand joins servers.</p><p class="an">Express conveyors between kitchens.</p><p class="why">Needed when a model is split across GPUs (see step 6).</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CH4 ================= -->
+<section id="ch4">
+  <div class="eyebrow"><span class="step">Roadmap step 4</span> Optimization techniques</div>
+  <h2>How modern systems get faster and cheaper</h2>
+  <p class="lede">Four ideas carry most of the weight: manage KV memory like an operating system, never let the GPU idle, guess ahead cheaply, and shrink the numbers. Each has a live demo.</p>
+  <div class="sec-body">
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Simulation · PagedAttention</div><h3>Same GPU memory, same requests, two allocators</h3></div><div style="display:flex;gap:8px"><button class="btn" type="button" id="pgToggle">Pause</button><button class="btn" type="button" id="pgReset">Restart</button></div></div>
+      <div class="lab-body">
+        <div class="paged">
+          <div class="pcol"><h4><span>Reserve max length up front</span><span class="pill bad">naive</span></h4><div class="pgrid" id="pgA"></div><div class="pstats" id="pgAs"></div></div>
+          <div class="pcol"><h4><span>Allocate small pages on demand</span><span class="pill good">paged</span></h4><div class="pgrid" id="pgB"></div><div class="pstats" id="pgBs"></div></div>
+        </div>
+        <p class="note">Each colour is one request's KV cache; each square is one block of 16 tokens. Hatched squares are reserved but never used. vLLM's PagedAttention paper reports 2–4× more throughput from this alone.</p>
+      </div>
+    </div>
+    <div class="plain"><span class="tag">Plain words</span>
+      <p>The naive way is a restaurant that reserves a table for ten for every party, just in case. PagedAttention seats people at small tables as they arrive and adds a table when the party grows. A seating chart (the "block table") keeps track of who sits where.</p>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Simulation · continuous batching</div><h3>Four GPU slots, twelve requests of different lengths</h3></div><button class="btn" type="button" id="cbPlay">Replay</button></div>
+      <div class="lab-body">
+        <div class="chart-wrap"><svg id="cb" viewBox="0 0 680 300" role="img" aria-label="Gantt chart comparing static and continuous batching"></svg></div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Static · all done at</div><div class="v" id="cbS">–</div></div>
+          <div class="ro"><div class="k">Static · GPU busy</div><div class="v" id="cbSU">–</div></div>
+          <div class="ro"><div class="k">Continuous · all done at</div><div class="v" id="cbC">–</div></div>
+          <div class="ro"><div class="k">Continuous · GPU busy</div><div class="v" id="cbCU">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="plain"><span class="tag">Plain words</span>
+      <p>Static batching is a tour bus: nobody leaves until the whole group has finished, and nobody new boards mid-tour. Continuous batching is a taxi rank: the moment one passenger gets out, the next one gets in. Same cars, more trips.</p>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Step-through · speculative decoding</div><h3>A small model drafts, the big model checks</h3></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" id="sdStep">Next round</button><button class="btn" type="button" id="sdAuto">Auto</button><button class="btn" type="button" id="sdReset">Reset</button></div></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="sdA">Draft acceptance rate α <output id="sdAO">0.75</output></label><input type="range" id="sdA" min="0.3" max="0.95" step="0.05" value="0.75"></div>
+          <div class="field"><label for="sdK">Tokens drafted per round k <output id="sdKO">4</output></label><input type="range" id="sdK" min="1" max="8" step="1" value="4"></div>
+        </div>
+        <div><div class="rowlbl">This round: draft proposes → target verifies in one pass</div><div class="specline" id="sdProp"><span class="note">Press "Next round".</span></div></div>
+        <div><div class="rowlbl">Output so far</div><div class="specline" id="sdOut"></div></div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Big-model passes</div><div class="v" id="sdP">0</div></div>
+          <div class="ro"><div class="k">Tokens produced</div><div class="v" id="sdT">0</div></div>
+          <div class="ro"><div class="k">Tokens per pass (this run)</div><div class="v" id="sdR">–</div></div>
+          <div class="ro"><div class="k">Expected per pass</div><div class="v" id="sdE">–</div></div>
+        </div>
+        <div class="legend" style="padding:0"><span><i class="sw" style="background:var(--accent-soft);border:1px solid var(--accent)"></i>draft accepted</span><span><i class="sw" style="background:var(--bad-soft);border:1px solid var(--bad)"></i>draft rejected</span><span><i class="sw" style="background:var(--copper-soft);border:1px solid var(--copper)"></i>token from the big model</span></div>
+        <p class="note">Expected tokens per big-model pass = (1 − α<sup>k+1</sup>) / (1 − α). Output quality is identical: the big model checks every token. It pays off when the draft matches your traffic, which is why Fireworks trains drafters on each customer's data (Cursor reported up to 2× lower latency).</p>
+      </div>
+    </div>
+    <div class="plain"><span class="tag">Plain words</span>
+      <p>A junior writer drafts the next four words; the senior editor reads all four at once and ticks the ones that are right. Checking four words takes the editor about as long as writing one, so every correct guess is time saved. When the junior guesses wrong, the editor writes that word and the junior starts again from there.</p>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Interactive · quantization</div><h3>One weight in 16, 8 and 4 bits</h3></div><div class="seg" id="qSeg" role="group" aria-label="Precision"><button type="button" data-q="fp16" aria-pressed="false">FP16</button><button type="button" data-q="fp8" aria-pressed="true">FP8</button><button type="button" data-q="int4" aria-pressed="false">INT4</button></div></div>
+      <div class="lab-body">
+        <div class="qbits" id="qBits"></div>
+        <div class="rowlbl" id="qBitsN"></div>
+        <div class="readouts">
+          <div class="ro"><div class="k">π stored as</div><div class="v" id="qPi">–</div></div>
+          <div class="ro"><div class="k">70B model weights</div><div class="v" id="qGb">–</div></div>
+          <div class="ro"><div class="k">Fits one H100 (80 GB)?</div><div class="v" id="qFit">–</div></div>
+        </div>
+        <div><div class="membar"><div class="w" id="qBarW"></div></div><div class="gpuTicks"><span style="left:50%">H100 · 80 GB</span><span style="left:100%">2 × H100</span></div></div>
+        <p class="note" id="qNote"></p>
+      </div>
+    </div>
+    <div class="concepts">
+      <div class="concept"><h4>FlashAttention</h4><p class="def">A fused attention kernel that works in tiles inside SRAM and never writes the full attention matrix to HBM.</p><p class="an">Chopping on the board without walking to the fridge between cuts.</p><p class="why">Fireworks' FireAttention is their own take on this idea.</p></div>
+      <div class="concept"><h4>Chunked prefill</h4><p class="def">Split a long prompt's prefill into chunks and interleave them with other users' decode steps.</p><p class="an">Prepping a banquet order in batches so regular diners still get served.</p><p class="why">Stops one 100K-token prompt from freezing everyone's streaming.</p></div>
+      <div class="concept"><h4>Prompt / prefix caching</h4><p class="def">Keep the KV cache for a shared prefix (system prompt, documents, chat history) and reuse it.</p><p class="an">Keeping a pot of base sauce ready instead of starting from scratch.</p><p class="why">Agents and RAG repeat huge prefixes. Fireworks bills cached input tokens at a discount.</p></div>
+      <div class="concept"><h4>Quantization</h4><p class="def">Store weights (and sometimes KV) in fewer bits: FP8, INT8, INT4 (AWQ, GPTQ), FP4.</p><p class="an">Vacuum-packing food: same meal, half the freezer space.</p><p class="why">FP8 on H100+ halves memory and roughly doubles decode speed with minimal quality loss. Always run evals.</p></div>
+      <div class="concept"><h4>KV-cache compression</h4><p class="def">FP8 KV cache, GQA/MLA attention, or evicting old tokens.</p><p class="an">Smaller containers double how much fits in the fridge.</p><p class="why">Halving KV size roughly doubles concurrent users.</p></div>
+      <div class="concept"><h4>Disaggregated serving</h4><p class="def">Run prefill and decode on separate GPU pools and ship the KV cache between them.</p><p class="an">A prep kitchen and a plating line that never block each other.</p><p class="why">Tunes TTFT and ITL independently at large scale.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CH5 ================= -->
+<section id="ch5">
+  <div class="eyebrow"><span class="step">Roadmap step 5</span> Engines &amp; frameworks</div>
+  <h2>The frameworks, and what each platform runs</h2>
+  <p class="lede">A serving framework (or "engine") is the software that loads model weights onto GPUs and turns requests into tokens. The key difference between the two companies: <b>on Runpod you choose the engine</b> (anything that runs in a Docker container), and <b>on Fireworks the engine is Fireworks' own</b>. You bring weights; they serve them.</p>
+  <div class="sec-body">
+
+    <div class="tablewrap">
+      <table class="matrix">
+        <thead><tr><th>Framework</th><th>What it is</th><th class="rpc">On Runpod</th><th class="fwc">On Fireworks</th></tr></thead>
+        <tbody>
+          <tr><td><b>vLLM</b></td><td>The default open-source LLM server. PagedAttention, continuous batching, OpenAI-compatible API.</td><td><span class="sb ok">Official worker</span> <code>worker-vllm</code> in the Serverless Hub; also Pod templates.</td><td><span class="sb na">Not used</span> Fireworks runs its own engine. Know vLLM because customers compare you against self-hosting it.</td></tr>
+          <tr><td><b>SGLang</b></td><td>Fast server that reuses shared prompt prefixes (RadixAttention); strong at agents and JSON output.</td><td><span class="sb ok">Official worker</span> <code>worker-sglang</code>.</td><td><span class="sb na">Not used</span> Prefix reuse is offered as prompt caching instead.</td></tr>
+          <tr><td><b>Ollama</b></td><td>One-command local runner built on llama.cpp; pulls quantized models from a library.</td><td><span class="sb mid">Pod tutorial</span> PyTorch template, expose port 11434, set <code>OLLAMA_HOST=0.0.0.0</code>. Community serverless workers exist.</td><td><span class="sb na">Not applicable</span> Local/dev tool. A common starting point before a customer moves to a hosted API.</td></tr>
+          <tr><td><b>llama.cpp</b></td><td>C/C++ engine for GGUF quantized models on CPU, Apple Metal, CUDA.</td><td><span class="sb mid">Bring your own container</span> on a Pod or custom worker.</td><td><span class="sb na">Not applicable</span></td></tr>
+          <tr><td><b>TensorRT-LLM / Triton</b></td><td>NVIDIA's compiled engine plus inference server; top throughput for a fixed model.</td><td><span class="sb mid">Bring your own container</span> NVIDIA images on Pods or a custom Serverless worker.</td><td><span class="sb na">Not used</span></td></tr>
+          <tr><td><b>TGI</b></td><td>Hugging Face's server, now in maintenance mode.</td><td><span class="sb old">Archived worker</span> <code>worker-tgi</code>. Steer new builds to vLLM or SGLang.</td><td><span class="sb na">Not used</span></td></tr>
+          <tr><td><b>ComfyUI · SDXL</b></td><td>Image-generation pipelines.</td><td><span class="sb ok">Official workers</span> <code>worker-comfyui</code>, <code>worker-sdxl</code>.</td><td><span class="sb mid">Managed API</span> Image models served via API.</td></tr>
+          <tr><td><b>faster-whisper</b></td><td>Speech-to-text.</td><td><span class="sb ok">Official worker</span> <code>worker-faster_whisper</code>.</td><td><span class="sb mid">Managed API</span> Audio transcription models via API.</td></tr>
+          <tr><td><b>Infinity embeddings</b></td><td>Embedding server for search and RAG.</td><td><span class="sb ok">Official worker</span> <code>worker-infinity-embedding</code>.</td><td><span class="sb mid">Managed API</span> Embedding models via API.</td></tr>
+          <tr><td><b>Axolotl (fine-tuning)</b></td><td>Open-source fine-tuning toolkit.</td><td><span class="sb ok">Official worker</span> <code>llm-fine-tuning</code>; or any Pod.</td><td><span class="sb ok">Managed service</span> SFT, LoRA and reinforcement fine-tuning without running a trainer.</td></tr>
+          <tr><td><b>Your own weights</b></td><td>A Hugging Face model or fine-tune you own.</td><td><span class="sb ok">Yes</span> Point the vLLM worker's <code>MODEL_NAME</code> at it, or bake it into your image.</td><td><span class="sb ok">Yes</span> <code>firectl model create</code> uploads safetensors + config; LoRA adapters deploy to on-demand deployments.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend" style="padding:0"><span><span class="sb ok">green</span> first-party / official</span><span><span class="sb mid">amber</span> supported with setup, or managed API</span><span><span class="sb old">grey</span> archived</span><span><span class="sb na">dash</span> not how that platform works</span></div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Map</div><h3>Where each framework fits</h3></div></div>
+      <div class="lab-body">
+        <div class="chart-wrap"><svg id="fwMap" viewBox="-24 0 724 380" role="img" aria-label="Map placing frameworks by number of concurrent users and size of hardware"></svg></div>
+        <p class="note">Positions are qualitative. Read it as: the more users and GPUs, the further up and right you go, and the more batching and memory management matter. Tap a bubble to open that framework below.</p>
+      </div>
+    </div>
+
+    <div class="plain"><span class="tag">Plain words</span>
+      <p><b>Ollama</b> is a home espresso machine: one button, great coffee, one cup at a time. <b>vLLM</b> and <b>SGLang</b> are café machines built to pour hundreds of cups an hour. <b>TensorRT-LLM</b> is a factory line tuned for one drink. <b>Fireworks</b> is a coffee chain: you never touch the machine, you just order.</p>
+    </div>
+
+    <div class="lab" id="fwx">
+      <div class="lab-head"><div><div class="t">Explorer · tap any box</div><h3>How each framework works inside</h3></div></div>
+      <div class="lab-body">
+        <div class="seg fwtabs" id="fwTabs" role="tablist"></div>
+        <div class="chart-wrap"><svg id="fwDiag" viewBox="0 0 700 146" role="img" aria-label="Architecture diagram of the selected framework"></svg></div>
+        <div class="dg-detail" id="fwDetail" aria-live="polite"></div>
+        <div class="fwinfo">
+          <div><h5>Best for</h5><p id="fwBest"></p></div>
+          <div><h5 class="rpc">On Runpod</h5><p id="fwRp"></p></div>
+          <div><h5 class="fwc">On Fireworks</h5><p id="fwFw"></p></div>
+        </div>
+        <div><div class="rowlbl">Run it</div><pre class="code" id="fwCode"></pre></div>
+        <div class="caution" id="fwSay"></div>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Interactive · SGLang RadixAttention / prompt caching</div><h3>Shared prefixes are computed once</h3></div><button class="btn" type="button" id="rxReset">Reset</button></div>
+      <div class="lab-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="rxBtns"></div>
+        <div class="chart-wrap"><svg id="rxTree" viewBox="0 0 700 250" role="img" aria-label="Prefix tree of cached prompt segments"></svg></div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Prompt tokens sent</div><div class="v" id="rxSent">0</div></div>
+          <div class="ro"><div class="k">Actually computed</div><div class="v" id="rxComp">0</div></div>
+          <div class="ro"><div class="k">Reused from cache</div><div class="v" id="rxReuse">0</div></div>
+          <div class="ro"><div class="k">Prefill saved</div><div class="v" id="rxPct">–</div></div>
+        </div>
+        <p class="note">Send requests in any order. A segment turns copper when it's computed for the first time and green when a later request reuses it. Agents repeat the same system prompt and tool definitions on every call, which is why this matters so much for them. Fireworks exposes the same idea as prompt caching (cheaper cached input tokens); on Runpod you get it from SGLang or from vLLM's prefix caching.</p>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Deploy flows</div><h3>From zero to an API call on each platform</h3></div></div>
+      <div class="lab-body">
+        <div class="seg" id="dfTabs" role="tablist"></div>
+        <ol class="flow" id="dfSteps"></ol>
+        <pre class="code" id="dfCode"></pre>
+        <p class="note" id="dfNote"></p>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Interactive</div><h3>Engine chooser</h3></div></div>
+      <div class="lab-body">
+        <div class="stack" style="gap:10px">
+          <div><div class="rowlbl">Where does it run?</div><div class="seg" id="engHw"><button type="button" data-v="nv" aria-pressed="true">NVIDIA data centre</button><button type="button" data-v="amd" aria-pressed="false">AMD</button><button type="button" data-v="edge" aria-pressed="false">Laptop / CPU / edge</button><button type="button" data-v="managed" aria-pressed="false">Don't want to run GPUs</button></div></div>
+          <div><div class="rowlbl">What's the traffic like?</div><div class="seg" id="engWl"><button type="button" data-v="gen" aria-pressed="true">Many users, general chat/API</button><button type="button" data-v="prefix" aria-pressed="false">Agents, shared prefixes, JSON</button><button type="button" data-v="max" aria-pressed="false">One model, max performance</button></div></div>
+        </div>
+        <p id="engWhy" style="font-weight:500"></p>
+        <div><button class="btn" type="button" id="engOpen">Open it in the explorer ↑</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CH6 ================= -->
+<section id="ch6">
+  <div class="eyebrow"><span class="step">Roadmap step 6</span> For mid/senior: scale out</div>
+  <h2>When one GPU isn't enough</h2>
+  <p class="lede">A 405B model needs ~810 GB just for FP16 weights, more than eight H100s hold. There are four ways to split work across GPUs, and real deployments combine them. Pick a strategy: each walkthrough shows the model being split, one request travelling through, and the trade-off at the end.</p>
+  <div class="sec-body">
+    <div class="stage3d story" id="par3d">
+      <div class="hud"><span class="pill acc" id="parState">Data parallel</span><span class="hint">drag to tilt</span></div>
+      <canvas aria-label="3D walkthrough: a model drawn as a tower of layers is split across four GPUs, then a request travels through them"></canvas>
+    <div class="story-foot">
+      <div class="story-top">
+        <div class="seg" role="group" aria-label="Scenario"><button type="button" data-p="dp" aria-pressed="true">Data</button><button type="button" data-p="tp" aria-pressed="false">Tensor</button><button type="button" data-p="pp" aria-pressed="false">Pipeline</button><button type="button" data-p="ep" aria-pressed="false">Expert (MoE)</button></div>
+        <div class="ctrls"><button class="btn" type="button" data-act="prev">‹ Back</button><button class="btn primary" type="button" data-act="play">Play</button><button class="btn" type="button" data-act="next">Next ›</button></div>
+      </div>
+      <div class="prog" aria-hidden="true"><i></i></div>
+      <p class="cap" aria-live="polite"><span class="stepno">Step 1</span><span class="cap-text"></span></p>
+    </div>
+    </div>
+    <div class="concepts">
+      <div class="concept"><h4>MoE models</h4><p class="def">Mixture of experts: only a few "expert" sub-networks run per token (e.g. Mixtral, DeepSeek, Llama 4).</p><p class="an">A hospital that sends each patient to two specialists, not every doctor.</p><p class="why">Memory is sized by total parameters; speed by active parameters.</p></div>
+      <div class="concept"><h4>LoRA &amp; multi-LoRA</h4><p class="def">Tiny trainable adapters on a frozen base model. Many adapters can share one base on one GPU.</p><p class="an">One base recipe, a different spice packet per customer.</p><p class="why">Fireworks serves hundreds of fine-tunes cheaply this way.</p></div>
+      <div class="concept"><h4>Autoscaling &amp; cold starts</h4><p class="def">Add workers as traffic rises; the first request on a new worker waits for the model to load.</p><p class="an">Opening more checkout lanes, but staff take time to arrive.</p><p class="why">Runpod FlashBoot snapshots help; a warm minimum worker is the reliable fix.</p></div>
+      <div class="concept"><h4>Cost per million tokens</h4><p class="def">All-in serving cost divided by tokens actually served.</p><p class="an">Cost per plate, including rent and the idle hours.</p><p class="why">The number the customer's CFO cares about. See the lab below.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LAB ================= -->
+<section id="lab">
+  <div class="eyebrow">Practice</div>
+  <h2>Sizing &amp; cost lab</h2>
+  <p class="lede">The most common whiteboard question for this role: "How many GPUs does this need, and what will it cost?" Change the inputs and watch the method, not just the answer.</p>
+  <div class="sec-body">
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Calculator</div><h3>Will it fit? GPU memory sizing</h3></div><span class="pill good" id="vFit">fits</span></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="vModel">Model</label><select id="vModel"></select></div>
+          <div class="field"><label for="vW">Weight precision</label><select id="vW"><option value="2">FP16 / BF16</option><option value="1" selected>FP8</option><option value="0.5">INT4 / FP4</option></select></div>
+          <div class="field"><label for="vKv">KV-cache precision</label><select id="vKv"><option value="2" selected>FP16</option><option value="1">FP8</option></select></div>
+          <div class="field"><label for="vGpu">GPU</label><select id="vGpu"></select></div>
+          <div class="field"><label for="vCtx">Context per request <output id="vCtxO">8K</output></label><input type="range" id="vCtx" min="0" max="7" step="1" value="2"></div>
+          <div class="field"><label for="vCon">Concurrent requests <output id="vConO">16</output></label><input type="range" id="vCon" min="1" max="256" step="1" value="16"></div>
+        </div>
+        <div>
+          <div class="membar" id="vBar"><div class="w" id="vBw">weights</div><div class="kv" id="vBk">KV</div><div class="o" id="vBo"></div></div>
+          <div class="gpuTicks" id="vTicks"></div>
+        </div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Weights</div><div class="v" id="vRw">–</div></div>
+          <div class="ro"><div class="k">KV cache</div><div class="v" id="vRk">–</div></div>
+          <div class="ro"><div class="k">Total w/ overhead</div><div class="v" id="vRt">–</div></div>
+          <div class="ro"><div class="k">GPUs needed</div><div class="v" id="vRn">–</div></div>
+          <div class="ro"><div class="k">Max requests at this context</div><div class="v" id="vRm">–</div></div>
+          <div class="ro"><div class="k">Single-user decode ceiling</div><div class="v" id="vRs">–</div></div>
+        </div>
+        <div class="formula" id="vF"></div>
+        <p class="note">Overhead of 10% covers activations, CUDA context and fragmentation; engines typically use ~90% of GPU memory. GPU count rounds up to 1, 2, 4 or 8 for tensor parallelism. The decode ceiling is bandwidth ÷ bytes read per token, an upper bound for one user.</p>
+      </div>
+    </div>
+
+    <div class="lab">
+      <div class="lab-head"><div><div class="t">Calculator</div><h3>Serverless per-token vs dedicated GPUs</h3></div><span class="pill acc" id="cWin">serverless cheaper</span></div>
+      <div class="lab-body">
+        <div class="controls">
+          <div class="field"><label for="cVol">Tokens per month <output id="cVolO">2.0B</output></label><input type="range" id="cVol" min="0" max="100" value="46"></div>
+          <div class="field"><label for="cPrice">Serverless price, $ / 1M tokens <output id="cPriceO">$0.90</output></label><input type="range" id="cPrice" min="0.1" max="3" step="0.05" value="0.9"></div>
+          <div class="field"><label for="cGpuH">Dedicated GPU $ / hour <output id="cGpuHO">$2.89</output></label><input type="range" id="cGpuH" min="0.5" max="10" step="0.01" value="2.89"></div>
+          <div class="field"><label for="cN">GPUs in deployment <output id="cNO">2</output></label><input type="range" id="cN" min="1" max="16" step="1" value="2"></div>
+          <div class="field"><label for="cTp">Deployment throughput, tok/s <output id="cTpO">2,500</output></label><input type="range" id="cTp" min="200" max="20000" step="100" value="2500"></div>
+        </div>
+        <div class="chart-wrap"><svg id="costChart" viewBox="0 0 680 300" role="img" aria-label="Monthly cost versus monthly token volume for serverless and dedicated options"></svg></div>
+        <div class="readouts">
+          <div class="ro"><div class="k">Serverless / month</div><div class="v" id="cS">–</div></div>
+          <div class="ro"><div class="k">Dedicated / month</div><div class="v" id="cD">–</div></div>
+          <div class="ro"><div class="k">Break-even volume</div><div class="v" id="cBE">–</div></div>
+          <div class="ro"><div class="k">Dedicated utilisation</div><div class="v" id="cU">–</div></div>
+        </div>
+        <p class="note">Example defaults: a 70B-class model at ~$0.90 per 1M tokens serverless vs two H100s at a Runpod-like $2.89/hour serving ~2,500 tok/s with batching. Prices move often: check live pricing before quoting. Runpod's own Serverless-vs-Pod rule of thumb is the same idea: break-even utilisation ≈ Pod $/hr ÷ Serverless $/hr (≈ 60% on H100).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SCENARIOS ================= -->
+<section id="scenarios">
+  <div class="eyebrow">Practice</div>
+  <h2>Customer scenarios, worked through</h2>
+  <p class="lede">These show up in role-plays and technical rounds. Use the same shape every time: <b>diagnose</b> with questions and metrics, <b>fix</b> in order of cheapest first, <b>measure</b> before and after.</p>
+  <div class="sec-body">
+    <div>
+      <details class="case" open><summary><h4>"Our chatbot takes 3 seconds before anything appears."</h4><span class="plus">+</span></summary>
+        <div class="case-body">
+          <div class="col"><h5>Diagnose</h5><ul><li>That's TTFT, so look at prefill and queueing, not decode.</li><li>How long are prompts? Same system prompt every call?</li><li>Is it cold starts (first request after idle) or every request?</li><li>p50 vs p95: spiky means queueing or noisy neighbours.</li></ul></div>
+          <div class="col"><h5>Fix</h5><ul><li>Prefix caching for the repeated system prompt and history.</li><li>Trim RAG context; retrieve fewer, better chunks.</li><li>Chunked prefill so long prompts don't block others.</li><li>Keep a minimum warm worker; pick a priority/fast tier.</li></ul></div>
+          <div class="col"><h5>Measure</h5><ul><li>p50/p95 TTFT before and after, same traffic replay.</li><li>Cache hit rate.</li><li>Cost per 1K conversations.</li></ul></div>
+          <div class="say"><b>One-liner</b>"TTFT is almost all prefill and queue time. Your system prompt is 6K tokens and identical on every call, so prompt caching should remove most of it. Let's replay yesterday's traffic and compare p95."</div>
+        </div></details>
+      <details class="case"><summary><h4>"We want to move off OpenAI to open models to cut cost."</h4><span class="plus">+</span></summary>
+        <div class="case-body">
+          <div class="col"><h5>Diagnose</h5><ul><li>What tasks? Chat, extraction, code, agents with tools?</li><li>Current volume, latency targets, monthly bill.</li><li>What does "good enough" mean? Is there an eval set?</li></ul></div>
+          <div class="col"><h5>Fix</h5><ul><li>Both platforms are OpenAI-compatible: swap base URL and key.</li><li>Shortlist 2–3 open models; run the customer's eval.</li><li>Close quality gaps with LoRA / fine-tuning on their data.</li><li>Use JSON / grammar mode for reliable structured output.</li><li>Send offline jobs to batch pricing.</li></ul></div>
+          <div class="col"><h5>Measure</h5><ul><li>Eval score vs the incumbent model.</li><li>$ per 1M tokens and total cost of ownership.</li><li>p95 latency; tool-call success rate.</li></ul></div>
+          <div class="say"><b>One-liner</b>"The API swap takes an afternoon; the real work is the eval. Give me 200 real examples and I'll show quality, latency and cost side by side for three models by Friday."</div>
+        </div></details>
+      <details class="case"><summary><h4>"Size GPUs for a 70B model at 20 requests/second."</h4><span class="plus">+</span></summary>
+        <div class="case-body">
+          <div class="col"><h5>Diagnose</h5><ul><li>Average input and output tokens per request?</li><li>Latency target (p95 TTFT, ITL)?</li><li>Peak vs average traffic; can it queue?</li></ul></div>
+          <div class="col"><h5>Fix</h5><ul><li>Say 1K in / 300 out: 20 rps × 300 = 6K output tok/s.</li><li>FP8 weights 70 GB; add KV for concurrency (lab above).</li><li>Per-replica throughput from a benchmark, e.g. ~2.5K tok/s on 2×H100.</li><li>6K ÷ 2.5K → 3 replicas, +1 for headroom = 4 replicas (8 H100s), or fewer H200s.</li></ul></div>
+          <div class="col"><h5>Measure</h5><ul><li>Load test at 1×, 1.5×, 2× peak.</li><li>Goodput at the latency target.</li><li>$ per 1M tokens per option.</li></ul></div>
+          <div class="say"><b>One-liner</b>"Decode is memory-bound, so I size on bandwidth and KV headroom, not FLOPS. Here are three options with monthly cost. I'd validate the per-replica number with a one-hour benchmark before you commit."</div>
+        </div></details>
+      <details class="case"><summary><h4>"Serverless or dedicated?"</h4><span class="plus">+</span></summary>
+        <div class="case-body">
+          <div class="col"><h5>Diagnose</h5><ul><li>Traffic shape: bursty, business hours, or flat 24/7?</li><li>Strictness of the latency SLA.</li><li>Monthly token volume and growth.</li></ul></div>
+          <div class="col"><h5>Fix</h5><ul><li>Bursty or low volume → serverless / scale to zero.</li><li>Steady high volume or strict SLA → dedicated or reserved capacity.</li><li>Often both: dedicated baseline, serverless for spikes.</li></ul></div>
+          <div class="col"><h5>Measure</h5><ul><li>Utilisation of dedicated capacity.</li><li>Cold-start rate on serverless.</li><li>Blended $ per 1M tokens.</li></ul></div>
+          <div class="say"><b>One-liner</b>"It's a utilisation question. Above roughly 60% steady utilisation, dedicated wins. Below it, you're paying for idle GPUs."</div>
+        </div></details>
+      <details class="case"><summary><h4>"Cold starts on Runpod Serverless are killing our p95."</h4><span class="plus">+</span></summary>
+        <div class="case-body">
+          <div class="col"><h5>Diagnose</h5><ul><li>Worker logs: time spent pulling image vs loading weights vs compiling.</li><li>Is the model downloaded at request time?</li><li>How often do workers scale to zero?</li></ul></div>
+          <div class="col"><h5>Fix</h5><ul><li>Load the model at worker start, outside the handler.</li><li>Bake weights into the image or use a network volume.</li><li>Cache compiled kernels / CUDA graphs.</li><li>Enable FlashBoot; set min workers ≥ 1 for SLA traffic.</li></ul></div>
+          <div class="col"><h5>Measure</h5><ul><li>Cold-start count and duration per day.</li><li>p95 end-to-end latency.</li><li>Extra cost of warm workers vs SLA value.</li></ul></div>
+          <div class="say"><b>One-liner</b>"FlashBoot helps when a snapshot is warm, but a miss means a full reload. Moving the model load out of the handler and keeping one warm worker costs about $X a month and removes the tail."</div>
+        </div></details>
+      <details class="case"><summary><h4>"The pod crashed with CUDA out of memory."</h4><span class="plus">+</span></summary>
+        <div class="case-body">
+          <div class="col"><h5>Diagnose</h5><ul><li><span class="mono">nvidia-smi</span>: what's using memory?</li><li>Engine settings: max model length, max sequences, memory utilisation.</li><li>Did it fail at load (weights) or under load (KV cache)?</li></ul></div>
+          <div class="col"><h5>Fix</h5><ul><li>At load: quantize (FP8/AWQ) or use a bigger GPU / tensor parallelism.</li><li>Under load: lower max context or max concurrent sequences; FP8 KV cache.</li><li>Leave headroom for other processes.</li></ul></div>
+          <div class="col"><h5>Measure</h5><ul><li>Peak memory under a load test.</li><li>Max concurrency before latency degrades.</li></ul></div>
+          <div class="say"><b>One-liner</b>"Weights fit fine. It's the KV cache: your max context is 128K, and a single request at that length needs about 40 GB. Cap it at 32K or move to FP8 KV and you'll get four times the users."</div>
+        </div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FLASHCARDS ================= -->
+<section id="cards">
+  <div class="eyebrow">Recall</div>
+  <h2>Flashcards</h2>
+  <p class="lede">Tap a card to flip it. Say the answer out loud before you flip; then check what you missed.</p>
+  <div class="sec-body">
+    <div class="cardbar"><div class="seg" id="cardFilter"></div><button class="btn" type="button" id="cardShuffle">Shuffle</button></div>
+    <div class="cards" id="cardGrid"></div>
+  </div>
+</section>
+
+<!-- ================= PLAN ================= -->
+<section id="plan">
+  <div class="eyebrow">Schedule</div>
+  <h2>A 7-day plan</h2>
+  <p class="lede">About two focused hours a day. Tick days off as you go; your progress stays in this browser.</p>
+  <div class="sec-body">
+    <div class="progress" aria-hidden="true"><i id="planBar"></i></div>
+    <div class="plan" id="planList"></div>
+  </div>
+</section>
+
+<!-- ================= CHEAT ================= -->
+<section id="cheat">
+  <div class="eyebrow">Last look before the call</div>
+  <h2>Cheat sheet</h2>
+  <div class="sec-body">
+    <div class="cheat">
+      <div class="cc"><div class="k">Fireworks · Series D</div><div class="v">$1.5B @ $17.5B</div><p>July 2026. Reported &gt;$1B annualised revenue.</p></div>
+      <div class="cc"><div class="k">Runpod · growth round</div><div class="v">$100M @ $1B</div><p>June 2026, led by Summit Partners. ~$240M annualised revenue, 1M+ developers.</p></div>
+      <div class="cc"><div class="k">Weights, 70B model</div><div class="v">140 / 70 / 35 GB</div><p>FP16 / FP8 / INT4. Bytes per param × params.</p></div>
+      <div class="cc"><div class="k">KV cache, Llama 3 70B</div><div class="v">≈0.33 MB / token</div><p>2 × 80 layers × 8 KV heads × 128 dim × 2 bytes. 128K context ≈ 43 GB.</p></div>
+      <div class="cc"><div class="k">VRAM rule</div><div class="v">W + KV + 10%</div><p>Then round GPUs up to 1, 2, 4 or 8.</p></div>
+      <div class="cc"><div class="k">Decode ceiling</div><div class="v">BW ÷ bytes</div><p>H100 3.35 TB/s ÷ 70 GB ≈ 48 tok/s for one user.</p></div>
+      <div class="cc"><div class="k">H100 → H200</div><div class="v">same FLOPS</div><p>80 → 141 GB, 3.35 → 4.8 TB/s. Memory is the upgrade.</p></div>
+      <div class="cc"><div class="k">H100 ridge point</div><div class="v">≈300 FLOP/B</div><p>Batch-1 decode ≈ 1–2. That's why batching matters.</p></div>
+      <div class="cc"><div class="k">Spec decoding</div><div class="v">(1−αᵏ⁺¹)/(1−α)</div><p>Tokens per big-model pass. α 0.75, k 4 ≈ 3.1.</p></div>
+      <div class="cc"><div class="k">Serverless vs dedicated</div><div class="v">≈60% utilisation</div><p>Break-even on Runpod H100: Pod $/hr ÷ Serverless $/hr.</p></div>
+      <div class="cc"><div class="k">Engines</div><div class="v">vLLM default</div><p>SGLang for shared prefixes/JSON, TensorRT-LLM for max NVIDIA perf, llama.cpp for edge. TGI in maintenance.</p></div>
+      <div class="cc"><div class="k">Latency vocabulary</div><div class="v">TTFT · ITL · goodput</div><p>Agree the target percentile (p95) before any benchmark.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SOURCES ================= -->
+<section id="sources">
+  <div class="eyebrow">Check the work</div>
+  <h2>Sources</h2>
+  <p class="lede">Company figures are as reported in September 2026; performance claims are vendor benchmarks; prices change often. Re-check pricing pages before making a cost estimate.</p>
+  <div class="sec-body">
+    <ol class="sources">
+      <li><a href="https://fireworks.ai/blog/series-d-announcement">Fireworks: Series D announcement</a></li>
+      <li><a href="https://www.cnbc.com/2026/07/16/fireworks-nvidia-cloud-ai-startup-value.html">CNBC: Fireworks hits $17.5B valuation</a></li>
+      <li><a href="https://sacra.com/c/fireworks-ai/">Sacra: Fireworks AI revenue &amp; funding</a></li>
+      <li><a href="https://fireworks.ai/blog/fireoptimizer">Fireworks: FireOptimizer &amp; adaptive speculative decoding</a></li>
+      <li><a href="https://fireworks.ai/blog/firefunction-v2">Fireworks: FireFunction V2</a></li>
+      <li><a href="https://fireworks.ai/blog/why-do-all-LLMs-need-structured-output-modes">Fireworks: structured output modes</a></li>
+      <li><a href="https://docs.fireworks.ai/serverless/pricing">Fireworks docs: serverless pricing</a></li>
+      <li><a href="https://docs.fireworks.ai/guides/function-calling">Fireworks docs: tool calling</a></li>
+      <li><a href="https://www.summitpartners.com/news/runpod-raises-100m-led-by-summit-partners-to-accelerate-the-ai-developer-cloud">Summit Partners: Runpod raises $100M</a></li>
+      <li><a href="https://www.prnewswire.com/news-releases/runpod-raises-100m-led-by-summit-partners-to-accelerate-the-ai-developer-cloud-302808689.html">PR Newswire: Runpod funding release</a></li>
+      <li><a href="https://www.kucoin.com/news/flash/runpod-raises-100m-at-1b-valuation-rejects-500m-buyout-offers">KuCoin News: Runpod valuation and buyout offers</a></li>
+      <li><a href="https://www.runpod.io/product/serverless">Runpod: Serverless</a></li>
+      <li><a href="https://sergeyshmakov.github.io/mineru-runpod/blog/2026-05-26-runpod-flashboot-mechanism-investigation/">Independent test: how Runpod FlashBoot works</a></li>
+      <li><a href="https://flexprice.io/blog/runprod-pricing-guide-with-gpu-costs">Flexprice: Runpod pricing 2026</a></li>
+      <li><a href="https://www.usagepricing.com/tools/pricing-calculator/runpod">UsagePricing: Runpod GPU prices</a></li>
+      <li><a href="https://www.morphllm.com/fireworks-ai-pricing">Morph: Fireworks pricing 2026</a></li>
+      <li><a href="https://rywalker.com/research/ai-inference-platforms">Ry Walker: AI inference platforms compared</a></li>
+      <li><a href="https://alignify.co/blog/inference-infrastructure">Alignify: inference platforms 2026</a></li>
+      <li><a href="https://bentoml.com/llm/getting-started/llm-quantization">BentoML: LLM inference handbook, quantization</a></li>
+      <li><a href="https://arxiv.org/abs/2309.06180">Kwon et al.: PagedAttention / vLLM (SOSP 2023)</a></li>
+      <li><a href="https://arxiv.org/abs/2205.14135">Dao et al.: FlashAttention</a></li>
+      <li><a href="https://arxiv.org/abs/2211.17192">Leviathan et al.: speculative decoding</a></li>
+      <li><a href="https://github.com/orgs/runpod-workers/repositories">Runpod workers on GitHub (vLLM, SGLang, ComfyUI, faster-whisper…)</a></li>
+      <li><a href="https://docs.runpod.io/serverless/vllm/get-started">Runpod docs: deploy vLLM on Serverless</a></li>
+      <li><a href="https://docs.runpod.io/tutorials/pods/run-ollama">Runpod docs: set up Ollama on a Pod</a></li>
+      <li><a href="https://docs.fireworks.ai/models/uploading-custom-models">Fireworks docs: custom models</a></li>
+      <li><a href="https://fireworks.ai/blog/multi-lora">Fireworks: multi-LoRA serving</a></li>
+      <li><a href="https://fireworks.ai/blog/fire-attention-serving-open-source-models-4x-faster-than-vllm-by-quantizing-with-no-tradeoffs">Fireworks: FireAttention</a></li>
+      <li><a href="https://docs.vllm.ai/en/latest/deployment/frameworks/runpod/">vLLM docs: RunPod deployment</a></li>
+    </ol>
+  </div>
+</section>
+
+<footer>Inference Field Guide · compiled September 2026 for AI field engineers and curious builders. Not affiliated with Fireworks AI or Runpod. Illustrative numbers are labelled as such.</footer>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const nf=(x,d=0)=>Number(x).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const SVGNS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){const e=document.createElementNS(SVGNS,tag);for(const k in attrs){e.setAttribute(k,attrs[k]);}if(parent)parent.appendChild(e);return e;}
+function setPressed(group,btn){group.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===btn?'true':'false'));}
+function fmtTok(n){if(n>=1e9)return nf(n/1e9,n>=1e10?0:1)+'B';if(n>=1e6)return nf(n/1e6,n>=1e7?0:1)+'M';if(n>=1e3)return nf(n/1e3,0)+'K';return nf(n);}
+function fmtUSD(n){if(n>=1e6)return '$'+nf(n/1e6,1)+'M';if(n>=1e4)return '$'+nf(n/1e3,0)+'K';if(n>=1e3)return '$'+nf(n/1e3,1)+'K';return '$'+nf(n,0);}
+
+/* theme change hooks */
+const themeCbs=[];
+function onTheme(cb){themeCbs.push(cb);}
+function fireTheme(){themeCbs.forEach(cb=>{try{cb();}catch(e){}});}
+try{window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',fireTheme);}catch(e){}
+new MutationObserver(fireTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','class']});
+
+/* ---------------- rail active link ---------------- */
+(function(){
+  const links=$$('#railnav a');const map={};links.forEach(a=>map[a.getAttribute('href').slice(1)]=a);
+  const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(a=>a.classList.remove('on'));const a=map[e.target.id];if(a){a.classList.add('on');if(window.innerWidth<1100){try{a.scrollIntoView({block:'nearest',inline:'center'});}catch(_){}}}}});},{rootMargin:'-45% 0px -50% 0px'});
+  $$('main section[id]').forEach(s=>io.observe(s));
+})();
+
+/* ---------------- generic three.js stage ---------------- */
+function stage(wrap,o){
+  const canvas=wrap.querySelector('canvas');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(o.fov||35,1,0.1,200);
+  camera.position.set(o.cam[0],o.cam[1],o.cam[2]);camera.lookAt(0,o.lookY||0,0);
+  const root=new THREE.Group();scene.add(root);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x3a3f46,0.95));
+  const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(5,10,7);scene.add(dl);
+  const api={scene,camera,root,renderer,canvas,update:null,after:null};
+  let rotY=o.rotY||0,rotX=o.rotX||0,auto=!reduce&&o.auto!==false,drag=null,visible=false,raf=null,last=0,t=0;
+  function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;if(o.fitW){const f=Math.tan((o.fov||35)*Math.PI/360);const z=Math.max(o.cam[2],o.fitW/(2*f*camera.aspect));const r=z/o.cam[2];camera.position.set(o.cam[0]*r,(o.cam[1]-(o.lookY||0))*r+(o.lookY||0),z);camera.lookAt(0,o.lookY||0,0);}camera.updateProjectionMatrix();if(reduce)draw(0);}
+  function draw(dt){root.rotation.y=rotY;root.rotation.x=rotX;if(api.update)api.update(t,dt);renderer.render(scene,camera);if(api.after)api.after();}
+  function frame(now){raf=null;if(!visible)return;const dt=Math.min(0.05,(now-last)/1000||0.016);last=now;t+=dt;if(auto)rotY+=dt*(o.spin||0.1);draw(dt);if(!reduce)raf=requestAnimationFrame(frame);}
+  api.kick=function(){if(reduce){t+=0.5;draw(0.5);return;}if(raf==null&&visible){last=performance.now();raf=requestAnimationFrame(frame);}};
+  canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};auto=false;try{canvas.setPointerCapture(e.pointerId);}catch(_){}});
+  canvas.addEventListener('pointermove',e=>{if(!drag)return;rotY+=(e.clientX-drag.x)*0.008;rotX=Math.max(-0.35,Math.min(0.5,rotX+(e.clientY-drag.y)*0.004));drag={x:e.clientX,y:e.clientY};if(reduce)draw(0);});
+  const end=()=>{drag=null;};canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
+  new ResizeObserver(resize).observe(canvas);
+  new IntersectionObserver(es=>{visible=es[0].isIntersecting;if(visible)api.kick();}).observe(canvas);
+  setTimeout(resize,0);
+  return api;
+}
+function noWebGL(wrap,msg){const c=wrap.querySelector('canvas');const d=document.createElement('div');d.style.cssText='padding:40px 20px;color:var(--muted);font-size:.9rem;min-height:200px;display:flex;align-items:center;justify-content:center;text-align:center';d.textContent=msg;c.replaceWith(d);wrap.querySelectorAll('.lbl').forEach(l=>l.hidden=true);}
+const hasGL=(function(){try{const c=document.createElement('canvas');return !!(window.THREE&&(c.getContext('webgl')||c.getContext('experimental-webgl')));}catch(e){return false;}})();
+
+/* ---------------- narrated story player (shared) ---------------- */
+function Story(wrap,S){
+  const q=s=>wrap.querySelector(s);
+  const ui={cap:q('.cap-text'),no:q('.stepno'),bar:q('.prog i'),play:q('[data-act=play]'),prev:q('[data-act=prev]'),next:q('[data-act=next]')};
+  let steps=[],i=0,t=0,playing=false,started=false;
+  const api={};
+  function total(){return steps.reduce((a,s)=>a+s.dur,0);}
+  function apply(){const s=steps[i];const k=s.dur?Math.min(1,t/s.dur):1;s.set(k);
+    const cap=typeof s.cap==='function'?s.cap(k):s.cap;ui.cap.textContent=cap;ui.no.textContent=(s.label||('Step '+(i+1)))+' of '+steps.length;
+    let before=0;for(let j=0;j<i;j++)before+=steps[j].dur;ui.bar.style.width=((before+Math.min(t,s.dur))/total()*100)+'%';
+    ui.prev.disabled=i===0;ui.next.disabled=i===steps.length-1&&t>=s.dur;}
+  function btn(){const end=i===steps.length-1&&t>=steps[i].dur;ui.play.textContent=playing?'Pause':(end?'Replay':'Play');}
+  api.load=function(fn){steps=fn();i=0;t=0;apply();btn();S.kick();};
+  api.tick=function(dt){if(!playing)return;t+=dt;const s=steps[i];if(t>=s.dur+(s.hold==null?.7:s.hold)){if(i<steps.length-1){i++;t=0;}else{t=s.dur;playing=false;btn();}}apply();};
+  api.play=function(){if(reduce){api.step(1);return;}const end=i===steps.length-1&&t>=steps[i].dur;if(end){i=0;t=0;}playing=true;btn();S.kick();};
+  api.pause=function(){playing=false;btn();};
+  api.step=function(d){i=Math.max(0,Math.min(steps.length-1,i+d));t=reduce||!playing?steps[i].dur:0;apply();btn();S.kick();};
+  api.restart=function(){i=0;t=0;apply();if(!reduce){playing=true;}btn();S.kick();};
+  api.autostart=function(){if(started)return;started=true;if(!reduce){playing=true;btn();}};
+  api.isPlaying=()=>playing;
+  ui.play.addEventListener('click',()=>playing?api.pause():api.play());
+  ui.prev.addEventListener('click',()=>api.step(-1));
+  ui.next.addEventListener('click',()=>api.step(1));
+  return api;
+}
+function clamp01(x){return x<0?0:x>1?1:x;}
+function easeIO(x){x=clamp01(x);return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2;}
+function makeLabels(wrap,S,items){
+  const v=new THREE.Vector3();
+  const L=items.map(it=>{const d=document.createElement('div');d.className='lbl'+(it.cls?' '+it.cls:'');d.innerHTML=it.html;wrap.appendChild(d);return {d,it};});
+  return function(){const w=S.canvas.clientWidth,h=S.canvas.clientHeight;L.forEach(o=>{const p=o.it.at();if(!p){o.d.style.opacity=0;return;}v.copy(p).applyMatrix4(S.root.matrixWorld).project(S.camera);o.d.style.left=((v.x+1)/2*w)+'px';o.d.style.top=((1-v.y)/2*h)+'px';o.d.style.opacity=v.z<1?1:0;if(o.it.text)o.d.innerHTML=o.it.text();});};
+}
+function whenVisible(elm,cb){new IntersectionObserver((es,io)=>{if(es[0].isIntersecting){cb();io.disconnect();}},{threshold:.45}).observe(elm);}
+
+/* ---------------- SCENE 1: why decode is memory-bound ---------------- */
+(function(){
+  const wrap=$('#mem3d');if(!wrap)return;
+  if(!hasGL){noWebGL(wrap,'This walkthrough needs WebGL. In short: for every layer, the weights travel from memory to the chip (slow), the cores compute (fast), and the weights are thrown away. With one token, the cores are idle most of the time.');wrap.querySelector('.story-foot').hidden=true;return;}
+  const S=stage(wrap,{cam:[0.4,4.2,9.4],fov:36,rotY:-0.1,rotX:0,auto:false,lookY:1.05,fitW:11.4});
+  const R=S.root;
+  const std=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.7,metalness:.05},o||{}));
+  const baseMat=std(0xdfe2dc,{roughness:.95});const base=new THREE.Mesh(new THREE.BoxGeometry(11.6,.1,4.8),baseMat);base.position.set(0,-.05,.2);R.add(base);
+  // HBM
+  const HX=-4.1,slabY=L=>.24+L*.34;const hbm=[];
+  for(let L=0;L<8;L++){const m=new THREE.Mesh(new THREE.BoxGeometry(1.6,.26,1.4),std(0xb4531a,{emissive:0xb4531a,emissiveIntensity:0}));m.position.set(HX,slabY(L),0);R.add(m);hbm.push(m);}
+  const hbmFrame=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.95,2.95,1.75)),new THREE.LineBasicMaterial({color:0x59606a}));hbmFrame.position.set(HX,1.45,0);R.add(hbmFrame);
+  // bus
+  const busMat=std(0x9aa1a8,{transparent:true,opacity:.45});const bus=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,3.55,20),busMat);bus.rotation.z=Math.PI/2;bus.position.set(-1.45,.62,0);R.add(bus);
+  // chip
+  const chip=new THREE.Mesh(new THREE.BoxGeometry(4.1,.14,2.7),std(0x2a3037,{roughness:.5,metalness:.3}));chip.position.set(2.45,.07,0);R.add(chip);
+  const sramMat=std(0x7fd0c3,{emissive:0x3cc4ae,emissiveIntensity:0});const sram=new THREE.Mesh(new THREE.BoxGeometry(.75,.18,2.3),sramMat);sram.position.set(.85,.23,0);R.add(sram);
+  const cores=[];for(let i=0;i<4;i++)for(let j=0;j<4;j++){const m=new THREE.Mesh(new THREE.BoxGeometry(.44,.32,.44),std(0x8d959d,{emissive:0x0e7a6b,emissiveIntensity:0}));m.position.set(1.9+i*.6,.3,-.9+j*.6);R.add(m);cores.push(m);}
+  // moving weights
+  const blkMat=std(0xb4531a,{emissive:0xb4531a,emissiveIntensity:.35});const blk=new THREE.Mesh(new THREE.BoxGeometry(.8,.2,.8),blkMat);R.add(blk);
+  // tokens
+  const tokMat=std(0xbfc5ca,{emissive:0x0e7a6b,emissiveIntensity:0});const toks=[];
+  for(let n=0;n<32;n++){const m=new THREE.Mesh(new THREE.BoxGeometry(.22,.1,.22),tokMat);R.add(m);toks.push(m);}
+  let mode='decode';
+  const P={decode:{n:1,dc:.1},batch:{n:32,dc:.95}};
+  const dm=L=>L<2?1.5:.85;
+  function layoutTokens(){toks.forEach((m,n)=>{if(n>=P[mode].n){m.visible=false;return;}m.visible=true;if(P[mode].n===1){m.position.set(2.8,.18,1.95);m.scale.set(2.2,1.4,2.2);}else{const c=n%8,r=Math.floor(n/8);m.position.set(1.55+c*.34,.12,1.6+r*.3);m.scale.set(1,1,1);}});}
+  let accent=new THREE.Color('#0e7a6b'),copper=new THREE.Color('#b4531a'),idle=new THREE.Color('#bfc5ca');
+  function themeCol(){accent=new THREE.Color(css('--accent')||'#0e7a6b');copper=new THREE.Color(css('--copper')||'#b4531a');hbm.forEach(m=>{m.material.color.copy(copper);m.material.emissive.copy(copper);});blkMat.color.copy(copper);blkMat.emissive.copy(copper);cores.forEach(m=>m.material.emissive.copy(accent));tokMat.emissive.copy(accent);
+    const dark=css('--ground').toLowerCase()<'#8';baseMat.color.set(dark?0x1e232b:0xdfe2dc);idle=new THREE.Color(dark?'#4a525c':'#bfc5ca');hbmFrame.material.color.set(css('--muted')||'#59606a');}
+  themeCol();onTheme(()=>{themeCol();S.kick();});
+  // state writers
+  function state(o){ // o: {hl, blk:{p,s}|null, coreOn, prog, pop}
+    hbm.forEach((m,L)=>m.material.emissiveIntensity=o.hl===L?.55:(o.pulse?o.pulse:0));
+    if(o.blk){blk.visible=true;blk.position.copy(o.blk.p);blk.scale.setScalar(o.blk.s);}else blk.visible=false;
+    sramMat.emissiveIntensity=o.sram||0;
+    cores.forEach((m,i)=>{m.material.emissiveIntensity=o.coreOn?(.75+.2*Math.sin(i*1.7+o.coreOn*20)):0;});
+    tokMat.color.copy(idle).lerp(accent,o.prog);tokMat.emissiveIntensity=o.prog>=1?.35:0;
+    const s=1+(o.pop||0)*.35;toks.forEach((m,n)=>{if(!m.visible)return;const b=P[mode].n===1?[2.2,1.4,2.2]:[1,1,1];m.scale.set(b[0]*s,b[1]*s,b[2]*s);});
+  }
+  const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+  function blkPath(L,f){const a=V(HX,slabY(L),0),b=V(-3.2,.62,0),c=V(.3,.62,0),d=V(.85,.42,0);
+    if(f<.15)return a.lerp(b,easeIO(f/.15));if(f<.88)return b.lerp(c,(f-.15)/.73);return c.lerp(d,easeIO((f-.88)/.12));}
+  // meter
+  const mMv=$('#memMv'),mCp=$('#memCp'),mMvB=$('#memMvB'),mCpB=$('#memCpB'),mTok=$('#memTok');
+  const maxT=(()=>{let a=0;for(let L=0;L<8;L++)a+=dm(L)+P.batch.dc;return a;})();
+  function meter(mv,cp,tokDone){mMv.textContent=nf(mv,1)+' s';mCp.textContent=nf(cp,1)+' s';mMvB.style.width=(mv/maxT*100)+'%';mCpB.style.width=(cp/maxT*100)+'%';const tot=mv+cp;$('#memBusy').textContent=tot?nf(cp/tot*100)+'%':'–';mTok.textContent=tokDone+' / '+P[mode].n;}
+  function busyPct(){let mv=0,cp=0;for(let L=0;L<8;L++){mv+=dm(L);cp+=P[mode].dc;}return Math.round(cp/(mv+cp)*100);}
+  function build(){
+    layoutTokens();const n=P[mode].n,dc=P[mode].dc;const steps=[];
+    steps.push({dur:3.2,label:'Step 1',cap:n===1?'One new token must pass through all 8 layers of the model. Every layer\'s weights live in HBM, the GPU\'s large main memory (left).':'32 tokens at once (a batch of users, or a prompt being prefilled) must pass through all 8 layers. The weights live in HBM (left).',
+      set:k=>{state({pulse:.25+.2*Math.sin(k*12),prog:0});meter(0,0,0);}});
+    let mvB=0,cpB=0;
+    for(let L=0;L<8;L++){const a=dm(L),mv0=mvB,cp0=cpB;
+      steps.push({dur:a+dc,label:'Layer '+(L+1),cap:k=>{const tt=k*(a+dc);if(tt<a)return 'Layer '+(L+1)+' of 8 · Fetch: this layer\'s weights stream out of HBM over the memory bus. This is the slow part.';
+          return 'Layer '+(L+1)+' of 8 · Compute: '+(n===1?'the cores do the math for 1 token in a flash, then go idle. The weights are discarded: on-chip SRAM is too small to keep them.':'the same weights are reused for all 32 tokens, so the cores stay busy far longer before the weights are discarded.');},
+        set:k=>{const tt=k*(a+dc);if(tt<a){const f=tt/a;state({hl:L,blk:{p:blkPath(L,f),s:1},prog:L/8});meter(mv0+tt,cp0,0);}
+          else{const f=(tt-a)/dc;state({hl:-1,blk:{p:V(.85,.42,0),s:Math.max(.05,1-f)},sram:.5,coreOn:f+.001,prog:(L+f)/8});meter(mv0+a,cp0+(tt-a),0);}}});
+      mvB+=a;cpB+=dc;}
+    const mvT=mvB,cpT=cpB;
+    steps.push({dur:1.2,hold:0,label:'Result',cap:n===1?'Result · 1 token cost one full read of every weight. The cores were busy only '+busyPct()+'% of the time. That is "memory-bound", and it is why decode speed follows memory bandwidth, not FLOPS.':'Result · 32 tokens for the same single read of the weights. The cores were busy '+busyPct()+'% of the time. Batching users, or prefilling a long prompt, turns waiting into work.',
+      set:k=>{state({prog:1,pop:Math.sin(clamp01(k*2)*Math.PI)});meter(mvT,cpT,n);}});
+    return steps;
+  }
+  const story=Story(wrap,S);
+  S.update=(t,dt)=>story.tick(dt);
+  S.after=makeLabels(wrap,S,[
+    {html:'<b>HBM memory</b> · holds all weights',at:()=>V(HX,3.15,0)},
+    {html:'<b>Memory bus</b> · 3.35 TB/s · the bottleneck',at:()=>V(-1.45,.95,0)},
+    {html:'<b>SRAM</b> · tiny on-chip buffer',at:()=>V(.85,.45,-1.2),cls:'lo'},
+    {html:'<b>Cores (SMs)</b> · 989 TFLOPS',at:()=>V(2.8,.55,-1.25)},
+    {html:'',text:()=>P[mode].n===1?'<b>1 token</b>':'<b>32 tokens</b>',at:()=>V(P[mode].n===1?3.55:4.35,.25,P[mode].n===1?1.95:1.9),cls:'side'}]);
+  wrap.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;setPressed(b.parentElement,b);story.load(build);if(!reduce)story.play();}));
+  story.load(build);
+  whenVisible(wrap,()=>story.autostart());
+})();
+
+/* ---------------- SCENE 2: splitting a model across GPUs ---------------- */
+(function(){
+  const wrap=$('#par3d');if(!wrap)return;
+  if(!hasGL){noWebGL(wrap,'This walkthrough needs WebGL. Data parallel copies the model to every GPU; tensor parallel slices every layer; pipeline parallel gives each GPU a chunk of layers; expert parallel gives each GPU different experts.');wrap.querySelector('.story-foot').hidden=true;return;}
+  const S=stage(wrap,{cam:[0,2.7,10.8],fov:40,rotY:0,rotX:0.06,auto:false,lookY:2.35,fitW:12.6});
+  const R=S.root;const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+  const GX=[-4.2,-1.4,1.4,4.2],gy=L=>.3+L*.3,ty=L=>3.5+L*.26;
+  const std=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.65},o||{}));
+  const frameMat=new THREE.LineBasicMaterial({color:0x59606a});const plates=[];
+  GX.forEach(x=>{const f=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2.1,2.85,1.5)),frameMat);f.position.set(x,1.45,0);R.add(f);const p=new THREE.Mesh(new THREE.BoxGeometry(2.1,.1,1.5),std(0xc9cdc6,{emissive:0x0e7a6b,emissiveIntensity:0}));p.position.set(x,0,0);R.add(p);plates.push(p);});
+  const layerCol=L=>new THREE.Color().setHSL((168-L*(146/7))/360,.5,.5);
+  const expHue=[205,262,330,40],expCol=e=>new THREE.Color().setHSL(expHue[e]/360,.6,.55),grey=new THREE.Color(0x8a9199);
+  const FULL=V(1.5,.22,1.1);const geo=new THREE.BoxGeometry(1,1,1);
+  const pool=[];for(let i=0;i<32;i++){const m=new THREE.Mesh(geo,std(0xffffff,{emissive:0xffffff,emissiveIntensity:0}));R.add(m);pool.push(m);}
+  const tokMat=new THREE.MeshStandardMaterial({color:0x161a1f,roughness:.4});
+  const toks=[];for(let i=0;i<4;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(.17,20,14),tokMat);R.add(m);toks.push(m);}
+  const syncMat=new THREE.MeshStandardMaterial({color:0x0e7a6b,emissive:0x0e7a6b,emissiveIntensity:.8,transparent:true,opacity:.9});const sync=new THREE.Mesh(new THREE.BoxGeometry(10.6,.06,.06),syncMat);R.add(sync);
+  const router=new THREE.Mesh(new THREE.OctahedronGeometry(.32),std(0x0e7a6b,{emissive:0x0e7a6b,emissiveIntensity:.3}));router.position.set(0,4.25,0);R.add(router);
+  const lineMat=new THREE.LineBasicMaterial({color:0x0e7a6b});const lines=[0,1].map(()=>{const g=new THREE.BufferGeometry().setFromPoints([V(0,0,0),V(0,0,0)]);const l=new THREE.Line(g,lineMat);R.add(l);return l;});
+  function themeCol(){const a=new THREE.Color(css('--accent')||'#0e7a6b');tokMat.color.set(css('--ink')||'#161a1f');frameMat.color.set(css('--muted')||'#59606a');syncMat.color.copy(a);syncMat.emissive.copy(a);router.material.color.copy(a);router.material.emissive.copy(a);lineMat.color.copy(a);plates.forEach(p=>p.material.emissive.copy(a));const dark=css('--ground').toLowerCase()<'#8';plates.forEach(p=>p.material.color.set(dark?0x2b313a:0xc9cdc6));}
+  themeCol();onTheme(()=>{themeCol();S.kick();});
+  let mode='dp';
+  // pose: returns array of {p,s,c,v} for pool
+  function pose(m,which){const out=[];for(let i=0;i<32;i++)out.push({p:V(0,-20,0),s:V(.01,.01,.01),c:grey,v:false});
+    if(m==='dp'){for(let c=0;c<4;c++)for(let L=0;L<8;L++){const o=out[c*8+L];o.v=true;o.c=layerCol(L);o.s=FULL.clone();o.p=which==='tower'?V(0,ty(L),0):V(GX[c],gy(L),0);}}
+    else if(m==='tp'){for(let p=0;p<4;p++)for(let L=0;L<8;L++){const o=out[p*8+L];o.v=true;o.c=layerCol(L);o.s=V(.34,.22,1.1);o.p=which==='tower'?V((p-1.5)*.38,ty(L),0):V(GX[p],gy(L),0);}}
+    else if(m==='pp'){for(let L=0;L<8;L++){const o=out[L];o.v=true;o.c=layerCol(L);o.s=FULL.clone();o.p=which==='tower'?V(0,ty(L)+(Math.floor(L/2))*.06,0):V(GX[Math.floor(L/2)],gy(L%2),0);}}
+    else{for(let p=0;p<4;p++){const o=out[p];o.v=true;o.c=grey;o.s=V(.34,.3,1.1);o.p=which==='tower'?V((p-1.5)*.38,ty(0),0):V(GX[p],.35,0);}
+      for(let e=0;e<4;e++){const o=out[4+e];o.v=true;o.c=expCol(e);o.s=V(.34,.62,1.1);o.p=which==='tower'?V((e-1.5)*.38,ty(0)+.55,0):V(GX[e],1.05,0);o.s=which==='tower'?V(.34,.62,1.1):V(1.5,.62,1.1);}}
+    return out;}
+  function applyPose(a,b,k,glow){for(let i=0;i<32;i++){const m=pool[i],A=a[i],B=b[i];const kk=easeIO(clamp01(k*1.35-(i%8)*.045));m.visible=A.v||B.v;if(!m.visible)continue;m.position.copy(A.p).lerp(B.p,kk);m.scale.copy(A.s).lerp(B.s,kk);m.material.color.copy(B.c);m.material.emissive.copy(B.c);m.material.emissiveIntensity=glow&&glow[i]?glow[i]:0;}}
+  function reset(){toks.forEach(t=>t.visible=false);sync.visible=false;router.visible=false;lines.forEach(l=>l.visible=false);plates.forEach(p=>p.material.emissiveIntensity=0);}
+  function plateOn(arr){plates.forEach((p,i)=>p.material.emissiveIntensity=arr.indexOf(i)>=0?.55:0);}
+  function tok(i,p){toks[i].visible=true;toks[i].position.copy(p);}
+  const tokNames={dp:['A','B','C','D'],tp:['request','copy','copy','copy'],pp:['A','B','C','D'],ep:['"Paris"','"Paris"','','']};
+  let names=tokNames.dp,towerLabel=true,expLabels=false,syncLabel=false,routerLabel=false;
+  function build(){
+    const T=pose(mode,'tower'),P=pose(mode,'placed');names=tokNames[mode].slice();
+    const intro={dur:3.6,label:'Step 1',cap:mode==='ep'?'This model is a mixture of experts: shared layers (grey) plus 4 expert blocks. Each token only needs 2 of the 4 experts. We have 4 GPUs below.':'This is our model: 8 layers stacked into a tower. A request (the dark ball) has to pass through every layer, bottom to top. Below are 4 GPUs.',
+      set:k=>{reset();applyPose(T,T,1);towerLabel=true;expLabels=false;syncLabel=false;routerLabel=false;names=['request','','',''];tok(0,V(1.1,ty(0)+k*(ty(7)-ty(0)),0));}};
+    const splitCap={dp:'Data parallel: copy the whole model onto every GPU. Each GPU gets all 8 layers.',
+      tp:'Tensor parallel: cut every layer into 4 vertical slices. GPU 1 gets slice 1 of every layer, GPU 2 gets slice 2, and so on.',
+      pp:'Pipeline parallel: cut the tower into 4 chunks of 2 layers. GPU 1 gets layers 1–2, GPU 2 gets layers 3–4, and so on.',
+      ep:'Expert parallel: slice the shared layers across all GPUs, and give each GPU one expert (A, B, C, D).'};
+    const split={dur:2.8,label:'Step 2',cap:splitCap[mode],set:k=>{reset();towerLabel=k<.3;expLabels=mode==='ep'&&k>.9;applyPose(T,P,k);}};
+    const steps=[intro,split];
+    if(mode==='dp'){names=['A','B','C','D'];
+      steps.push({dur:4.2,label:'Step 3',cap:'Four different requests (A–D) arrive. Each goes to its own GPU and climbs that GPU\'s 8 layers. All four run at the same time.',set:k=>{reset();names=['A','B','C','D'];applyPose(P,P,1);plateOn([0,1,2,3]);for(let c=0;c<4;c++)tok(c,V(GX[c]+1.25,gy(0)+easeIO(k)*(gy(7)-gy(0)),.2));}});
+      steps.push({dur:1,hold:0,label:'Result',cap:'Result: 4× more requests per second. But each request is no faster, and every GPU must hold a full copy of the model, so this only works when the model fits on one GPU.',set:k=>{reset();names=['A','B','C','D'];applyPose(P,P,1);for(let c=0;c<4;c++)tok(c,V(GX[c]+1.25,gy(7),.2));}});}
+    if(mode==='tp'){
+      steps.push({dur:7,label:'Step 3',cap:k=>{const L=Math.min(7,Math.floor(k*8)),f=k*8-L;return f<.65?'Layer '+(L+1)+' of 8 · The same request is on all 4 GPUs. Each computes only its slice of this layer.':'Layer '+(L+1)+' of 8 · Sync: the GPUs exchange partial results (the flashing bar) before anyone can start the next layer.';},
+        set:k=>{reset();names=['request','copy','copy','copy'];applyPose(P,P,1);const L=Math.min(7,Math.floor(k*8)),f=k*8-L;const y=gy(L);plateOn([0,1,2,3]);for(let p=0;p<4;p++)tok(p,V(GX[p]+1.25,y,.2));
+          const glow=[];for(let p=0;p<4;p++)glow[p*8+L]=f<.65?.5:.15;applyPose(P,P,1,glow);if(f>=.65){sync.visible=true;sync.position.set(0,y,.75);syncMat.opacity=.5+.5*Math.sin((f-.65)/.35*Math.PI);syncLabel=true;}else syncLabel=false;}});
+      steps.push({dur:1,hold:0,label:'Result',cap:'Result: one request finishes faster because 4 GPUs share its work. The price is a sync after every layer, which needs very fast links (NVLink). That is why tensor parallelism usually stays inside one server.',set:k=>{reset();syncLabel=false;names=['request','copy','copy','copy'];applyPose(P,P,1);for(let p=0;p<4;p++)tok(p,V(GX[p]+1.25,gy(7),.2));}});}
+    if(mode==='pp'){
+      const stageT=1/4;
+      function ppPos(u){ // u in [0,4): stage index + frac; returns position
+        const j=Math.min(3,Math.floor(u)),f=u-j;if(f<.6||j===3)return {p:V(GX[j]+1.25,gy(0)+Math.min(1,f/.6)*(gy(1)-gy(0)),.2),g:j,active:f<.6};
+        const h=(f-.6)/.4,x=GX[j]+1.25+(GX[j+1]-GX[j])*easeIO(h),y=gy(1)+(gy(0)-gy(1))*h+Math.sin(h*Math.PI)*.9;return {p:V(x,y,.2),g:-1,active:false};}
+      steps.push({dur:6,label:'Step 3',cap:k=>{const j=Math.min(3,Math.floor(k*4));return 'Request A climbs layers '+(j*2+1)+'–'+(j*2+2)+' on GPU '+(j+1)+(j<3?', then hands its result to GPU '+(j+2)+'. The other GPUs wait.':'. Done.');},
+        set:k=>{reset();names=['A','','',''];applyPose(P,P,1);const r=ppPos(Math.min(3.999,k*4));tok(0,r.p);plateOn(r.g>=0&&r.active?[r.g]:[]);}});
+      steps.push({dur:7,label:'Step 4',cap:'Now a stream of requests: while GPU 2 works on A, GPU 1 already starts B. Once the pipeline is full, all 4 GPUs are busy, like an assembly line.',
+        set:k=>{reset();names=['A','B','C','D'];applyPose(P,P,1);const on=[];for(let n=0;n<4;n++){const u=k*7-n*1.0;if(u<0||u>=4){if(u>=4)tok(n,V(GX[3]+1.25,gy(1),.2));continue;}const r=ppPos(u);tok(n,r.p);if(r.active)on.push(r.g);}plateOn(on);}});
+      steps.push({dur:1,hold:0,label:'Result',cap:'Result: each GPU holds only a quarter of the model, and the hand-offs are small, so this works even across servers. The trade-off: extra latency for each hop, and idle "bubbles" when there aren\'t enough requests to fill the line.',set:k=>{reset();names=['A','B','C','D'];applyPose(P,P,1);for(let n=0;n<4;n++)tok(n,V(GX[3]+1.25+(n-1.5)*.001,gy(1)+n*.0,.2));toks.forEach((t,n)=>t.visible=n===0);names=['A–D done','','',''];}});}
+    if(mode==='ep'){
+      function route(k,ex,word){reset();expLabels=true;routerLabel=true;router.visible=true;names=[word,word,'',''];
+        const glow=[];if(k>.62)ex.forEach(e=>glow[4+e]=.55);applyPose(P,P,1,glow);
+        if(k<.25){const f=easeIO(k/.25);tok(0,V(-5.2,4.6,0).lerp(V(-.45,4.25,0),f));names=[word,'','',''];}
+        else{const f=easeIO(clamp01((k-.25)/.37));ex.forEach((e,i)=>{tok(i,V(0,4.25,0).lerp(V(GX[e]+1.25,1.05,.2),f));lines[i].visible=true;lines[i].geometry.setFromPoints([V(0,4.25,0),V(GX[e],1.4,0)]);});}
+        plateOn(k>.62?ex:[]);}
+      steps.push({dur:4.5,label:'Step 3',cap:k=>k<.62?'The token "Paris" passes through the shared layers, then reaches the router. The router picks the 2 best experts for it: B and D.':'Only GPUs 2 and 4 do expert work for "Paris". Experts A and C stay idle for this token.',set:k=>route(k,[1,3],'"Paris"')});
+      steps.push({dur:4.5,label:'Step 4',cap:k=>k<.62?'The next token, "is", goes to the router, which picks different experts: A and C.':'Different tokens use different experts, so across many tokens every GPU gets work.',set:k=>route(k,[0,2],'"is"')});
+      steps.push({dur:1,hold:0,label:'Result',cap:'Result: only 2 of 4 experts run per token, so you get big-model knowledge at small-model compute. But memory must still hold every expert, and tokens have to be shuffled between GPUs. This is how DeepSeek- and Llama 4-style models are served.',set:k=>{reset();expLabels=true;routerLabel=true;router.visible=true;applyPose(P,P,1);names=['','','',''];}});}
+    return steps;
+  }
+  const story=Story(wrap,S);
+  S.update=(t,dt)=>story.tick(dt);
+  const lab=[];
+  GX.forEach((x,i)=>lab.push({html:'<b>GPU '+(i+1)+'</b>',at:()=>V(x,-.45,.75),cls:'lo'}));
+  lab.push({html:'',text:()=>mode==='ep'?'<b>Model</b> · shared layers + 4 experts':'<b>Model</b> · 8 layers',at:()=>towerLabel?V(0,ty(7)+.55,0):null});
+  for(let i=0;i<4;i++)lab.push({html:'',text:()=>'<b>'+names[i]+'</b>',at:()=>toks[i].visible&&names[i]?toks[i].position.clone().add(V(0,.25,0)):null,cls:'tok'});
+  lab.push({html:'<b>sync</b> · all-reduce',at:()=>syncLabel&&sync.visible?V(5.4,sync.position.y+.1,.75):null,cls:'lo'});
+  lab.push({html:'<b>Router</b> · picks 2 experts per token',at:()=>routerLabel?V(.5,4.25,0):null,cls:'side'});
+  ['A','B','C','D'].forEach((n,e)=>lab.push({html:'<b>Expert '+n+'</b>',at:()=>mode==='ep'&&expLabels?V(GX[e],1.55,.6):null,cls:'lo'}));
+  S.after=makeLabels(wrap,S,lab);
+  wrap.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.p;setPressed(b.parentElement,b);$('#parState').textContent={dp:'Data parallel',tp:'Tensor parallel',pp:'Pipeline parallel',ep:'Expert parallel (MoE)'}[mode];story.load(build);if(!reduce)story.play();}));
+  story.load(build);
+  whenVisible(wrap,()=>story.autostart());
+})();
+
+/* ---------------- CH1: request player ---------------- */
+(function(){
+  const pL=$('#pLen'),oL=$('#oLen'),pc=$('#pCache');const PREF=8000,ITL=0.022;
+  const lenFrom=v=>Math.round(256*Math.pow(2,v/100*7)/64)*64;
+  let st={};
+  function calc(){const len=lenFrom(+pL.value),out=+oL.value,cache=pc.checked;const eff=len*(cache?.2:1);const ttft=.05+eff/PREF;const tot=ttft+out*ITL;st={len,out,cache,ttft,tot};
+    $('#pLenO').textContent=nf(len)+' tok';$('#oLenO').textContent=nf(out)+' tok';
+    $('#rTTFT').innerHTML=(ttft<1?nf(ttft*1000)+'<small> ms</small>':nf(ttft,2)+'<small> s</small>');
+    $('#rITL').innerHTML=nf(ITL*1000)+'<small> ms</small>';
+    $('#rTot').innerHTML=nf(tot,2)+'<small> s</small>';
+    $('#rShare').innerHTML=nf((tot-ttft)/tot*100)+'<small> %</small>';
+    const a=ttft/tot*100;$('#tlA').style.width=a+'%';$('#tlB').style.width=(100-a)+'%';$('#tlA').textContent=a>12?'prefill '+nf(ttft,2)+'s':'';$('#tlB').textContent=(100-a)>14?'decode '+nf(tot-ttft,1)+'s':'';$('#tlEnd').textContent=nf(tot,2)+' s';
+    build(false);}
+  let timers=[];
+  function build(anim){timers.forEach(clearTimeout);timers=[];
+    const pr=$('#promptRow'),or=$('#outRow');pr.innerHTML='';or.innerHTML='';
+    const pn=Math.max(4,Math.min(48,Math.round(st.len/700)+3)),on=Math.max(6,Math.min(60,Math.round(st.out/20)));
+    const cachedN=st.cache?Math.round(pn*.8):0;
+    const pe=[];for(let i=0;i<pn;i++){const d=document.createElement('div');d.className='tk'+(i<cachedN?' cached':'')+(anim?'':' pf');pr.appendChild(d);pe.push(d);}
+    const oe=[];for(let i=0;i<on;i++){const d=document.createElement('div');d.className='tk'+(anim?'':' out');if(!anim)d.style.animation='none';or.appendChild(d);oe.push(d);}
+    if(!anim)return;
+    const D=Math.max(1.8,Math.min(5,st.tot))*1000;const pd=Math.max(350,st.ttft/st.tot*D);const dd=D-pd;
+    timers.push(setTimeout(()=>pe.forEach(d=>d.classList.add('pf')),120));
+    oe.forEach((d,i)=>timers.push(setTimeout(()=>d.classList.add('out'),pd+i*(dd/on))));}
+  [pL,oL,pc].forEach(x=>x.addEventListener('input',calc));
+  $('#playBtn').addEventListener('click',()=>build(!reduce));
+  calc();
+})();
+
+/* ---------------- CH2: attention ---------------- */
+(function(){
+  const words=['The','chef','plated','the','dish','because','it','was','ready'];
+  const W=[[1],[.45,.55],[.08,.6,.32],[.1,.12,.38,.4],[.04,.1,.42,.14,.3],[.03,.12,.25,.03,.27,.3],[.02,.16,.06,.03,.55,.08,.1],[.02,.05,.04,.02,.2,.1,.4,.17],[.02,.08,.1,.02,.34,.06,.2,.12,.06]];
+  const notes={6:'"it" puts most of its weight on "dish". That is how the model works out what the pronoun refers to.',2:'"plated" looks hardest at "chef": who is doing the plating.',8:'"ready" attends to "dish" and "it": the thing that is ready.',7:'"was" leans on "it", the subject it agrees with.',0:'The first word can only attend to itself: nothing came before it.'};
+  const box=$('#sentence');const btns=words.map((w,i)=>{const b=document.createElement('button');b.type='button';b.className='tok';b.innerHTML='<span class="pct"></span>'+w+'<span class="w"><i></i></span>';b.addEventListener('click',()=>sel(i));b.addEventListener('mouseenter',()=>sel(i));box.appendChild(b);return b;});
+  function sel(q){const row=W[q],mx=Math.max.apply(null,row);btns.forEach((b,i)=>{b.classList.toggle('q',i===q);b.classList.toggle('future',i>q);const w=i<=q?row[i]:0;b.querySelector('.w i').style.width=(i<=q?w/mx*100:0)+'%';b.querySelector('.pct').textContent=i<=q?Math.round(w*100)+'%':'';});
+    $('#attnQ').textContent='query: '+words[q];$('#attnNote').textContent=(notes[q]||'Each word blends information from the earlier words it attends to most.')+' Later words are greyed out: a decoder only looks backwards.';}
+  sel(6);
+})();
+
+/* ---------------- CH3: roofline ---------------- */
+const GPUS=[
+  {n:'RTX 4090',mem:24,bw:1.008,bf16:165,fp8:330},
+  {n:'L40S',mem:48,bw:0.864,bf16:362,fp8:733},
+  {n:'A100 80GB',mem:80,bw:2.039,bf16:312,fp8:null},
+  {n:'H100 SXM',mem:80,bw:3.35,bf16:989,fp8:1979},
+  {n:'H200',mem:141,bw:4.8,bf16:989,fp8:1979},
+  {n:'B200',mem:192,bw:8.0,bf16:2250,fp8:4500},
+  {n:'MI300X',mem:192,bw:5.3,bf16:1307,fp8:2615}];
+(function(){
+  const sel=$('#rfGpu');GPUS.forEach((g,i)=>{const o=document.createElement('option');o.value=i;o.textContent=g.n;if(g.n==='H100 SXM')o.selected=true;sel.appendChild(o);});
+  const svg=$('#roof');const Wd=680,H=340,L=64,Rr=20,T=18,B=48,pw=Wd-L-Rr,ph=H-T-B;
+  const x0=-1,x1=12,y0=0,y1=Math.log10(6000);
+  const X=v=>L+(Math.log2(v)-x0)/(x1-x0)*pw,Y=v=>T+ph-(Math.log10(v)-y0)/(y1-y0)*ph;
+  function draw(){
+    const g=GPUS[+sel.value],bytes=+$('#rfPrec').value,Bn=Math.pow(2,+$('#rfB').value);
+    const peak=bytes===1?(g.fp8||g.bf16):g.bf16;const bw=g.bw;const ridge=peak/bw;
+    const ai=2*Bn/bytes;const ach=Math.min(peak,bw*ai);
+    svg.innerHTML='';
+    const ridgeC=Math.min(4096,Math.max(.5,ridge));
+    el('rect',{x:L,y:T,width:X(ridgeC)-L,height:ph,style:'fill:var(--copper-soft);opacity:.6'},svg);
+    el('rect',{x:X(ridgeC),y:T,width:L+pw-X(ridgeC),height:ph,style:'fill:var(--accent-soft);opacity:.6'},svg);
+    [1,4,16,64,256,1024,4096].forEach(v=>{el('line',{x1:X(v),x2:X(v),y1:T,y2:T+ph,style:'stroke:var(--rule);stroke-width:1'},svg);const t=el('text',{x:X(v),y:T+ph+16,'text-anchor':'middle','font-size':11,style:'fill:var(--muted)'},svg);t.textContent=v;});
+    [1,10,100,1000].forEach(v=>{el('line',{x1:L,x2:L+pw,y1:Y(v),y2:Y(v),style:'stroke:var(--rule);stroke-width:1'},svg);const t=el('text',{x:L-8,y:Y(v)+4,'text-anchor':'end','font-size':11,style:'fill:var(--muted)'},svg);t.textContent=v>=1000?'1K':v;});
+    let t=el('text',{x:L+pw/2,y:H-8,'text-anchor':'middle','font-size':11,style:'fill:var(--muted)'},svg);t.textContent='Arithmetic intensity · FLOPs per byte moved (log)';
+    t=el('text',{x:14,y:T+ph/2,'text-anchor':'middle','font-size':11,transform:'rotate(-90 14 '+(T+ph/2)+')',style:'fill:var(--muted)'},svg);t.textContent='Achievable TFLOPS (log)';
+    const xs=.5,ys=bw*xs;
+    el('path',{d:'M'+X(xs)+','+Y(Math.max(1,ys))+' L'+X(ridgeC)+','+Y(peak)+' L'+X(4096)+','+Y(peak),style:'fill:none;stroke:var(--ink);stroke-width:2.5'},svg);
+    el('line',{x1:X(ridgeC),x2:X(ridgeC),y1:Y(peak),y2:T+ph,style:'stroke:var(--ink);stroke-width:1;stroke-dasharray:4 4'},svg);
+    t=el('text',{x:X(ridgeC)+6,y:T+ph-8,'font-size':11,style:'fill:var(--ink)'},svg);t.textContent='ridge ≈ '+nf(ridge)+' FLOP/B';
+    t=el('text',{x:L+8,y:T+16,'font-size':11,style:'fill:var(--copper);font-weight:600'},svg);t.textContent='MEMORY-BOUND';
+    t=el('text',{x:L+pw-8,y:T+16,'text-anchor':'end','font-size':11,style:'fill:var(--accent);font-weight:600'},svg);t.textContent='COMPUTE-BOUND';
+    t=el('text',{x:X(4096)-4,y:Y(peak)-8,'text-anchor':'end','font-size':11,style:'fill:var(--ink)'},svg);t.textContent='peak '+nf(peak)+' TF';
+    const px=X(Math.min(4096,ai)),py=Y(Math.max(1,ach));
+    el('circle',{cx:px,cy:py,r:8,style:'fill:var(--surface);stroke:var(--ink);stroke-width:2.5'},svg);
+    el('circle',{cx:px,cy:py,r:4,style:'fill:'+(ai<ridge?'var(--copper)':'var(--accent)')},svg);
+    t=el('text',{x:px+(px>L+pw-120?-12:12),y:py+(py<T+40?20:-12),'text-anchor':px>L+pw-120?'end':'start','font-size':12,style:'fill:var(--ink);font-weight:600'},svg);t.textContent='batch '+Bn;
+    $('#rfBO').textContent=Bn;$('#rfAI').innerHTML=nf(ai)+'<small> FLOP/B</small>';$('#rfAch').innerHTML=nf(ach)+'<small> TF</small>';$('#rfUtil').innerHTML=nf(ach/peak*100,ach/peak<.1?1:0)+'<small> %</small>';
+    $('#rfTok').innerHTML=nf(ach*1e12/(2*70e9))+'<small> tok/s</small>';
+    const p=$('#rfState');if(ai<ridge){p.textContent='memory-bound';p.className='pill cu';}else{p.textContent='compute-bound';p.className='pill acc';}
+  }
+  ['#rfGpu','#rfPrec','#rfB'].forEach(s=>$(s).addEventListener('input',draw));draw();
+})();
+
+/* ---------------- CH4: paged attention sim ---------------- */
+(function(){
+  const COLS=10,ROWS=6,NB=COLS*ROWS,MAXL=10;
+  function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  let stream,sims,timer=null,running=!reduce,visible=false;
+  function mk(kind,gridEl,statEl){gridEl.innerHTML='';const cells=[];for(let i=0;i<NB;i++){const d=document.createElement('div');gridEl.appendChild(d);cells.push(d);}
+    return {kind,cells,statEl,own:new Array(NB).fill(-1),used:new Array(NB).fill(false),active:[],q:0,done:0,pre:0,requeue:[],r:rng(kind==='paged'?7:3)};}
+  function reset(){const r=rng(42);stream=[];for(let i=0;i<2000;i++)stream.push(2+Math.floor(r()*9));sims=[mk('naive',$('#pgA'),$('#pgAs')),mk('paged',$('#pgB'),$('#pgBs'))];sims.forEach(render);}
+  function nextReq(s){if(s.requeue.length)return s.requeue.shift();const id=s.q++;return {id,len:stream[id%stream.length],grown:0,blocks:[]};}
+  function freeCount(s){let n=0;for(let i=0;i<NB;i++)if(s.own[i]<0)n++;return n;}
+  function release(s,rq){rq.blocks.forEach(b=>{s.own[b]=-1;s.used[b]=false;});rq.blocks=[];}
+  function step(s){
+    const fin=[];
+    s.active.forEach(rq=>{if(rq.grown>=rq.len){fin.push(rq);return;}
+      if(s.kind==='naive'){const b=rq.blocks[rq.grown];s.used[b]=true;rq.grown++;}
+      else{let b=-1;const start=Math.floor(s.r()*NB);for(let k=0;k<NB;k++){const i=(start+k)%NB;if(s.own[i]<0){b=i;break;}}
+        if(b<0){const victim=s.active.filter(x=>x!==rq&&x.blocks.length&&fin.indexOf(x)<0).pop();if(victim){release(s,victim);victim.grown=0;s.active.splice(s.active.indexOf(victim),1);s.requeue.unshift(victim);s.pre++;}return;}
+        s.own[b]=rq.id;s.used[b]=true;rq.blocks.push(b);rq.grown++;}});
+    fin.forEach(rq=>{release(s,rq);s.active.splice(s.active.indexOf(rq),1);s.done++;});
+    for(let guard=0;guard<6;guard++){
+      if(s.kind==='naive'){let run=0,start=-1;for(let i=0;i<NB;i++){if(s.own[i]<0){run++;if(run===MAXL){start=i-MAXL+1;break;}}else run=0;}
+        if(start<0)break;const rq=nextReq(s);for(let i=start;i<start+MAXL;i++){s.own[i]=rq.id;rq.blocks.push(i);}s.active.push(rq);}
+      else{if(freeCount(s)<3)break;s.active.push(nextReq(s));break;}}
+  }
+  function render(s){let waste=0,used=0;const dk=document.documentElement.getAttribute('data-theme')==='dark'||(!document.documentElement.getAttribute('data-theme')&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+    for(let i=0;i<NB;i++){const c=s.cells[i],o=s.own[i];if(o<0){c.className='';c.style.background='';}else if(s.used[i]){used++;c.className='';c.style.background='hsl('+((o*47)%360)+' 55% '+(dk?58:52)+'%)';}else{waste++;c.className='waste';c.style.background='';}}
+    const held=used+waste;
+    s.statEl.innerHTML='<span>running <b>'+s.active.length+'</b></span><span>finished <b>'+s.done+'</b></span><span>wasted <b>'+(held?Math.round(waste/held*100):0)+'%</b></span>'+(s.kind==='paged'?'<span>preempted <b>'+s.pre+'</b></span>':'');}
+  function tick(){sims.forEach(s=>{step(s);render(s);});}
+  function sched(){clearInterval(timer);timer=null;if(running&&visible)timer=setInterval(tick,420);}
+  reset();for(let i=0;i<14;i++)tick();
+  new IntersectionObserver(es=>{visible=es[0].isIntersecting;sched();}).observe($('#pgA'));
+  const tg=$('#pgToggle');tg.textContent=running?'Pause':'Play';
+  tg.addEventListener('click',()=>{running=!running;tg.textContent=running?'Pause':'Play';sched();});
+  $('#pgReset').addEventListener('click',()=>{reset();for(let i=0;i<4;i++)tick();sched();});
+  onTheme(()=>sims.forEach(render));
+})();
+
+/* ---------------- CH4: continuous batching ---------------- */
+(function(){
+  const lens=[6,2,9,3,4,8,2,5,7,3,6,4],S=4;
+  const stat=[],cont=[];let bs=0;
+  for(let b=0;b<lens.length;b+=S){const grp=lens.slice(b,b+S);grp.forEach((l,i)=>stat.push({id:b+i,slot:i,s:bs,e:bs+l}));bs+=Math.max.apply(null,grp);}
+  const free=new Array(S).fill(0);lens.forEach((l,id)=>{let k=0;for(let i=1;i<S;i++)if(free[i]<free[k])k=i;cont.push({id,slot:k,s:free[k],e:free[k]+l});free[k]+=l;});
+  const Ts=bs,Tc=Math.max.apply(null,free),busy=lens.reduce((a,b)=>a+b,0);
+  $('#cbS').innerHTML='step '+Ts;$('#cbC').innerHTML='step '+Tc;$('#cbSU').innerHTML=nf(busy/(Ts*S)*100)+'<small> %</small>';$('#cbCU').innerHTML=nf(busy/(Tc*S)*100)+'<small> %</small>';
+  const svg=$('#cb');const W=680,L=112,Rr=16,pw=W-L-Rr,rh=22,gap=5;const X=t=>L+t/Ts*pw;
+  const panels=[{name:'Static batching',data:stat,top:26,T:Ts},{name:'Continuous batching',data:cont,top:26+S*(rh+gap)+46,T:Tc}];
+  const clips=[];
+  const defs=el('defs',{},svg);
+  panels.forEach((p,pi)=>{
+    const t=el('text',{x:0,y:p.top-10,'font-size':12,style:'fill:var(--ink);font-weight:600'},svg);t.textContent=p.name;
+    const cp=el('clipPath',{id:'cbclip'+pi},defs);const cr=el('rect',{x:L,y:p.top-4,width:pw,height:S*(rh+gap)+8},cp);clips.push(cr);
+    for(let s=0;s<S;s++){const y=p.top+s*(rh+gap);el('rect',{x:L,y:y,width:pw,height:rh,rx:4,style:'fill:var(--surface2)'},svg);const lt=el('text',{x:L-10,y:y+15,'text-anchor':'end','font-size':11,style:'fill:var(--muted)'},svg);lt.textContent='GPU slot '+(s+1);}
+    const g=el('g',{'clip-path':'url(#cbclip'+pi+')'},svg);
+    p.data.forEach(r=>{const y=p.top+r.slot*(rh+gap);el('rect',{x:X(r.s)+1,y:y+1,width:Math.max(2,X(r.e)-X(r.s)-2),height:rh-2,rx:4,style:'fill:hsl('+((r.id*47)%360)+' 55% 55%)'},g);const tt=el('text',{x:X(r.s)+7,y:y+15,'font-size':11,style:'fill:#fff;font-weight:600'},g);tt.textContent='R'+(r.id+1);});
+    el('line',{x1:X(p.T),x2:X(p.T),y1:p.top-6,y2:p.top+S*(rh+gap),style:'stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3'},svg);
+    const dt=el('text',{x:X(p.T)+(p.T>Ts-3?-4:4),y:p.top-10,'text-anchor':p.T>Ts-3?'end':'start','font-size':11,style:'fill:var(--ink)'},svg);dt.textContent='all done · step '+p.T;
+  });
+  const axY=panels[1].top+S*(rh+gap)+16;
+  for(let t=0;t<=Ts;t+=4){const tx=el('text',{x:X(t),y:axY,'text-anchor':'middle','font-size':10,style:'fill:var(--muted)'},svg);tx.textContent=t;}
+  const al=el('text',{x:L+pw/2,y:axY+16,'text-anchor':'middle','font-size':10,style:'fill:var(--muted)'},svg);al.textContent='decode steps';
+  svg.setAttribute('viewBox','0 0 680 '+(axY+24));
+  const head=el('line',{x1:L,x2:L,y1:14,y2:axY-12,style:'stroke:var(--accent);stroke-width:2'},svg);
+  let raf=null;
+  function show(tt){const w=X(tt)-L;clips.forEach(c=>c.setAttribute('width',Math.max(0,w)));head.setAttribute('x1',X(tt));head.setAttribute('x2',X(tt));head.style.opacity=tt>=Ts?0:1;}
+  function play(){if(reduce){show(Ts);return;}cancelAnimationFrame(raf);const t0=performance.now(),D=6000;const f=now=>{const k=Math.min(1,(now-t0)/D);show(k*Ts);if(k<1)raf=requestAnimationFrame(f);};raf=requestAnimationFrame(f);}
+  show(Ts);let played=false;
+  new IntersectionObserver(es=>{if(es[0].isIntersecting&&!played){played=true;play();}},{threshold:.4}).observe(svg);
+  $('#cbPlay').addEventListener('click',play);
+})();
+
+/* ---------------- CH4: speculative decoding ---------------- */
+(function(){
+  const target='The KV cache stores keys and values so each new token can skip recomputing the whole past sequence .'.split(' ');
+  const wrong=['a','memory','saves','queries','or','weights','then','every','old','word','must','redo','its','full','prompt','again','big','fast'];
+  let pos,passes,produced,autoT=null;
+  const A=$('#sdA'),K=$('#sdK');
+  function chip(w,c,title){const s=document.createElement('span');s.className='sw-tok '+c;s.textContent=w;if(title)s.title=title;return s;}
+  function exp(){const a=+A.value,k=+K.value;$('#sdAO').textContent=a.toFixed(2);$('#sdKO').textContent=k;$('#sdE').textContent=nf((1-Math.pow(a,k+1))/(1-a),2);}
+  function stats(){$('#sdP').textContent=passes;$('#sdT').textContent=produced;$('#sdR').textContent=passes?nf(produced/passes,2):'–';}
+  function reset(){pos=0;passes=0;produced=0;$('#sdOut').innerHTML='';$('#sdProp').innerHTML='<span class="note">Press "Next round".</span>';stopAuto();stats();}
+  function round(){
+    if(pos>=target.length){stopAuto();return;}
+    const a=+A.value,k=+K.value,prop=$('#sdProp'),out=$('#sdOut');prop.innerHTML='';
+    let rejected=false,i=0;
+    for(;i<k&&pos<target.length;i++){
+      if(Math.random()<a){prop.appendChild(chip(target[pos],'acc','accepted'));out.appendChild(chip(target[pos],'acc'));pos++;produced++;}
+      else{prop.appendChild(chip(wrong[(Math.random()*wrong.length)|0],'rej','rejected by the big model'));
+        for(let j=i+1;j<k;j++)prop.appendChild(chip(wrong[(Math.random()*wrong.length)|0],'draft','discarded'));
+        prop.appendChild(chip(target[pos],'tgt','written by the big model'));out.appendChild(chip(target[pos],'tgt'));pos++;produced++;rejected=true;break;}}
+    if(!rejected&&pos<target.length){prop.appendChild(chip(target[pos],'tgt','bonus token from the verification pass'));out.appendChild(chip(target[pos],'tgt'));pos++;produced++;}
+    passes++;stats();
+    if(pos>=target.length){const n=document.createElement('span');n.className='note';n.textContent='  Done. Without a draft model this would have taken '+produced+' passes.';prop.appendChild(n);stopAuto();}
+  }
+  function stopAuto(){clearInterval(autoT);autoT=null;$('#sdAuto').textContent='Auto';}
+  $('#sdStep').addEventListener('click',round);
+  $('#sdReset').addEventListener('click',reset);
+  $('#sdAuto').addEventListener('click',()=>{if(autoT){stopAuto();return;}if(pos>=target.length)reset();autoT=setInterval(round,900);$('#sdAuto').textContent='Stop';round();});
+  [A,K].forEach(x=>x.addEventListener('input',exp));
+  exp();reset();
+})();
+
+/* ---------------- LAB: VRAM calculator ---------------- */
+(function(){
+  const MODELS=[
+    {n:'Llama 3.1 8B',p:8.03,a:8.03,l:32,kv:8,hd:128},
+    {n:'Qwen2.5 32B',p:32.8,a:32.8,l:64,kv:8,hd:128},
+    {n:'Mixtral 8x7B (MoE)',p:46.7,a:12.9,l:32,kv:8,hd:128},
+    {n:'Llama 3.3 70B',p:70.6,a:70.6,l:80,kv:8,hd:128},
+    {n:'Llama 3.1 405B',p:405,a:405,l:126,kv:8,hd:128}];
+  const CTX=[1024,2048,4096,8192,16384,32768,65536,131072];
+  const ms=$('#vModel');MODELS.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m.n;if(i===3)o.selected=true;ms.appendChild(o);});
+  const gs=$('#vGpu');GPUS.forEach((g,i)=>{const o=document.createElement('option');o.value=i;o.textContent=g.n+' · '+g.mem+' GB';if(g.n==='H100 SXM')o.selected=true;gs.appendChild(o);});
+  const ctxEl=$('#vCtx');ctxEl.max=CTX.length-1;
+  function run(){
+    const m=MODELS[+ms.value],g=GPUS[+gs.value],wb=+$('#vW').value,kb=+$('#vKv').value,ctx=CTX[+ctxEl.value],con=+$('#vCon').value;
+    const kvTok=2*m.l*m.kv*m.hd*kb;const W=m.p*wb;const KV=kvTok*ctx*con/1e9;const tot=(W+KV)*1.1;
+    let raw=Math.ceil(tot/(g.mem*.95));let n=1;while(n<raw)n*=2;
+    $('#vCtxO').textContent=ctx>=1024?(ctx/1024)+'K':ctx;$('#vConO').textContent=con;
+    $('#vRw').innerHTML=nf(W,W<10?1:0)+'<small> GB</small>';$('#vRk').innerHTML=nf(KV,KV<10?1:0)+'<small> GB</small>';$('#vRt').innerHTML=nf(tot,0)+'<small> GB</small>';
+    const pill=$('#vFit');
+    if(n>8){pill.className='pill bad';pill.textContent='multi-node';$('#vRn').innerHTML='&gt; 8<small> '+g.n+'</small>';}
+    else{pill.className='pill '+(n===1?'good':'acc');pill.textContent=n===1?'fits on 1 GPU':'needs '+n+' GPUs';$('#vRn').innerHTML=n+'<small> × '+g.n+'</small>';}
+    const nn=Math.min(n,8);const perSeq=kvTok*ctx/1e9;const mx=Math.floor((nn*g.mem*.95/1.1-W)/perSeq);
+    $('#vRm').innerHTML=(n>8||mx<1)?'–':nf(mx)+'<small> at '+(ctx/1024)+'K</small>';
+    const tps=nn*g.bw*1e12/(m.a*1e9*wb);$('#vRs').innerHTML=nf(tps)+'<small> tok/s</small>';
+    const scale=Math.max(tot,(n>8?0:nn*g.mem));
+    const bw=$('#vBw'),bk=$('#vBk'),bo=$('#vBo');bw.style.width=(W/scale*100)+'%';bk.style.width=(KV/scale*100)+'%';bo.style.width=((tot-W-KV)/scale*100)+'%';
+    bw.textContent=W/scale>.14?'weights '+nf(W)+' GB':'';bk.textContent=KV/scale>.12?'KV '+nf(KV)+' GB':'';bo.textContent='';
+    const tk=$('#vTicks');tk.innerHTML='';if(n<=8){for(let k=1;k<=nn;k++){const s=document.createElement('span');s.style.left=(k*g.mem/scale*100)+'%';s.textContent=(nn<=4||k===nn)?'GPU '+k+' · '+nf(k*g.mem)+' GB':'';tk.appendChild(s);}}
+    $('#vF').textContent='KV per token = 2 × '+m.l+' layers × '+m.kv+' KV heads × '+m.hd+' dim × '+kb+' B = '+nf(kvTok/1024,0)+' KB\n'+
+      'KV total    = '+nf(kvTok/1024,0)+' KB × '+nf(ctx)+' tokens × '+con+' requests = '+nf(KV,1)+' GB\n'+
+      'Weights     = '+m.p+'B params × '+wb+' B = '+nf(W,1)+' GB\n'+
+      'Total       = ('+nf(W,1)+' + '+nf(KV,1)+') × 1.1 = '+nf(tot,1)+' GB  →  '+(n>8?'more than 8 GPUs: split across servers':n+' × '+g.mem+' GB')+
+      (m.a!==m.p?'\nMoE: memory sized on '+m.p+'B total, speed on '+m.a+'B active params':'');
+  }
+  ['#vModel','#vW','#vKv','#vGpu','#vCtx','#vCon'].forEach(s=>$(s).addEventListener('input',run));run();
+})();
+
+/* ---------------- LAB: cost calculator ---------------- */
+(function(){
+  const lo=7,hi=Math.log10(2e11);const vol=v=>Math.pow(10,lo+v/100*(hi-lo));
+  const svg=$('#costChart');const W=680,H=300,L=64,Rr=20,T=16,B=44,pw=W-L-Rr,ph=H-T-B;
+  const y0=1,y1=7;const X=v=>L+(Math.log10(v)-lo)/(hi-lo)*pw,Y=c=>T+ph-(Math.log10(Math.max(10,c))-y0)/(y1-y0)*ph;
+  function run(){
+    const V=vol(+$('#cVol').value),pr=+$('#cPrice').value,gh=+$('#cGpuH').value,n=+$('#cN').value,tp=+$('#cTp').value;
+    const cap=tp*3600*730;const D1=n*gh*730;const dedAt=v=>D1*Math.max(1,Math.ceil(v/cap));const S=V/1e6*pr;const D=dedAt(V);
+    $('#cVolO').textContent=fmtTok(V);$('#cPriceO').textContent='$'+pr.toFixed(2);$('#cGpuHO').textContent='$'+gh.toFixed(2);$('#cNO').textContent=n;$('#cTpO').textContent=nf(tp);
+    $('#cS').textContent=fmtUSD(S);$('#cD').textContent=fmtUSD(D);
+    const be=D1/pr*1e6;$('#cBE').innerHTML=be<=cap?fmtTok(be)+'<small> tok/mo</small>':'none<small> within capacity</small>';
+    const u=V/cap;$('#cU').innerHTML=u>1?nf(Math.ceil(u))+'×<small> replicas needed</small>':nf(u*100)+'<small> %</small>';
+    const p=$('#cWin');if(S<D){p.className='pill acc';p.textContent='serverless cheaper';}else{p.className='pill cu';p.textContent='dedicated cheaper';}
+    svg.innerHTML='';
+    for(let e=7;e<=11;e++){const v=Math.pow(10,e);el('line',{x1:X(v),x2:X(v),y1:T,y2:T+ph,style:'stroke:var(--rule)'},svg);const t=el('text',{x:X(v),y:T+ph+16,'text-anchor':'middle','font-size':11,style:'fill:var(--muted)'},svg);t.textContent=fmtTok(v);}
+    for(let e=1;e<=7;e++){const c=Math.pow(10,e);el('line',{x1:L,x2:L+pw,y1:Y(c),y2:Y(c),style:'stroke:var(--rule)'},svg);const t=el('text',{x:L-8,y:Y(c)+4,'text-anchor':'end','font-size':11,style:'fill:var(--muted)'},svg);t.textContent=fmtUSD(c);}
+    let t=el('text',{x:L+pw/2,y:H-6,'text-anchor':'middle','font-size':11,style:'fill:var(--muted)'},svg);t.textContent='Tokens per month (log)';
+    t=el('text',{x:14,y:T+ph/2,'text-anchor':'middle','font-size':11,transform:'rotate(-90 14 '+(T+ph/2)+')',style:'fill:var(--muted)'},svg);t.textContent='$ per month (log)';
+    let ds='',dd='';for(let i=0;i<=240;i++){const v=Math.pow(10,lo+i/240*(hi-lo));ds+=(i?'L':'M')+X(v).toFixed(1)+','+Y(v/1e6*pr).toFixed(1);dd+=(i?'L':'M')+X(v).toFixed(1)+','+Y(dedAt(v)).toFixed(1);}
+    el('path',{d:ds,style:'fill:none;stroke:var(--accent);stroke-width:2.5'},svg);
+    el('path',{d:dd,style:'fill:none;stroke:var(--copper);stroke-width:2.5'},svg);
+    if(be<=cap&&be>=Math.pow(10,lo)){const bx=X(be),by=Y(D1);el('circle',{cx:bx,cy:by,r:5,style:'fill:var(--surface);stroke:var(--ink);stroke-width:2'},svg);t=el('text',{x:bx+8,y:by-8,'font-size':11,style:'fill:var(--ink)'},svg);t.textContent='break-even '+fmtTok(be);}
+    const vx=X(V);el('line',{x1:vx,x2:vx,y1:T,y2:T+ph,style:'stroke:var(--ink);stroke-width:1;stroke-dasharray:4 3'},svg);
+    el('circle',{cx:vx,cy:Y(S),r:4.5,style:'fill:var(--accent)'},svg);el('circle',{cx:vx,cy:Y(D),r:4.5,style:'fill:var(--copper)'},svg);
+    t=el('text',{x:L+8,y:T+14,'font-size':11,style:'fill:var(--accent);font-weight:600'},svg);t.textContent='— serverless per token';
+    t=el('text',{x:L+8,y:T+30,'font-size':11,style:'fill:var(--copper);font-weight:600'},svg);t.textContent='— dedicated GPUs (steps = add a replica)';
+  }
+  ['#cVol','#cPrice','#cGpuH','#cN','#cTp'].forEach(s=>$(s).addEventListener('input',run));run();
+})();
+
+/* ---------------- FLASHCARDS ---------------- */
+(function(){
+  const C=[
+    ['Basics','What are the two phases of LLM inference, and what bounds each?','Prefill processes the whole prompt in parallel and is compute-bound. Decode generates one token at a time and is memory-bandwidth-bound.'],
+    ['Basics','TTFT is high. Which phase do you look at first?','Prefill and queueing. TTFT ≈ queue + prefill. Check prompt length, prefix caching, cold starts, and chunked prefill.'],
+    ['Basics','Why does the KV cache exist?','Keys and values of past tokens never change, so caching them avoids recomputing the whole history for every new token.'],
+    ['Basics','Throughput vs latency in one sentence?','Bigger batches serve more total tokens per second but each user may wait longer. Agree a latency target, then maximise goodput under it.'],
+    ['Hardware','Why is batch-1 decode memory-bound?','Every token reads all weights once (~1–2 FLOPs per byte), while an H100 can do ~300 FLOPs per byte moved. The cores wait on memory.'],
+    ['Hardware','H100 vs H200: what changes?','Same compute. H200 has 141 GB at 4.8 TB/s vs 80 GB at 3.35 TB/s. Better for decode-heavy traffic and 70B on a single GPU.'],
+    ['Hardware','Single-user decode speed ceiling?','Memory bandwidth ÷ bytes read per token. H100 (3.35 TB/s) with a 70 GB FP8 model ≈ 48 tokens/s.'],
+    ['Optimization','What problem does PagedAttention solve?','KV memory fragmentation and over-reservation. Small fixed blocks plus a block table let 2–4× more requests share a GPU.'],
+    ['Optimization','Continuous vs static batching?','Static waits for the whole batch to finish. Continuous swaps finished requests out and new ones in at every step, keeping the GPU busy.'],
+    ['Optimization','Does speculative decoding change output quality?','No. The big model verifies every drafted token; rejected ones are replaced. It only changes speed.'],
+    ['Optimization','When does prompt caching pay off most?','Long repeated prefixes: system prompts, agent tool schemas, multi-turn chat history, RAG over the same documents.'],
+    ['Optimization','What does FP8 quantization buy on H100?','Half the weight memory, roughly 2× decode speed, room for more KV cache, usually with minimal quality loss. Always verify with evals.'],
+    ['Sizing','VRAM for Llama 3 70B at FP8?','~70 GB weights + KV (~0.33 MB/token at FP16) + ~10% overhead. One 128K-token request alone needs ~43 GB of KV.'],
+    ['Sizing','Serverless or dedicated?','A utilisation question. Bursty or low volume → serverless. Steady, high utilisation (≈60%+) or strict SLAs → dedicated.'],
+    ['Companies','Fireworks vs Runpod in one sentence?','Fireworks is a managed inference API priced per token; Runpod is a GPU cloud priced per second where you run your own engine.'],
+    ['Companies','What is Fireworks FireOptimizer?','Adaptive speculative decoding: it trains a draft model on a customer\'s own traffic so more drafted tokens are accepted.'],
+    ['Companies','What is Runpod FlashBoot, and its caveat?','A snapshot mechanism to cut serverless cold starts. It helps on a warm snapshot; a miss still means a full model load.'],
+    ['Frameworks','Which engine does Fireworks run?','Its own proprietary stack (FireAttention kernels, FireOptimizer, multi-LoRA). Customers bring weights or pick library models; they never choose vLLM or SGLang.'],
+    ['Frameworks','How do you run vLLM on Runpod?','Serverless Hub → vLLM worker (worker-vllm), set MODEL_NAME, MAX_MODEL_LEN and GPU type; call the OpenAI-compatible endpoint. Or run vllm serve on a Pod.'],
+    ['Frameworks','Ollama vs vLLM?','Ollama: one-command local runner on llama.cpp and 4-bit GGUF, great for one developer. vLLM: server built for many concurrent users with paged KV memory and continuous batching.'],
+    ['Frameworks','When pick SGLang over vLLM?','When requests share long prefixes (agents, multi-turn chat, RAG on the same docs) or need fast JSON-constrained output. RadixAttention reuses the shared KV cache.'],
+    ['Frameworks','Why not always TensorRT-LLM?','It compiles an engine per GPU type and limits: 10–30% faster for a fixed model, but slower to set up, NVIDIA-only, and rebuilt whenever anything changes.'],
+    ['Companies','Secure Cloud vs Community Cloud?','Secure: vetted data centres, compliance, predictable uptime. Community: cheaper marketplace hosts for dev and interruption-tolerant work.']];
+  let filter='All',order=C.map((_,i)=>i);
+  const cats=['All'].concat(Array.from(new Set(C.map(c=>c[0]))));
+  const fb=$('#cardFilter');cats.forEach(c=>{const b=document.createElement('button');b.type='button';b.textContent=c;b.setAttribute('aria-pressed',c==='All'?'true':'false');b.addEventListener('click',()=>{filter=c;setPressed(fb,b);render();});fb.appendChild(b);});
+  function render(){const g=$('#cardGrid');g.innerHTML='';order.forEach(i=>{const c=C[i];if(filter!=='All'&&c[0]!==filter)return;
+    const b=document.createElement('button');b.type='button';b.className='card-flip';b.setAttribute('aria-label','Flashcard: '+c[1]);
+    b.innerHTML='<div class="card-in"><div class="face front"><span class="c">'+c[0]+'</span><span class="qq"></span><span class="flip">tap to flip</span></div><div class="face back"><span class="c">'+c[0]+' · answer</span><span class="aa"></span><span class="flip">tap to flip back</span></div></div>';
+    b.querySelector('.qq').textContent=c[1];b.querySelector('.aa').textContent=c[2];b.addEventListener('click',()=>b.classList.toggle('flipped'));g.appendChild(b);});}
+  $('#cardShuffle').addEventListener('click',()=>{for(let i=order.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[order[i],order[j]]=[order[j],order[i]];}render();});
+  render();
+})();
+
+/* ---------------- PLAN ---------------- */
+(function(){
+  const D=[
+    ['Foundations','Prefill vs decode, KV cache, TTFT / ITL, throughput vs latency. Play with the request player until you can predict the timeline.','Draw the prefill/decode diagram from memory.'],
+    ['Transformers & hardware','Q/K/V and attention; SMs, HBM vs SRAM, bandwidth, the roofline, GPU generations.','Explain why H200 beats H100 for decode without mentioning FLOPS.'],
+    ['Optimizations I','PagedAttention, continuous batching, chunked prefill, prefix caching. Read the vLLM paper abstract and the FireAttention blog.','Explain PagedAttention with an analogy in 30 seconds.'],
+    ['Optimizations II & engines','Speculative decoding, quantization (FP8, AWQ, GPTQ), vLLM vs SGLang vs TensorRT-LLM.','Deploy a vLLM worker on Runpod Serverless and time a cold start.'],
+    ['Scale out','Tensor, pipeline, expert and data parallelism; MoE; LoRA and multi-LoRA; autoscaling.','Call an open model on Fireworks through the OpenAI SDK; try JSON mode.'],
+    ['Sizing & economics','VRAM formula, KV math, cost per million tokens, serverless vs dedicated break-even.','Work three sizing problems on paper, then check them in the lab.'],
+    ['Company & mock','Positioning, competitors, the scenarios section. Rehearse five STAR stories out loud.','Do a timed mock: a 24-hour take-home outline and a 30-minute customer role-play.']];
+  let done=[];try{done=JSON.parse(localStorage.getItem('ifg-plan')||'[]')||[];}catch(e){done=[];}
+  const list=$('#planList');
+  function save(){try{localStorage.setItem('ifg-plan',JSON.stringify(done));}catch(e){}}
+  function bar(){$('#planBar').style.width=(done.length/D.length*100)+'%';}
+  D.forEach((d,i)=>{const r=document.createElement('div');r.className='day'+(done.indexOf(i)>=0?' done':'');
+    r.innerHTML='<div class="d">'+(i+1)+'<small>day</small></div><div><h4></h4><p></p><p style="margin-top:6px;color:var(--ink)"><b>Deliverable:</b> <span class="dl"></span></p><label class="check" for="plan'+i+'"><input type="checkbox" id="plan'+i+'"'+(done.indexOf(i)>=0?' checked':'')+'> Done</label></div>';
+    r.querySelector('h4').textContent=d[0];r.querySelector('p').textContent=d[1];r.querySelector('.dl').textContent=d[2];
+    r.querySelector('input').addEventListener('change',e=>{if(e.target.checked){if(done.indexOf(i)<0)done.push(i);}else{done=done.filter(x=>x!==i);}r.classList.toggle('done',e.target.checked);save();bar();});
+    list.appendChild(r);});
+  bar();
+})();
+/* ================= shared SVG diagram renderer ================= */
+let dgSeq=0;
+function drawDiagram(svg,spec,opts){
+  opts=opts||{};svg.innerHTML='';const id='dg'+(dgSeq++);
+  const defs=el('defs',{},svg);const mk=el('marker',{id:id+'a',viewBox:'0 0 10 10',refX:9,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'},defs);el('path',{d:'M0,0 L10,5 L0,10 z',style:'fill:var(--muted)'},mk);
+  const N={};spec.nodes.forEach(n=>N[n.id]=n);
+  (spec.edges||[]).forEach(e=>{const a=N[e[0]],b=N[e[1]],o=e[3]||{};let d;
+    if(o.path)d=o.path;else{const ax=a.x+a.w/2,ay=a.y+a.h/2,bx=b.x+b.w/2,by=b.y+b.h/2;
+      if(Math.abs(bx-ax)>=Math.abs(by-ay)){const sx=bx>ax?a.x+a.w:a.x,ex=bx>ax?b.x:b.x+b.w;const sy=ay,ey=by;d=sy===ey?'M'+sx+','+sy+' L'+ex+','+ey:'M'+sx+','+sy+' C'+(sx+ex)/2+','+sy+' '+(sx+ex)/2+','+ey+' '+ex+','+ey;}
+      else{const sy=by>ay?a.y+a.h:a.y,ey=by>ay?b.y:b.y+b.h;d='M'+ax+','+sy+' C'+ax+','+(sy+ey)/2+' '+bx+','+(sy+ey)/2+' '+bx+','+ey;}}
+    const p=el('path',{d:d,'marker-end':'url(#'+id+'a)',style:'fill:none;stroke:var(--muted);stroke-width:1.5'+(o.dash?';stroke-dasharray:4 4':'')},svg);
+    if(e[2]){const t=el('text',{'font-size':10.5,'text-anchor':'middle',style:'fill:var(--muted)'},svg);t.textContent=e[2];const L=p.getTotalLength?p.getTotalLength():0;if(L){const m=p.getPointAtLength(L/2);t.setAttribute('x',m.x+(o.dx||0));t.setAttribute('y',m.y+(o.dy!=null?o.dy:-6));}}});
+  const G={};
+  spec.nodes.forEach(n=>{const g=el('g',{tabindex:0,role:'button','aria-label':n.t,style:'cursor:pointer'},svg);
+    const r=el('rect',{x:n.x,y:n.y,width:n.w,height:n.h,rx:10,style:'fill:var(--surface2);stroke:var(--rule);stroke-width:1.5;transition:fill .2s,stroke .2s'},g);
+    const t=el('text',{x:n.x+n.w/2,y:n.y+(n.s&&n.s.length?24:n.h/2+5),'text-anchor':'middle','font-size':n.fs||13.5,style:'fill:var(--ink);font-family:var(--body);font-weight:600'},g);t.textContent=n.t;
+    (n.s||[]).forEach((line,i)=>{const s=el('text',{x:n.x+n.w/2,y:n.y+44+i*15,'text-anchor':'middle','font-size':10.5,style:'fill:var(--muted)'},g);s.textContent=line;});
+    G[n.id]={g,r};
+    const act=()=>{if(opts.onSelect)opts.onSelect(n);};g.addEventListener('click',act);g.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();act();}});});
+  function paint(idsSel,idsHot){Object.keys(G).forEach(k=>{const r=G[k].r;if(idsHot&&idsHot.indexOf(k)>=0){r.style.fill='var(--copper-soft)';r.style.stroke='var(--copper)';r.style.strokeWidth=2.5;}else if(idsSel&&idsSel.indexOf(k)>=0){r.style.fill='var(--accent-soft)';r.style.stroke='var(--accent)';r.style.strokeWidth=2.5;}else{r.style.fill='var(--surface2)';r.style.stroke='var(--rule)';r.style.strokeWidth=1.5;}});}
+  return {paint,G,N};
+}
+function row(n,defs,y,h,W){const gap=n>5?15:(n===5?26:31);const w=Math.floor((W-(n-1)*gap-6)/n);return defs.map((d,i)=>Object.assign({x:3+i*(w+gap),y:y,w:w,h:h},d));}
+
+/* ================= CH1: life of a request ================= */
+(function(){
+  const svg=$('#lifeDiag');if(!svg)return;
+  const nodes=row(7,[
+    {id:'c',t:'Client',s:['the prompt'],fs:12.5},{id:'g',t:'Gateway',s:['auth, limits'],fs:12.5},{id:'q',t:'Queue',s:['waits for slot'],fs:12.5},
+    {id:'s',t:'Scheduler',s:['joins batch'],fs:12.5},{id:'p',t:'Prefill',s:['builds KV'],fs:12.5},{id:'d',t:'Decode',s:['1 token/step'],fs:12.5},{id:'o',t:'Stream out',s:['to the user'],fs:12.5}],44,86,780);
+  const D=drawDiagram(svg,{nodes,edges:[['c','g'],['g','q'],['q','s'],['s','p'],['p','d'],['d','o'],
+    ['d','d','repeat for every output token',{path:'M'+(nodes[5].x+18)+','+nodes[5].y+' C'+(nodes[5].x+18)+',6 '+(nodes[5].x+nodes[5].w-18)+',6 '+(nodes[5].x+nodes[5].w-18)+','+nodes[5].y,dy:-2}],
+    ['o','c','tokens stream back to the user',{path:'M'+(nodes[6].x+nodes[6].w/2)+','+(nodes[6].y+nodes[6].h)+' C'+(nodes[6].x+nodes[6].w/2)+',185 '+(nodes[0].x+nodes[0].w/2)+',185 '+(nodes[0].x+nodes[0].w/2)+','+(nodes[0].y+nodes[0].h),dash:1,dy:14}]]},{onSelect:n=>go(order.indexOf(n.id))});
+  const order=['c','g','q','s','p','d','o'];
+  const caps=['The app sends the prompt (system prompt, chat history, tool definitions and the user\'s message) over HTTPS.',
+    'The gateway authenticates the key, checks rate limits and routes to a replica that has the model loaded. Milliseconds.',
+    'If every slot on that replica is busy, the request waits here. Under load, queueing is a hidden part of time-to-first-token.',
+    'At the next decode step the scheduler admits the request into the running batch (continuous batching) and reserves KV-cache memory for it.',
+    'Prefill: the whole prompt runs through the model in parallel and fills the KV cache. It ends with the first output token, and that moment is TTFT.',
+    'Decode: one token per step. Each step reads all the weights plus this request\'s KV cache. The time between tokens is ITL.',
+    'Each token streams back the moment it exists. On a stop token or max_tokens, the request leaves the batch and its KV memory is freed for someone else.'];
+  const latency=['network','~ms','0 → seconds','~1 step','→ TTFT','→ ITL × tokens','network'];
+  let i=0,timer=null;
+  function go(k){i=Math.max(0,Math.min(order.length-1,k));D.paint([],[order[i]]);$('#lifeNo').textContent='Step '+(i+1)+' of 7 · '+latency[i];$('#lifeCap').textContent=caps[i];$('#lifePrev').disabled=i===0;$('#lifeNext').disabled=i===order.length-1;}
+  function stop(){clearInterval(timer);timer=null;$('#lifePlay').textContent='Play';}
+  $('#lifePlay').addEventListener('click',()=>{if(timer){stop();return;}if(i===order.length-1)go(0);$('#lifePlay').textContent='Pause';timer=setInterval(()=>{if(i>=order.length-1){stop();return;}go(i+1);},2600);});
+  $('#lifePrev').addEventListener('click',()=>{stop();go(i-1);});$('#lifeNext').addEventListener('click',()=>{stop();go(i+1);});
+  go(0);
+})();
+
+/* ================= CH1: toy tokenizer ================= */
+(function(){
+  const inp=$('#tokIn');if(!inp)return;
+  const suf=['ization','ation','ing','ed','ly','er','est','s'];
+  function split(word){const lead=word.match(/^\s*/)[0],w=word.slice(lead.length);if(!/^[A-Za-z]+$/.test(w)||w.length<=6)return [word];
+    for(const s of suf){if(w.length-s.length>=4&&w.toLowerCase().endsWith(s)){return split(lead+w.slice(0,w.length-s.length)).concat([w.slice(w.length-s.length)]);}}
+    const out=[lead+w.slice(0,4)];for(let k=4;k<w.length;k+=4)out.push(w.slice(k,k+4));return out;}
+  function tok(text){const raw=text.match(/\s*[A-Za-z]+|\s*\d|\s*[^\sA-Za-z\d]|\s+$/g)||[];let o=[];raw.forEach(r=>o=o.concat(split(r)));return o;}
+  function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0)%100000;}
+  const cols=['var(--accent-soft)','var(--copper-soft)','var(--rp-soft)','var(--good-soft)','var(--warn-soft)'];
+  function run(){const t=tok(inp.value);const box=$('#tokOut');box.innerHTML='';t.forEach((p,i)=>{const s=document.createElement('span');s.className='tp';s.style.background=cols[i%cols.length];const vis=p.replace(/^ /,'·').replace(/\n/g,'↵');s.innerHTML='<span></span><small></small>';s.firstChild.textContent=vis;s.lastChild.textContent=hash(p);box.appendChild(s);});
+    const words=(inp.value.match(/[A-Za-z0-9']+/g)||[]).length;$('#tkChars').textContent=nf(inp.value.length);$('#tkWords').textContent=nf(words);$('#tkToks').textContent=nf(t.length);$('#tkRatio').textContent=t.length?nf(inp.value.length/t.length,1):'–';
+    $('#tkCost').innerHTML='$'+nf(t.length*1e6/1e6*0.9,2)+'<small> per 1M sends</small>';}
+  inp.addEventListener('input',run);run();
+})();
+
+/* ================= CH4: quantization bits ================= */
+(function(){
+  const box=$('#qBits');if(!box)return;
+  const M={fp16:{bits:[['sign',1,'s'],['exponent',5,'e'],['mantissa',10,'m']],pi:'3.140625',err:'0.03%',gb:140,note:'The usual training/serving baseline. Needs 2 × H100 for a 70B model.'},
+    fp8:{bits:[['sign',1,'s'],['exponent',4,'e'],['mantissa',3,'m']],pi:'3.25',err:'3.5%',gb:70,note:'Half the memory. H100/H200/B200 have FP8 tensor cores, so math is ~2× faster too. Quality loss is usually negligible, but verify with evals.'},
+    int4:{bits:[['4-bit integer × a shared scale',4,'i']],pi:'3.0',err:'4.5%',gb:35,note:'A quarter of the memory (AWQ, GPTQ, GGUF Q4). Each weight is one of only 16 levels, rescaled per group. Small quality drop; common for local and budget serving.'}};
+  let mode='fp8';
+  function run(){const m=M[mode];box.innerHTML='';m.bits.forEach(b=>{const g=document.createElement('div');g.className='qgrp q-'+b[2];g.innerHTML='<div class="cells"></div><span></span>';for(let i=0;i<b[1];i++){const c=document.createElement('i');g.firstChild.appendChild(c);}g.lastChild.textContent=b[0]+' · '+b[1];box.appendChild(g);});
+    const total=m.bits.reduce((a,b)=>a+b[1],0);$('#qBitsN').textContent=total+' bits per weight';
+    $('#qPi').innerHTML=m.pi+'<small> (off by '+m.err+')</small>';$('#qGb').innerHTML=m.gb+'<small> GB</small>';
+    const fit=m.gb<=76;$('#qFit').innerHTML=fit?('yes<small> · '+(80-m.gb)+' GB left for KV cache</small>'):'no<small> · needs 2 GPUs</small>';
+    $('#qBarW').style.width=Math.min(100,m.gb/160*100)+'%';$('#qBarW').textContent=m.gb+' GB';$('#qNote').textContent=m.note;}
+  $$('#qSeg button').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.q;setPressed(b.parentElement,b);run();}));run();
+})();
+
+/* ================= CH5: frameworks ================= */
+const FW={
+ vllm:{name:'vLLM',n:[{id:'a',t:'Client',s:['OpenAI SDK,','curl, LangChain'],i:'Anything that speaks the OpenAI API can call vLLM. Change the base URL, keep the code.'},
+   {id:'b',t:'API server',s:['/v1/chat/completions','tokenizes input'],i:'The OpenAI-compatible front door. Tokenizes prompts and streams tokens back over HTTP (server-sent events).'},
+   {id:'c',t:'Scheduler',s:['continuous batching,','picks who runs'],i:'Every decode step it decides which requests run, admits new ones, and pre-empts a request if KV memory runs out. This is continuous batching.'},
+   {id:'d',t:'KV cache mgr',s:['PagedAttention','blocks, prefix cache'],i:'Hands out fixed-size KV blocks like operating-system memory pages, and can share blocks between requests with identical prefixes (automatic prefix caching).'},
+   {id:'e',t:'GPU workers',s:['model executor,','tensor parallel'],i:'Run the forward pass with optimized kernels (FlashAttention / FlashInfer, CUDA graphs). --tensor-parallel-size splits the model across GPUs.'}],
+  best:'Serving many users on NVIDIA or AMD GPUs. Widest model support, and the fastest path from a Hugging Face model to a production API.',
+  rp:'One click: the vLLM worker in the Serverless Hub. Set MODEL_NAME, MAX_MODEL_LEN and GPU type, and you get an OpenAI-compatible endpoint that can scale to zero. Or run it yourself on a Pod.',
+  fw:'Not what Fireworks runs. But many Fireworks prospects self-host vLLM today. The pitch: same OpenAI API, no GPUs to babysit, plus custom kernels, speculative decoding and multi-LoRA.',
+  code:'# on a GPU machine or Runpod Pod\npip install vllm\nvllm serve meta-llama/Llama-3.1-8B-Instruct \\\n  --max-model-len 8192 --tensor-parallel-size 1 --enable-prefix-caching\n\n# call it like OpenAI\ncurl localhost:8000/v1/chat/completions -H "Content-Type: application/json" \\\n  -d \'{"model":"meta-llama/Llama-3.1-8B-Instruct","messages":[{"role":"user","content":"Hi"}]}\'',
+  say:'Say it like this: "vLLM has two big ideas. PagedAttention manages KV memory like OS pages, and continuous batching swaps requests in and out every step. Together they let it serve 2–4× more users than naive serving."'},
+ sglang:{name:'SGLang',n:[{id:'a',t:'Client',s:['OpenAI API or','Python frontend'],i:'Speaks the OpenAI API, plus a Python frontend for multi-call programs: agents, branching, structured output.'},
+   {id:'b',t:'Server + router',s:['launch_server,','data-parallel router'],i:'The runtime entry point. A router can spread requests across several replicas while keeping cache locality.'},
+   {id:'c',t:'Scheduler',s:['cache-aware','continuous batching'],i:'Batches like vLLM, but orders requests to maximize prefix-cache hits.'},
+   {id:'d',t:'RadixAttention',s:['prefix tree of','cached KV'],i:'Keeps the KV cache in a radix tree keyed by token prefixes, so any request that shares a prefix reuses it automatically. Try the demo below.'},
+   {id:'e',t:'GPU workers',s:['FlashInfer kernels,','TP, spec decoding'],i:'Optimized kernels, tensor and data parallelism, speculative decoding, and fast constrained decoding for JSON and regex output.'}],
+  best:'Agents, multi-turn chat, RAG over the same documents, and strict JSON output: any workload where requests share long prefixes.',
+  rp:'Official worker-sglang for Serverless endpoints, or run it on a Pod.',
+  fw:'Not what Fireworks runs. The equivalent customer benefit is prompt caching (discounted cached input tokens) plus JSON and grammar modes.',
+  code:'pip install "sglang[all]"\npython -m sglang.launch_server \\\n  --model-path Qwen/Qwen2.5-7B-Instruct --port 30000\n\n# OpenAI-compatible\ncurl localhost:30000/v1/chat/completions -H "Content-Type: application/json" \\\n  -d \'{"model":"Qwen/Qwen2.5-7B-Instruct","messages":[{"role":"user","content":"Hi"}]}\'',
+  say:'Say it like this: "SGLang\'s edge is RadixAttention. It keeps the KV cache in a prefix tree, so a 3,000-token system prompt and tool list is computed once and reused by every agent call."'},
+ ollama:{name:'Ollama',n:[{id:'a',t:'You',s:['ollama run llama3.1','REST on :11434'],i:'A CLI plus a local REST API on port 11434, with an OpenAI-compatible endpoint under /v1.'},
+   {id:'b',t:'Ollama server',s:['model library,','load / unload'],i:'Pulls models by name (like Docker images), keeps the active ones in memory, and applies Modelfile settings such as system prompt and parameters.'},
+   {id:'c',t:'llama.cpp engine',s:['runs the math on','CPU · Metal · CUDA'],i:'The engine underneath. Very efficient for one user, with limited parallelism compared with vLLM\'s paged memory and large-batch scheduler.'},
+   {id:'d',t:'GGUF weights',s:['usually 4-bit,','files on disk'],i:'Models ship as GGUF files, usually 4-bit (Q4_K_M), so an 8B model is about 5 GB and runs on a laptop.'}],
+  best:'A developer\'s laptop, demos, private or offline experiments, trying many models quickly. Not for serving many concurrent users.',
+  rp:'Supported on a Pod: PyTorch template, expose port 11434, set OLLAMA_HOST=0.0.0.0, install and run "ollama serve". Reach it at https://<POD_ID>-11434.proxy.runpod.net. Community serverless workers also exist.',
+  fw:'Not applicable. Ollama users are a classic Fireworks lead: they\'ve proven a model works locally and now need speed and scale without running GPUs.',
+  code:'# on a Runpod Pod (port 11434 exposed, OLLAMA_HOST=0.0.0.0)\ncurl -fsSL https://ollama.com/install.sh | sh\nollama serve > ollama.log 2>&1 &\nollama run llama3.1\n\n# from anywhere\ncurl https://<POD_ID>-11434.proxy.runpod.net/api/generate \\\n  -d \'{"model":"llama3.1","prompt":"Hi","stream":false}\'',
+  say:'Say it like this: "Ollama is perfect for one developer. For many users I\'d move them to vLLM on Runpod, or to a managed API like Fireworks, because Ollama isn\'t built around paged KV memory and large-batch scheduling."'},
+ llamacpp:{name:'llama.cpp',n:[{id:'a',t:'Clients',s:['apps, Ollama,','LM Studio'],i:'Many desktop tools, Ollama and LM Studio among them, are built on llama.cpp.'},
+   {id:'b',t:'llama-server',s:['OpenAI-compatible,','parallel slots'],i:'A lightweight HTTP server with a fixed number of parallel slots and simple batching.'},
+   {id:'c',t:'Backends',s:['CPU · Metal','CUDA · Vulkan'],i:'Runs almost anywhere: Apple Silicon, consumer GPUs, plain CPUs, even phones.'},
+   {id:'d',t:'GGUF file',s:['Q4 · Q5 · Q8','quantized weights'],i:'A single-file model format with the tokenizer and metadata inside. Quantization levels trade size for quality.'}],
+  best:'Edge and local inference: CPUs, Macs, cheap consumer GPUs, and embedding a model inside an app.',
+  rp:'Bring your own container on a Pod or a custom worker. Pairs well with cheap RTX-class GPUs on Community Cloud.',
+  fw:'Not applicable.',
+  code:'llama-server -m llama-3.1-8b-instruct-Q4_K_M.gguf \\\n  -c 8192 -ngl 99 --parallel 4 --port 8080\n# -ngl 99: put all layers on the GPU; --parallel: request slots',
+  say:'Say it like this: "llama.cpp is the engine behind most local tools. I\'d bring it up for edge or CPU deployments, not for high-throughput serving."'},
+ trt:{name:'TensorRT-LLM',n:[{id:'a',t:'HF checkpoint',s:['safetensors +','config'],i:'Start from the same Hugging Face weights as any other engine.'},
+   {id:'b',t:'Convert',s:['quantize: FP8,','INT4 AWQ'],i:'Convert to TensorRT-LLM format, optionally quantizing with a calibration dataset.'},
+   {id:'c',t:'Build engine',s:['compiled for this GPU,','max batch & length'],i:'Produces an engine optimized for one GPU type and fixed limits. Change the GPU, the max length or the model, and you rebuild. Newer releases add a PyTorch path that shortens this step.'},
+   {id:'d',t:'Serve',s:['trtllm-serve or','Triton server'],i:'In-flight batching (NVIDIA\'s name for continuous batching), paged KV cache, OpenAI-compatible serving.'},
+   {id:'e',t:'Clients',s:['HTTP / gRPC'],i:'Clients call it like any other server.'}],
+  best:'One model at very high, steady volume on NVIDIA GPUs, where another 10–30% throughput pays for the engineering time.',
+  rp:'Bring your own NVIDIA container (TensorRT-LLM or Triton images) on a Pod, or package it as a custom Serverless worker.',
+  fw:'Not used. Fireworks\' pitch is that level of tuning without the build-and-maintain work.',
+  code:'# classic compile-then-serve flow (flags vary by version)\ntrtllm-build --checkpoint_dir ./ckpt_fp8 --output_dir ./engine \\\n  --max_batch_size 64 --max_seq_len 8192\ntrtllm-serve ./engine --tokenizer meta-llama/Llama-3.1-8B-Instruct',
+  say:'Say it like this: "TensorRT-LLM wins on raw throughput for a fixed model, but you pay in build complexity and NVIDIA lock-in. It\'s a buy-versus-build conversation."'},
+ fireworks:{name:'Fireworks stack',n:[{id:'a',t:'Your app',s:['OpenAI SDK,','base_url = Fireworks'],i:'Existing OpenAI code works: change the base URL, API key and model name.'},
+   {id:'b',t:'Fireworks API',s:['serverless · on-demand','batch · reserved'],i:'One API, several capacity modes: per-token serverless, dedicated on-demand GPUs, discounted batch jobs, and reserved throughput.'},
+   {id:'c',t:'FireAttention',s:['custom CUDA kernels,','FP8 / FP4'],i:'Fireworks\' own serving engine: custom attention kernels and quantization tuned per model and GPU generation.'},
+   {id:'d',t:'Optimizer + LoRA',s:['adaptive spec decoding,','100s of adapters'],i:'FireOptimizer trains draft models on your traffic for speculative decoding. Multi-LoRA serves hundreds of fine-tunes on one base model at the base model\'s price (cross-model continuous batching).'},
+   {id:'e',t:'Fireworks GPUs',s:['H100 · H200 · B200,','multi-region'],i:'Fireworks provisions and scales the hardware. The customer never sees a GPU.'}],
+  best:'Teams that want production open-model inference and fine-tuning without owning GPUs or engines.',
+  rp:'The contrast: on Runpod the customer owns the engine and tuning layers (choosing and configuring vLLM or SGLang), and Runpod owns the GPUs.',
+  fw:'Library models are one API call away. Your own weights: firectl model create, then firectl deployment create. LoRA adapters: upload, then deploy on an on-demand deployment.',
+  code:'from openai import OpenAI\nimport os\n\nclient = OpenAI(base_url="https://api.fireworks.ai/inference/v1",\n                api_key=os.environ["FIREWORKS_API_KEY"])\nclient.chat.completions.create(\n    model="accounts/fireworks/models/llama-v3p1-8b-instruct",\n    messages=[{"role": "user", "content": "Hi"}])',
+  say:'Say it like this: "Fireworks is the managed version of everything in this chapter: their own engine instead of vLLM, speculative decoding and multi-LoRA built in, and the GPUs are their problem."'}};
+let openFramework=null;
+(function(){
+  const tabs=$('#fwTabs');if(!tabs)return;
+  const keys=Object.keys(FW);let cur='vllm';
+  keys.forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=FW[k].name;b.dataset.k=k;b.setAttribute('role','tab');b.setAttribute('aria-pressed',k===cur?'true':'false');b.addEventListener('click',()=>show(k));tabs.appendChild(b);});
+  function show(k){cur=k;const f=FW[k];setPressed(tabs,tabs.querySelector('[data-k="'+k+'"]'));
+    const nodes=row(f.n.length,f.n,40,96,700);const edges=[];for(let i=0;i<nodes.length-1;i++)edges.push([nodes[i].id,nodes[i+1].id]);
+    const svg=$('#fwDiag');const D=drawDiagram(svg,{nodes,edges},{onSelect:n=>{D.paint([n.id]);$('#fwDetail').innerHTML='<b></b> <span></span>';$('#fwDetail b').textContent=n.t+':';$('#fwDetail span').textContent=n.i;}});
+    const cap=el('text',{x:3,y:22,'font-size':12,style:'fill:var(--muted)'},svg);cap.textContent=k==='trt'?'build pipeline, left to right':'request path, left to right';
+    D.paint([nodes[0].id]);$('#fwDetail').innerHTML='<b></b> <span></span>';$('#fwDetail b').textContent=nodes[0].t+':';$('#fwDetail span').textContent=nodes[0].i;
+    $('#fwBest').textContent=f.best;$('#fwRp').textContent=f.rp;$('#fwFw').textContent=f.fw;$('#fwCode').textContent=f.code;$('#fwSay').textContent=f.say;}
+  openFramework=function(k,scroll){show(k);if(scroll){try{$('#fwx').scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});}catch(e){}}};
+  show(cur);
+})();
+
+/* map */
+(function(){
+  const svg=$('#fwMap');if(!svg)return;
+  const L=110,R=690,T=20,B=330;
+  const xs=[['1',160],['10',300],['100',450],['1,000+',610]],ys=[['Laptop / CPU',300],['1 GPU',225],['Multi-GPU server',150],['GPU cluster',70]];
+  xs.forEach(x=>{el('line',{x1:x[1],x2:x[1],y1:T,y2:B,style:'stroke:var(--rule);stroke-dasharray:3 4'},svg);const t=el('text',{x:x[1],y:B+18,'text-anchor':'middle','font-size':11,style:'fill:var(--muted)'},svg);t.textContent=x[0];});
+  ys.forEach(y=>{el('line',{x1:L,x2:R,y1:y[1],y2:y[1],style:'stroke:var(--rule);stroke-dasharray:3 4'},svg);const t=el('text',{x:L-8,y:y[1]+4,'text-anchor':'end','font-size':11,style:'fill:var(--muted)'},svg);t.textContent=y[0];});
+  let t=el('text',{x:(L+R)/2,y:B+40,'text-anchor':'middle','font-size':11,style:'fill:var(--muted)'},svg);t.textContent='Concurrent users →';
+  const regions=[
+    {k:'ollama',x:110,y:195,w:170,h:135,lab:'Ollama',sub:'one developer',c:'--copper',lx:0},
+    {k:'llamacpp',x:175,y:255,w:215,h:70,lab:'llama.cpp',sub:'edge, CPU, Mac',c:'--warn',lx:1},
+    {k:'vllm',x:265,y:48,w:295,h:208,lab:'vLLM · SGLang',sub:'many users, 1–N GPUs',c:'--accent',lx:0},
+    {k:'trt',x:455,y:48,w:200,h:120,lab:'TensorRT-LLM',sub:'one model, max throughput',c:'--rp',lx:1},
+    {k:'fireworks',x:470,y:6,w:220,h:34,lab:'Managed API (Fireworks)',sub:'',c:'--fw',lx:0,dash:1}];
+  regions.forEach(r=>{const g=el('g',{tabindex:0,role:'button','aria-label':r.lab,style:'cursor:pointer'},svg);
+    el('rect',{x:r.x,y:r.y,width:r.w,height:r.h,rx:12,style:'fill:var('+r.c+');fill-opacity:.12;stroke:var('+r.c+');stroke-width:1.5'+(r.dash?';stroke-dasharray:5 4':'')},g);
+    const tx=r.lx?r.x+r.w-10:r.x+10,anc=r.lx?'end':'start';const a=el('text',{x:tx,y:r.y+(r.h<40?20:20),'text-anchor':anc,'font-size':13,style:'fill:var('+r.c+');font-weight:700;font-family:var(--body)'},g);a.textContent=r.lab;
+    if(r.sub){const b=el('text',{x:tx,y:r.y+36,'text-anchor':anc,'font-size':10.5,style:'fill:var(--muted)'},g);b.textContent=r.sub;}
+    const act=()=>openFramework&&openFramework(r.k==='vllm'?'vllm':r.k,true);g.addEventListener('click',act);g.addEventListener('keydown',e=>{if(e.key==='Enter')act();});});
+  t=el('text',{x:R,y:B-8,'text-anchor':'end','font-size':10.5,style:'fill:var(--rp)'},svg);t.textContent='Runpod can host everything in the solid boxes';
+})();
+
+/* radix tree demo */
+(function(){
+  const svg=$('#rxTree');if(!svg)return;
+  const nodes=[{id:'s1',t:'System prompt',s:['2,000 tokens'],x:50,y:50,w:175,h:58,n:2000},{id:'tl',t:'Tool definitions',s:['1,500 tokens'],x:270,y:50,w:160,h:58,n:1500},
+    {id:'qa',t:'User A question',s:['60 tokens'],x:500,y:4,w:170,h:48,n:60},{id:'qb',t:'User B question',s:['80 tokens'],x:500,y:62,w:170,h:48,n:80},{id:'qc',t:'User C question',s:['50 tokens'],x:500,y:120,w:170,h:48,n:50},
+    {id:'s2',t:'Other system prompt',s:['1,800 tokens'],x:50,y:180,w:175,h:58,n:1800},{id:'qd',t:'User D question',s:['70 tokens'],x:270,y:180,w:160,h:58,n:70}];
+  const reqs={A:['s1','tl','qa'],B:['s1','tl','qb'],C:['s1','tl','qc'],D:['s2','qd']};
+  let D,cached={},sent=0,comp=0;
+  function draw(){D=drawDiagram(svg,{nodes:nodes.map(n=>Object.assign({},n,{s:n.s.slice(),fs:12.5})),edges:[['s1','tl'],['tl','qa'],['tl','qb'],['tl','qc'],['s2','qd']]},{});
+    el('circle',{cx:14,cy:145,r:7,style:'fill:var(--muted)'},svg);const t=el('text',{x:14,y:170,'text-anchor':'middle','font-size':10,style:'fill:var(--muted)'},svg);t.textContent='start';
+    el('path',{d:'M21,145 C36,145 36,79 50,79',style:'fill:none;stroke:var(--muted);stroke-width:1.5'},svg);el('path',{d:'M21,145 C36,145 36,209 50,209',style:'fill:none;stroke:var(--muted);stroke-width:1.5'},svg);}
+  function paintAll(hot,reused){Object.keys(D.G).forEach(k=>{const r=D.G[k].r;if(hot.indexOf(k)>=0){r.style.fill='var(--copper-soft)';r.style.stroke='var(--copper)';r.style.strokeWidth=2.5;}
+    else if(reused.indexOf(k)>=0){r.style.fill='var(--good-soft)';r.style.stroke='var(--good)';r.style.strokeWidth=2.5;}
+    else if(cached[k]){r.style.fill='var(--surface)';r.style.stroke='var(--accent)';r.style.strokeWidth=1.5;r.style.strokeDasharray='';}
+    else{r.style.fill='var(--surface2)';r.style.stroke='var(--rule)';r.style.strokeWidth=1.5;}});}
+  function stats(){$('#rxSent').textContent=nf(sent);$('#rxComp').textContent=nf(comp);$('#rxReuse').textContent=nf(sent-comp);$('#rxPct').innerHTML=sent?nf((sent-comp)/sent*100)+'<small> %</small>':'–';}
+  function send(k){const path=reqs[k],hot=[],re=[];path.forEach(id=>{const n=nodes.find(x=>x.id===id);sent+=n.n;if(cached[id])re.push(id);else{hot.push(id);comp+=n.n;cached[id]=1;}});paintAll(hot,re);stats();}
+  const bb=$('#rxBtns');Object.keys(reqs).forEach(k=>{const b=document.createElement('button');b.type='button';b.className='btn';b.textContent='Send request '+k;b.addEventListener('click',()=>send(k));bb.appendChild(b);});
+  $('#rxReset').addEventListener('click',()=>{cached={};sent=0;comp=0;draw();stats();});
+  draw();stats();
+})();
+
+/* deploy flows */
+(function(){
+  const tabs=$('#dfTabs');if(!tabs)return;
+  const F=[
+    {k:'rps',name:'Runpod Serverless · vLLM',cls:'rp',steps:[['Pick a model','e.g. meta-llama/Llama-3.1-8B-Instruct on Hugging Face'],['Hub → vLLM worker','set MODEL_NAME, MAX_MODEL_LEN, GPU type'],['Set workers','min 0 = scale to zero · min 1+ = no cold starts'],['Get endpoint ID','requests queue; workers scale up and down'],['Call it','OpenAI SDK against the endpoint']],
+     code:'from openai import OpenAI\nimport os\n\nclient = OpenAI(\n    base_url="https://api.runpod.ai/v2/<ENDPOINT_ID>/openai/v1",\n    api_key=os.environ["RUNPOD_API_KEY"])\nclient.chat.completions.create(\n    model="meta-llama/Llama-3.1-8B-Instruct",\n    messages=[{"role": "user", "content": "Hi"}])',
+     note:'Billed per second of active worker time. Watch cold starts: load the model when the worker boots, keep weights on a network volume, and enable FlashBoot.'},
+    {k:'rpp',name:'Runpod Pod · Ollama or vLLM',cls:'rp',steps:[['Choose a GPU','RTX 4090 for 8B, H100 or H200 for 70B'],['Pick a template','PyTorch (then install), or a vLLM image'],['Expose the port','11434 for Ollama · 8000 for vLLM'],['Start the server','web terminal or SSH'],['Call the proxy URL','https://<POD_ID>-<PORT>.proxy.runpod.net']],
+     code:'# vLLM on the Pod\nvllm serve meta-llama/Llama-3.1-8B-Instruct --port 8000\n\n# from anywhere\ncurl https://<POD_ID>-8000.proxy.runpod.net/v1/chat/completions \\\n  -H "Content-Type: application/json" \\\n  -d \'{"model":"meta-llama/Llama-3.1-8B-Instruct","messages":[{"role":"user","content":"Hi"}]}\'',
+     note:'A Pod bills per second while it runs, busy or idle, so stop it when you are done. Best for development, fine-tuning and steady always-on traffic.'},
+    {k:'fws',name:'Fireworks · library model',cls:'fw',steps:[['Create an API key','in the Fireworks console'],['Pick a model','from the model library'],['Call it','OpenAI SDK, base_url = Fireworks']],
+     code:FW.fireworks.code,note:'Pay per token. Nothing to deploy or scale; the fastest path from idea to production traffic.'},
+    {k:'fwc',name:'Fireworks · your own weights',cls:'fw',steps:[['Prepare files','safetensors, config.json, tokenizer files'],['Upload','firectl model create (local, S3 or Azure)'],['Deploy','firectl deployment create --wait'],['Call it','model = accounts/<ACCOUNT_ID>/models/<MODEL>'],['LoRA adapters','upload adapter, deploy on an on-demand deployment']],
+     code:'firectl model create my-model ./my-model-files/\nfirectl deployment create accounts/<ACCOUNT_ID>/models/my-model --wait\n\n# then, with the OpenAI SDK\nclient.chat.completions.create(\n    model="accounts/<ACCOUNT_ID>/models/my-model",\n    messages=[{"role": "user", "content": "Hi"}])',
+     note:'Supports most popular architectures (Llama, Qwen, Mistral, DeepSeek, Gemma, Phi and more). Many LoRA fine-tunes can share one base model deployment.'}];
+  function show(i){const f=F[i];setPressed(tabs,tabs.children[i]);const ol=$('#dfSteps');ol.className='flow '+f.cls;ol.innerHTML='';f.steps.forEach(s=>{const li=document.createElement('li');li.innerHTML='<b></b><span></span>';li.firstChild.textContent=s[0];li.lastChild.textContent=s[1];ol.appendChild(li);});$('#dfCode').textContent=f.code;$('#dfNote').textContent=f.note;}
+  F.forEach((f,i)=>{const b=document.createElement('button');b.type='button';b.textContent=f.name;b.setAttribute('role','tab');b.addEventListener('click',()=>show(i));tabs.appendChild(b);});
+  show(0);
+})();
+
+/* engine chooser (replaces old) */
+(function(){
+  if(!$('#engOpen'))return;
+  let hw='nv',wl='gen';
+  const why={
+    'nv-gen':['vllm','vLLM: the safe default for many users on NVIDIA. Continuous batching and PagedAttention out of the box, and it is what Runpod\'s official serverless worker runs.'],
+    'nv-prefix':['sglang','SGLang: RadixAttention reuses shared prefixes (system prompts, chat history, tool schemas) automatically, and constrained JSON decoding is fast. Great for agents.'],
+    'nv-max':['trt','TensorRT-LLM: when one model will run for months at high volume, compiling it squeezes out another 10–30%. Budget days of setup, and rebuild on every change.'],
+    'amd-gen':['vllm','vLLM supports AMD ROCm (e.g. MI300X). TensorRT-LLM is NVIDIA-only, so it is out.'],
+    'amd-prefix':['sglang','SGLang also runs on ROCm and keeps its prefix-caching advantage.'],
+    'amd-max':['vllm','On AMD, a tuned vLLM or SGLang is the performance path; there is no TensorRT-LLM.'],
+    'edge-gen':['ollama','Ollama: one command to pull and run a quantized model on a laptop. Use llama.cpp directly if you need more control.'],
+    'edge-prefix':['llamacpp','llama.cpp: supports prompt caching and grammar-constrained output on local hardware.'],
+    'edge-max':['llamacpp','llama.cpp with a 4-bit GGUF is the fastest practical option on laptop-class hardware.'],
+    'managed-gen':['fireworks','A managed API such as Fireworks: no GPUs or engines to run, pay per token, scale handled for you.'],
+    'managed-prefix':['fireworks','Fireworks with prompt caching and JSON / grammar modes gives you the agent benefits without running SGLang yourself.'],
+    'managed-max':['fireworks','Fireworks on-demand or reserved deployments, with FireOptimizer tuning speculative decoding to your traffic.']};
+  let pick='vllm';
+  function upd(){const r=why[hw+'-'+wl];pick=r[0];$('#engWhy').textContent=r[1];$('#engOpen').textContent='Open '+FW[pick].name+' in the explorer ↑';}
+  $$('#engHw button').forEach(b=>b.addEventListener('click',()=>{hw=b.dataset.v;setPressed(b.parentElement,b);upd();}));
+  $$('#engWl button').forEach(b=>b.addEventListener('click',()=>{wl=b.dataset.v;setPressed(b.parentElement,b);upd();}));
+  $('#engOpen').addEventListener('click',()=>openFramework&&openFramework(pick,true));
+  upd();
+})();
+
+})();
+
+</script>

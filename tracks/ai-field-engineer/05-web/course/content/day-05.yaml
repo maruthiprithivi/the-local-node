@@ -1,0 +1,600 @@
+# Day 5 · Agent workloads. Plain-language content for the guided course (spec section 3).
+# Sources (kit root = fireworks-field-engineer-kit/):
+#   L06    03-labs/lessons/06-prefix-caching/README.md (sample table line 55 prints 20.3; 740 / 36 is 20.6)
+#   bench  03-labs/lessons/06-prefix-caching/prefix_bench.py (PREAMBLE is 12,115 characters; the script
+#          prints len // 4 = 3,028 tokens; 12 QUESTIONS; max_tokens 48; `user` only on Fireworks, line 64;
+#          stable-first = system preamble + user question, no time at all (line 46); variable-first puts
+#          "Request time <stamp>. User asks: <q>" above the preamble (line 49); table has a target column
+#          (line 73); the `usage:` line (83) is followed by a "Cost check" line (84))
+#   mlx    03-labs/lessons/06-prefix-caching/mlx_prompt_cache.sh (step 1 cold generate, 2 cache_prompt,
+#          3 generate from the cache file)
+#   mock   03-labs/felab/mock_server.py (prefill 2,500 tok/s + 15 ms, 64-token blocks, lines 31, 50, 61-76, 148)
+#   serve  03-labs/lessons/02-three-local-servers/serve_llamacpp.sh (defaults -c 8192 --parallel 4, line 10)
+#   smoke  03-labs/scripts/smoke_test.sh lines 12-14 (starts and stops its own mock unless one is running), 28-29
+#   targets 03-labs/felab/targets.py line 74 (Fireworks default model gpt-oss-120b), line 100 (key message)
+#   narr   04-video-source/src/narration.json lines 1385-1527 (Prefix Caching; Caveats 1440-1450,
+#          Worked 1454-1480, BeforeAfter 1481-1507, Recap 1508-1519)
+#   LB     02-lab-book/field-engineer-lab-book.html lines 1198-1214 (F2: $0.30 vs $0.006, DeepSeek V4.1 Flash),
+#          1405-1417 (L6), 1764 (plan day 5)
+#   FG     02-lab-book/inference-field-guide.html lines 628 (3/4 word per token), 816, 836 (SGLang: strong at
+#          agents), 1724
+#   memo   03-labs/lessons/15-capstone/build_memo.py lines 44 (50% cached discount default), 50, 63-64
+# Arithmetic: 12,115 // 4 = 3,028; 740 / 36 = 20.6; 744 / 712 = 1.04; 3,028 x 0.75 = 2,271 words;
+#   3,028 / 2,500 = 1.21 s; mock warm call: 15 ms + about 29 new tokens / 2,500 = 27 ms (code reading, not a run);
+#   3,028 / 1,050 = 2.9 s; 20 x 3,600 = 72,000; 19 x 3,500 = 66,500; 3,500 + 20 x 100 = 5,500;
+#   66,500 / 72,000 = 92.4%; 72,000 / 5,500 = 13.1; 72,000 x 0.30 / 1e6 = 0.0216; 5,500 x 0.30 / 1e6 = 0.00165;
+#   66,500 x 0.006 / 1e6 = 0.000399; 0.002049 / 0.0216 = 9.5%; 0.006 / 0.30 = 2%; 1.9 / 0.35 = 5.4;
+#   90% case per 1M tokens: 0.03 + 0.0054 = 0.0354, 0.0354 / 0.30 = 11.8%; at 50% off: 0.03 + 900,000 x 0.15 / 1e6
+#   = 0.165, 0.165 / 0.30 = 55%, so 45% saved; coffee picture: 3,600 + 19 x (3,500 x 0.02 + 100) = 6,830,
+#   6,830 / 3,600 = 1.9 cups.
+
+day: 5
+tile: "Reuse a repeated opening prompt to answer faster and pay less"
+
+overview:
+  today: >-
+    An agent (a program that calls a model again and again) sends the same long opening, its instructions and
+    rules, with every request. Today you measure how much sooner the reply starts when the server reuses that
+    opening. You do it on your Mac, then on Fireworks, which also bills the reused part at a steep discount.
+  example: >-
+    Imagine a support bot that receives the same company handbook before every customer question. Reading that
+    handbook again each time wastes work. In the lesson's test, the first answer starts after about three
+    quarters of a second; later answers start almost immediately because the server reuses its work on the
+    handbook. Today you will measure that difference and see when the reuse fails.
+  deliverable: "Your wait for the first word of a reply, with the opening reused and without, on your Mac and on Fireworks, plus how many tokens Fireworks reused."
+  expected: >-
+    With the opening at the top of the prompt, calls 2 to 12 get their first word about 20 times sooner than call
+    1 in the lesson's sample; with the time of the request at the top instead, no sooner.
+  before:
+    - title: "The practice server is running."
+      body: >-
+        The first two runs use the kit's practice server: free, offline, with made-up speeds. Start it from the
+        `03-labs` folder. If it is still running from an earlier day, restart it: it may already remember today's
+        opening, and then call 1 is fast too.
+      command: "make mock &"
+      after: "It prints `mock LLM on http://localhost:9000/v1`. To restart it, first run `pkill -f felab.mock_server`."
+    - title: "llama.cpp and MLX (Apple's own model software) from Day 2."
+      body: >-
+        Both run the 4-bit Llama 3.1 8B model you downloaded on Day 2 (each keeps its own copy), so there is
+        nothing new to download today. You start llama.cpp in a second terminal during the step, with room for a
+        longer prompt than its default.
+    - title: "Your Fireworks key and spend cap from Day 1."
+      body: >-
+        The last run calls Fireworks and costs about $0.03. The script reads your key from the `.env` file in
+        `03-labs`, set up on Day 1.
+  feeds: >-
+    Day 10's sizing memo quotes your speed-up. It uses the last opening-first result you saved, which is your
+    Fireworks run if you follow the steps in order.
+
+steps:
+  d5-s1:
+    why: >-
+      Agents resend the same long opening with every request. When the server reuses it, replies start sooner
+      and, on Fireworks, cost less.
+    why_example: >-
+      In the lesson's example printout, call 1 waits 740 ms (thousandths of a second) for its first word. With
+      the 3,000-token opening reused (a token is a word piece, about three quarters of a word), the next calls
+      wait about 36 ms: about 20 times less.
+
+    videos:
+      11-prefix-caching:
+        in_this_video: "Why agent traffic is mostly repeats, how servers reuse the repeated part, and what that does to the wait and the bill."
+        key_points:
+          - point: "Most of what an agent sends is the same opening again."
+            detail: "In the video's 20-call example, 66,500 of the 72,000 tokens sent repeat the opening: 92%. The video shows 93% because it rounds 66,500 up to 67,000."
+          - point: "Reusing the opening cuts both the wait and the bill."
+            detail: "In the video's session, 95 of 100 calls see their first word within 0.35 seconds instead of 1.9. The input costs about a fifth of a cent instead of 2 cents."
+          - point: "Put the parts that never change first, or there is nothing to reuse."
+            detail: "One changing line at the top, such as the time, makes every call new: calls 2 to 12 took 712 ms instead of 36 ms in the lesson's sample."
+
+    plain:
+      lead: >-
+        An agent sends the same long opening with every request: its instructions, its tools (actions it may ask
+        for, such as a refund) and its rules. Only the last line, the question, changes. With prefix caching the
+        server keeps its notes on that opening (the KV cache from Day 4). It then reads only the new part, so the
+        reply starts much sooner.
+      picture: >-
+        A bookmark: if the first 3,000 words of a book are the same as last time, you start reading at word 3,001.
+        It only works if every word before the bookmark matches. Change one word on page 1 and you start again
+        from the top.
+      numbers_source: "the lesson's script and example printout (lesson 06), and the Prefix Caching video's prices"
+      numbers:
+        - "The shared opening: 3,028 tokens by the script's estimate (12,115 characters ÷ 4; about 2,300 words), sent with each of 12 different questions."
+        - "Opening first, call 1 (nothing saved yet): 740 ms before the first word."
+        - "Calls 2 to 12 (opening reused): 36 ms, the middle value. 740 ÷ 36 = about 20 times sooner."
+        - "A line with the time of the request (and the question) added above the opening: call 1 takes 744 ms, calls 2 to 12 about 712 ms. 744 ÷ 712 = 1.04, so almost no gain."
+        - "On Fireworks the reused part also costs less. The video's example prices: $0.30 per million tokens, or $0.006 cached. $0.006 ÷ $0.30 = 2% of the price."
+      words:
+        - term: "Prefix"
+          def: "the start of a prompt, up to the first token that differs from last time. Example: the shared 3,028-token opening."
+        - term: "TTFT (time to first token)"
+          def: "how long until the first token (word piece) of the reply appears. Example: 740 ms for call 1, 36 ms for the calls after it."
+        - term: "Agent"
+          def: "a program that calls a model many times, using tools, to finish a task. Example: the lesson's support agent with 5 tools."
+        - term: "Cached tokens"
+          def: "prompt tokens the server reused instead of reading again. Fireworks reports them as `cached_tokens` and bills them at a discount."
+
+    run:
+      - cmd: "python prefix_bench.py --target mock"
+        note: >-
+          Sends 12 different questions, each after the same 3,028-token opening, to the practice server (free,
+          offline). **Look for** call 1 marked (cold) and calls 2 to 12 far faster. The practice server reads 2,500
+          tokens a second, so call 1 takes about 1.2 seconds (3,028 ÷ 2,500), more than the lesson's 740 ms. Calls
+          2 to 12 take about 30 ms (15 ms plus the few new tokens), so its speed-up comes out near 40.
+      - cmd: "python prefix_bench.py --target mock --order variable-first"
+        note: >-
+          The same 12 questions, but with the time of the request (and the question) at the very top. **Look for**
+          every call about as slow as call 1. speedup_x (call 1's time divided by the middle of the others) should
+          be about 1.0.
+      - cmd: "bash ../02-three-local-servers/serve_llamacpp.sh"
+        note: >-
+          Starts the real llama.cpp server from Day 2. Run it in a second terminal, from this lesson's folder
+          (`cd lessons/06-prefix-caching` inside `03-labs`). Add `Q4_K_M 16384 4` after `.sh`: the 4-bit model, room
+          for 16,384 tokens, 4 seats (4,096 each). Without them it has 8,192 tokens over 4 seats, 2,048 each, too
+          few for the 3,000-token opening (Day 2's trap). **Look for** the line saying it is listening.
+      - cmd: "python prefix_bench.py --target llamacpp"
+        note: >-
+          The same test on the real model on your Mac. **Look for** a slow call 1 and calls 2 to 12 far faster. On
+          Day 4's example Mac, which reads about 1,050 tokens a second, call 1 takes roughly 3 seconds
+          (3,028 ÷ 1,050). Write down first_ms (call 1) and rest_p50_ms (the middle of calls 2 to 12).
+      - cmd: "python prefix_bench.py --target llamacpp --order variable-first"
+        note: >-
+          The time at the top again, on the real model. **Look for** every call about as slow as call 1 and a
+          speedup_x near 1.0: llama.cpp only reuses text that matches from the very first token.
+      - cmd: "bash mlx_prompt_cache.sh"
+        note: >-
+          The same idea done by hand with MLX (Apple's own engine). Step 1 answers cold, reading everything. Step 2
+          reads the opening once and saves its notes to a file. Step 3 answers from that file. **Look for** the
+          `Prompt:` line: about 3,000 tokens in step 1, only the short question in step 3.
+      - cmd: "python prefix_bench.py --target fireworks --usage"
+        note: >-
+          The same test on Fireworks (paid, about $0.03), then one extra call that prints the token counts. Every
+          call carries the same session name (the `user` value), so all reach the same copy of the model.
+          **Look for** the `usage:` line near the end, just above the `Cost check` line: cached_tokens should cover
+          most of prompt_tokens.
+
+    see: >-
+      Each run prints one row, after a target column naming the server: stable-first puts the opening at the top,
+      variable-first the time. first_ms is call 1, rest_p50_ms the middle of calls 2 to 12, and speedup_x the first
+      divided by the second. In the lesson's sample, stable-first falls from 740 to 36 ms (about 20 times) and
+      variable-first stays slow, 744 then 712 ms (about 1).
+
+    checks:
+      - q: >-
+          A customer's agent puts the current time (`Current time: …`) at the very top of its system prompt. The
+          system prompt is the fixed instructions sent at the start of every request. What do you tell them?
+        plain: >-
+          Move the time to the end. Put everything that never changes first and anything that changes last, so every
+          request starts with the same text the server can reuse.
+        picture: >-
+          A bookmark only helps if every page before it is the same as last time. Write the current time on page 1
+          and the bookmark is useless: you start the book again on every visit.
+        numbers_source: "the lesson's script and example printout, lesson 06"
+        numbers:
+          - "Opening first, nothing that changes above it (the lesson's stable-first run, question at the end): call 1 takes 740 ms, the rest 36 ms (the middle value). 740 ÷ 36 = about 20 times sooner."
+          - "A line with the time and the question added above the opening (variable first): call 1 takes 744 ms, calls 2 to 12 about 712 ms. 744 ÷ 712 = 1.04, so almost no gain."
+          - "The only difference between the two runs: the time-first run adds that one line above the opening."
+          - "The fix changes how the prompt is built. It needs no new server and no new setting."
+        words:
+          - term: "System prompt"
+            def: "the fixed instructions at the start of every request. Example: the script's 3,028-token support-agent opening."
+          - term: "Stable first, variable last"
+            def: "build the prompt with the parts that never change at the top. Example: rules and tools first, the time and the question last."
+          - term: "Prefix"
+            def: "the start of a prompt, up to the first token that differs from last time. Example: a new timestamp at the top leaves no shared prefix."
+        more: >-
+          Prefix caches match token by token from the start. llama.cpp and SGLang reuse the longest identical
+          prefix; vLLM and the practice server hash fixed-size blocks, each key covering everything before it
+          (64-token blocks in `mock_server.py`), so one changed token invalidates every block after it. Per-request
+          values such as the time or the user's name belong after the stable part, ideally in the last user message.
+
+      - q: >-
+          A customer runs several identical copies of the model (replicas) behind one address. Why does it matter to
+          send a `user` value (a session name) with each request, so each session keeps going to the same copy
+          (session affinity)?
+        plain: >-
+          Each copy keeps its own saved notes, and the copies do not share them. A request that lands on a copy that
+          has not seen this conversation starts cold: that copy must read the conversation again.
+        picture: >-
+          A chain of cafes where each barista remembers your usual order. Go back to the same barista and your coffee
+          comes fast. Walk up to a new one and you explain it all again.
+        numbers_source: "lesson 06's example printout and Day 3's sizing question"
+        numbers:
+          - "Warm, in the lesson's sample (the copy has already read the text): 36 ms to the first word."
+          - "Cold (the copy must read it all): 740 ms, about 20 times longer."
+          - "Day 3's example service had 18 copies. Sent at random, a conversation's next request would reach the copy holding its history only 1 time in 18."
+          - "The script sends `user` = `lesson-06-session` on every Fireworks call, so they all reach the same copy."
+        words:
+          - term: "Replica"
+            def: "one complete running copy of the server and model. Example: 18 copies for 120 people on Day 3."
+          - term: "Session affinity"
+            def: "sending every request of one session to the same copy, so it finds its saved notes. Example: the `user` field."
+          - term: "Cold and warm"
+            def: "cold: nothing saved yet, so everything is read; warm: the saved notes are reused. Example: 740 ms cold, 36 ms warm."
+        more: >-
+          Each replica holds its own KV cache in its own GPU memory; nothing is shared between replicas. A shared
+          system prompt warms on each replica after its first request there, but a session's own history (earlier
+          turns, tool results) is cached only where it was served. Without affinity those turns land on different
+          replicas, each pays full prefill, and the hit rate falls. Caches also expire, so the first call after an
+          idle spell is slow (the Prefix Caching video).
+
+      - q: >-
+          What is the business case for prefix caching: the argument, in money and speed, you would give the
+          customer?
+        plain: >-
+          Most of an agent's input is the same opening again, so most of the input bill moves to the much cheaper
+          cached price. The reply also starts several times sooner.
+        picture: >-
+          A print shop charges full price to set up a page and a small fee for every extra copy. An agent keeps
+          ordering the same page; with caching it pays for the setup once and copy prices after that.
+        numbers_source: "the Prefix Caching video's example prices, lesson 06's answer (90% repeated) and the Day 10 memo script"
+        numbers:
+          - "An agent whose input is 90% repeated opening, per 1 million input tokens:"
+          - "Without caching: 1,000,000 × $0.30 per million = $0.30."
+          - "With caching: 100,000 new tokens × $0.30 per million = $0.03, plus 900,000 cached × $0.006 per million = $0.0054."
+          - "Total $0.0354 instead of $0.30: about 12% of the bill, so 88% saved."
+          - "At 50% off instead (what the Day 10 memo assumes until you check): $0.03 + 900,000 × $0.15 per million = $0.165, so 45% saved."
+          - "Lesson example printout: 740 ms becomes 36 ms (the middle call), about 20 times sooner."
+          - "The video's session: 1.9 s becomes 0.35 s (the time 95 of 100 calls stay under), about 5 times sooner."
+        words:
+          - term: "Business case"
+            def: "the argument, in money and results, for making a change. Example: 88% off the input bill at the video's prices."
+          - term: "Input tokens"
+            def: "the tokens you send to the model; providers bill them per million. Example: $0.30 per million in the video's example."
+          - term: "Cached tokens"
+            def: "input tokens the server reused; Fireworks bills them at a discount. Example: $0.006 instead of $0.30 per million."
+          - term: "Order of magnitude"
+            def: "about 10 times. Example: 740 ms down to 36 ms is more than one order of magnitude."
+        more: >-
+          Cached-token pricing is set per model. The video's $0.30 and $0.006 per million match the lab book's figures
+          for DeepSeek V4.1 Flash on Fireworks (98% off); the Day 10 memo script assumes only 50% off until you check
+          the price page. Your own run uses the script's default model, gpt-oss-120b, which has its own prices; read
+          them off the price page before quoting a saving. The TTFT gain depends on the workload: 20x (call 1 against
+          the median of calls 2 to 12) in the lesson's sample, 5.4x at p95 in the video's measured session (1.9 s to
+          0.35 s). Quote the customer's own before-and-after with the cache hit rate; a cache that is never hit only
+          takes memory away from concurrency (the video).
+
+    say:
+      ask: "Our agent bill is too high. What would you do first?"
+      means:
+        - phrase: "Their system prompt is identical on every call"
+          meaning: "The customer's fixed opening (instructions, tools, rules) is the same text on every request. In the lesson it is 3,028 tokens, sent with every question."
+        - phrase: "so most of the input bill is cacheable"
+          meaning: "Most of what they pay for the model to read can be reused and billed at the cached price. In the video's 20-call session, 92% of the input tokens are repeats."
+        - phrase: "Stable first, variable last"
+          meaning: "Put what never changes at the top and what changes (the time, the question) at the bottom, so the opening matches every time. With the time at the top, calls 2 to 12 took 712 ms instead of 36 ms in the lesson's sample."
+        - phrase: "session affinity on"
+          meaning: "Send a session id (the `user` field) so each conversation keeps going to the same copy of the model, the one holding its saved notes."
+        - phrase: "and I'll show the cached-token count in the usage block"
+          meaning: "I prove it with the counts Fireworks returns with each answer: `cached_tokens` next to `prompt_tokens`. Most of the prompt should be cached."
+
+    fields:
+      - id: d5-llamacpp-stable
+        label: "llama.cpp, opening first: call 1 / middle of calls 2 to 12 (ms)"
+        hint: "From `python prefix_bench.py --target llamacpp`: the first_ms and rest_p50_ms columns. Write both, for example \"740 / 36\"."
+        unit: "ms"
+        meaning: "How long the first word takes when the whole opening must be read, and when it is reused."
+        example: "740 / 36 in the lesson's example printout: about 20 times sooner."
+      - id: d5-llamacpp-variable
+        label: "llama.cpp, time first: speed-up"
+        hint: "The speedup_x column of the `--order variable-first` run. Expect about 1.0."
+        unit: "x"
+        meaning: "How much reuse is left when one changing line sits at the top: none."
+        example: "1.0 in the lesson's sample (744 ÷ 712 = 1.04)."
+      - id: d5-fireworks-ttft
+        label: "Fireworks, opening first: call 1 / middle of calls 2 to 12 (ms)"
+        hint: "From `python prefix_bench.py --target fireworks --usage`: the first_ms and rest_p50_ms columns. Write both."
+        unit: "ms"
+        meaning: "The same test on Fireworks, where caching is on by default."
+        example: "No lesson sample for Fireworks. For scale, the video's session fell from 1,900 to 350 ms, but that is the time 95 of 100 calls stay under, not call 1 and the middle."
+      - id: d5-fireworks-cached
+        label: "Fireworks: cached tokens / prompt tokens"
+        hint: "From the `usage:` line near the end, just above the `Cost check` line. Write both numbers, cached first."
+        unit: "tokens"
+        meaning: "How much of the prompt Fireworks reused and billed at the cached price."
+        example: "cached_tokens should cover most of prompt_tokens; the opening alone is about 3,000 of them by the script's estimate."
+
+    done: >-
+      You have three things. On llama.cpp: the wait for the first word with the opening first and with the time
+      first. On Fireworks: the opening-first wait, and a `usage` line where cached_tokens covers most of
+      prompt_tokens.
+
+    stuck:
+      - problem: "`Connection refused`."
+        fix: >-
+          That server is not running. `make check` (from the `03-labs` folder) shows what is up. Start the practice
+          server with `make mock &`, or start llama.cpp as in the run notes and wait until it says it is listening.
+      - problem: "Opening first on the practice server shows a speed-up near 1, and call 1 is already fast."
+        fix: >-
+          The practice server still remembers the opening from an earlier run: this command run twice, or
+          `make smoke` while it was up. Restart it: `pkill -f felab.mock_server`, then `make mock &` from the
+          `03-labs` folder, and run again.
+      - problem: "`No such file or directory` when you start llama.cpp."
+        fix: >-
+          The command's path starts from this lesson's folder. From the `03-labs` folder run
+          `cd lessons/06-prefix-caching`, then start it again.
+      - problem: "llama.cpp returns an error about the context size, or its opening-first run shows no speed-up."
+        fix: >-
+          Each of its 4 seats holds only 2,048 tokens by default, less than the 3,000-token opening. Stop it (Ctrl+C)
+          and, from this lesson's folder, start it with `bash ../02-three-local-servers/serve_llamacpp.sh Q4_K_M 16384 4`
+          (4,096 tokens per seat).
+      - problem: "`FIREWORKS_API_KEY is not set`."
+        fix: "Put your key in the `.env` file in `03-labs`, as on Day 1, or export it in this terminal."
+      - problem: "`cached_tokens=0` or `cached_tokens=None`."
+        fix: >-
+          Run the Fireworks command again right away: caches expire when idle (the Prefix Caching video). If it
+          still says None, this model does not report it; pass another with `--model`.
+      - problem: "A Fireworks model id is not found."
+        fix: "Model ids change. Copy a current one from the Fireworks model library and pass it with `--model`."
+      - problem: "`mlx_lm.generate: command not found`."
+        fix: "The Python environment from Day 1 is not active. From the `03-labs` folder run `source .venv/bin/activate`, then try again."
+
+    replace:
+      - find: "# other terminal"
+        with: "# other terminal. Add Q4_K_M 16384 4 after .sh (see the note below)"
+      - find: "# F2: cached_tokens in the usage block"
+        with: "# Fireworks: cached_tokens in the usage block"
+      - find: "36.0       20.3"
+        with: "36.0       20.6"
+
+wrapup:
+  done: >-
+    Your notes show how long the first word takes on your Mac and on Fireworks, with the opening reused and
+    without. They also hold Fireworks' cached-token count.
+  whiteboards:
+    - video: 11-prefix-caching
+      q: >-
+        An agent session has 20 calls. Each call sends the same 3,500-token opening plus a new question of about 100
+        tokens. How many tokens are sent, how many are genuinely new, and what share is a repeat?
+      given: >-
+        A token is a chunk of text, about three quarters of a word, so the opening is about 2,600 words. The server
+        has to read the opening once. After that, only the questions are new.
+      plain: >-
+        72,000 tokens are sent, but only 5,500 are new. About 92 of every 100 tokens are repeats the server has
+        already read.
+      picture: >-
+        A teacher reads the same long instructions aloud before each of 20 questions. The class sits through them
+        20 times, but only the first reading told them anything new.
+      steps:
+        - "Tokens per call: 3,500 (opening) + 100 (question) = 3,600."
+        - "Tokens sent in the session: 20 calls × 3,600 = 72,000."
+        - "Repeated: the opening is new only on call 1, so 19 × 3,500 = 66,500 tokens are repeats."
+        - "Genuinely new: 3,500 (the first opening) + 20 × 100 (the questions) = 5,500. Check: 66,500 + 5,500 = 72,000."
+        - "Share that is a repeat: 66,500 ÷ 72,000 = 92%."
+        - "With the opening reused, the server reads 5,500 tokens instead of 72,000: 72,000 ÷ 5,500 = about 13 times less reading."
+      note: "The video says 67,000 repeated, 5,000 new and 93%: it rounds 66,500 up to 67,000 and counts the rest as new. The exact figures are 66,500, 5,500 and 92%; the conclusion is the same: over 90% is repeats."
+      kit_q: "Worked example · 20-turn agent session · 3,500-token prefix · ~100-token questions"
+      kit_a: "tokens sent 72,000 · genuinely new 5,000 · repeated prefix 67,000 · share that is repeat 93% · Caching turns 93% of the input bill into a rounding error"
+      more: >-
+        The video's 67,000 is 19 × 3,500 = 66,500 rounded up, and its 5,000 is 72,000 - 67,000. A real multi-turn
+        session also resends its growing history on every turn, which raises the repeated share further (the field
+        guide lists multi-turn chat history among the prefixes worth caching).
+      words:
+        - term: "Turn"
+          def: "one call to the model within a session. Example: 20 turns in the video's session."
+        - term: "Prefix"
+          def: "the start of a prompt, up to the first token that differs from last time. Example: the 3,500-token opening."
+        - term: "Token"
+          def: "a chunk of text, about three quarters of a word. Example: 3,500 tokens is about 2,600 words."
+
+    - video: 11-prefix-caching
+      q: >-
+        The same 20-call session. Input normally costs $0.30 per million tokens, and cached input $0.006 per million.
+        What does one session's input cost without caching and with it? What happens to the wait for the first word?
+      given: >-
+        Cached input is the repeated opening the server reuses: 66,500 of the 72,000 tokens. The other 5,500 are
+        paid at full price. The video measured the wait that 95 of 100 calls stay under (p95): 1.9 seconds cold,
+        0.35 seconds with the opening cached.
+      plain: >-
+        The session's input cost falls from about 2 cents to about a fifth of a cent, about 90% less. And 95 of 100
+        calls get their first word within 0.35 seconds instead of 1.9, about 5 times sooner.
+      picture: >-
+        A coffee shop charges full price for the first cup and 2 cents on the dollar for each refill; only a splash
+        of new milk in each cup is full price. Twenty cups cost about as much as two.
+      steps:
+        - "Without caching, all 72,000 tokens at full price: 72,000 × $0.30 ÷ 1,000,000 = $0.0216, about 2 cents."
+        - "With caching, the 5,500 new tokens at full price: 5,500 × $0.30 ÷ 1,000,000 = $0.00165."
+        - "Plus the 66,500 repeated tokens at the cached price: 66,500 × $0.006 ÷ 1,000,000 = $0.0004."
+        - "Total with caching: $0.00165 + $0.0004 = $0.00205, about a fifth of a cent."
+        - "Saving: $0.00205 ÷ $0.0216 = 9.5% of the old cost, so about 90% less."
+        - "The cached price is $0.006 ÷ $0.30 = 2% of the full price: a 98% discount."
+        - "Wait for the first word (p95): 1.9 s cold, 0.35 s cached. 1.9 ÷ 0.35 = about 5 times sooner."
+      note: "Prices differ by model. Check the price page before you quote a saving; the Day 10 memo script assumes only 50% off until you do."
+      kit_q: "The same session, cached · p95 TTFT · input billed at full rate · input cost at $0.30 / $0.006"
+      kit_a: "cold · cached prefix · p95 TTFT: 1.9 s · 0.35 s · input billed at full rate: 72,000 tok · 5,000 tok · input cost at $0.30 / $0.006: $0.0216 · $0.0019 · Requires prompts ordered stable-first — a code change, not a config flag."
+      more: >-
+        The video's $0.0019 uses its rounded 5,000 new and 67,000 repeated tokens: $0.0015 + $0.000402 = $0.0019.
+        The exact 5,500 and 66,500 give $0.00205. Both are more than 90% below $0.0216 (91% and 90.5%), as the video
+        says. Its TTFT figures are p95 for the video's measured session, a 5.4x gain, against 20x in the lesson's
+        sample (call 1 against the median of calls 2 to 12). The saving needs prompts ordered stable first: a code
+        change, not a setting.
+      words:
+        - term: "p95"
+          def: "the value 95 out of 100 requests stay under. Example: 95 of 100 calls see their first word within 0.35 s, cached."
+        - term: "Cached tokens"
+          def: "input tokens the server reused; Fireworks bills them at a discount. Example: $0.006 instead of $0.30 per million."
+        - term: "Input tokens"
+          def: "the tokens you send to the model; providers bill them per million. Example: 72,000 in the video's session."
+
+glossary:
+  # New on Day 5 (days 1, 3 and 10 copy Prefix caching (prompt caching), Preamble, Agent and Cached tokens verbatim)
+  - term: "Agent"
+    def: "a program that calls a model many times, using tools, to finish a task."
+    example: "Day 5's Acme Cloud support agent, with 5 tools."
+  - term: "Automatic prefix caching"
+    def: "vLLM's built-in prefix cache: it reuses saved notes for identical blocks at the start of a prompt."
+    example: "`vllm serve $MODEL --enable-prefix-caching`."
+  - term: "Block hash"
+    def: "a fingerprint of one fixed-size block of a prompt together with everything before it; a matching fingerprint means the saved notes can be reused."
+    example: "64-token blocks in the practice server."
+  - term: "Business case"
+    def: "the argument, in money and results, for making a change."
+    example: "88% off the input bill for an agent whose input is 90% repeats, at the video's prices."
+  - term: "Cache hit (hit rate)"
+    def: "a request that finds its opening already saved; the hit rate is the share of requests that do."
+    example: "the Prefix Caching video: measure the hit rate, because an unused cache only takes memory."
+  - term: "Cached tokens (cached_tokens)"
+    def: "input tokens the server reused instead of reading again; Fireworks reports them and bills them at a discount."
+    example: "`usage: prompt_tokens=… cached_tokens=…` from Day 5's `--usage` run."
+  - term: "Cold and warm"
+    def: "cold: nothing is saved yet, so the whole prompt is read; warm: saved notes are reused. Not the same as a cold start (Day 1), when a server is still loading the model."
+    example: "call 1 is cold (740 ms) and calls 2 to 12 are warm (36 ms) in Day 5's sample."
+  - term: "Input tokens"
+    def: "the tokens you send to the model; providers bill them per million."
+    example: "$0.30 per million, or $0.006 cached, in the Prefix Caching video."
+  - term: "Order of magnitude"
+    def: "about 10 times."
+    example: "740 ms down to 36 ms is more than one order of magnitude."
+  - term: "Preamble"
+    def: "the long fixed opening sent with every request: instructions, tool list and rules."
+    example: "3,028 tokens in Day 5's script."
+  - term: "Prefix"
+    def: "the start of a prompt, up to the first token that differs from an earlier one."
+    example: "the shared 3,028-token opening."
+  - term: "Prefix caching (prompt caching)"
+    def: "the server keeps its notes on a prompt's opening and reuses them when the next request starts the same way."
+    example: "740 ms for call 1, 36 ms for the rest in the lesson's sample."
+  - term: "Prompt cache file"
+    def: "a file holding the saved notes on a prompt, so a later run can skip reading it."
+    example: "`preamble.safetensors` in the MLX script."
+  - term: "RadixAttention"
+    def: "SGLang's prefix cache: it keeps saved notes in a tree of shared openings and orders requests to reuse them."
+    example: "the video's trunk, branch and leaf picture."
+  - term: "Session affinity"
+    def: "sending every request of one session to the same replica, so it finds its saved notes."
+    example: "the `user` value in Day 5's script, `lesson-06-session`."
+  - term: "Slot cache reuse"
+    def: "llama.cpp keeps each seat's notes from its last request and reuses the part that matches."
+    example: "why calls 2 to 12 are fast on llama.cpp."
+  - term: "Speed-up (speedup_x)"
+    def: "how many times faster: the slow time divided by the fast one."
+    example: "740 ÷ 36 = about 20."
+  - term: "Stable first, variable last"
+    def: "build the prompt with the parts that never change at the top and anything that changes at the bottom."
+    example: "rules and tools first, the time and the question last."
+  - term: "System prompt"
+    def: "the fixed instructions at the start of every request that set how the model behaves."
+    example: "\"You are the support agent for Acme Cloud.\""
+  - term: "Tool (tool definition)"
+    def: "an action an agent may ask for, described in the prompt so the model knows how to call it."
+    example: "search_tickets, get_invoice, refund, status_page and escalate in Day 5's script."
+  - term: "Turn"
+    def: "one call to the model within a session."
+    example: "20 turns in the video's agent session."
+  - term: "Usage block"
+    def: "the token counts a server returns with an answer."
+    example: "prompt_tokens and cached_tokens on Fireworks."
+  # Defined on earlier days: text copied verbatim from the first definition (Days 1 to 3); examples are Day 5's
+  - term: ".env file"
+    def: "the settings file in the `03-labs` folder, holding defaults and your Fireworks key; it never leaves your Mac."
+    example: "the lesson reads `FIREWORKS_API_KEY` from it."
+  - term: "4-bit, 8-bit, 16-bit"
+    def: "how many bits store each number; fewer bits, smaller model."
+    example: "`Q4_K_M` is the 4-bit version llama.cpp runs today."
+  - term: "API key"
+    def: "a secret code that proves a request comes from your account, so it can be billed."
+    example: "`FIREWORKS_API_KEY` in `.env`."
+  - term: "Concurrency (people served at once)"
+    def: "how many conversations the server runs at the same moment."
+    example: "8 on the practice server."
+  - term: "Context length (context, ctx)"
+    def: "the most tokens one conversation may hold."
+    example: "8K = 8,192 tokens."
+  - term: "Deployment (production)"
+    def: "a model running as a live service for real users."
+    example: "running out of note memory is the most common production failure."
+  - term: "Engine (inference server)"
+    def: "the program that loads a model and answers requests."
+    example: "llama.cpp, vLLM."
+  - term: "Fireworks"
+    def: "a cloud service that runs AI models and charges per use; one platform used in this course."
+    example: "today's last run costs about $0.03 there."
+  - term: "GPU"
+    def: "the chip that runs the model."
+    example: "H100; on a Mac it shares memory with everything else."
+  - term: "KV cache"
+    def: "the model's notes on the conversation so far (keys and values), so it does not reread everything for each new word."
+    example: "17.18 GB for one 131,072-token conversation."
+  - term: "Llama 3.1 8B, Llama 3 70B"
+    def: "the open models used in the lessons and videos, with 8 and 70 billion parameters."
+    example: "today's Mac runs use the 8B at 4-bit."
+  - term: "llama.cpp"
+    def: "the open-source engine used on the Mac; `llama-server` answers requests, `llama-bench` times the engine alone."
+    example: "Day 2's server."
+  - term: "make"
+    def: "a tool that runs named shortcuts listed in a file called `Makefile`."
+    example: "`make mock &` starts the practice server."
+  - term: "MLX"
+    def: "Apple's own software for running and training models on Apple chips; `mlx_lm.server` is its model server."
+    example: "`mlx_lm.cache_prompt` saves a prompt's notes to a file."
+  - term: "ms (millisecond)"
+    def: "a thousandth of a second."
+    example: "500 ms is half a second."
+  - term: "Notes"
+    def: "this course's plain word for the KV cache."
+    example: "128 KB of notes per token for Llama 3.1 8B."
+  - term: "p50 (median)"
+    def: "the middle value: half the requests are faster, half slower."
+    example: "rest_p50_ms, the middle time of calls 2 to 12."
+  - term: "p95"
+    def: "the value 95 out of 100 requests stay under."
+    example: "95 of 100 calls see their first word within 0.35 s in the Prefix Caching video's cached session."
+  - term: "Practice server (mock)"
+    def: "the kit's stand-in server with realistic behaviour and made-up numbers."
+    example: "it has 8 slots."
+  - term: "Prefill"
+    def: "the reading phase; the model reads the whole prompt at once."
+    example: "`pp512`."
+  - term: "Prompt"
+    def: "the text you send the model."
+    example: "a 3,000-token support question."
+  - term: "Replica"
+    def: "one complete running copy of the server and model."
+    example: "18 replicas for 120 people."
+  - term: "Request"
+    def: "one message sent to the model for an answer."
+    example: "95 of 100 requests under 3,000 tokens."
+  - term: "Server"
+    def: "a program that waits for requests and answers them."
+    example: "llama.cpp's `llama-server`."
+  - term: "Session"
+    def: "one conversation."
+    example: "an 8K session holds up to 8,192 tokens."
+  - term: "SGLang"
+    def: "a fast open-source server for NVIDIA GPUs that reuses shared prompt openings."
+    example: "its RadixAttention reuses shared openings; the field guide calls it strong at agents."
+  - term: "Slot"
+    def: "one seat on the server, a conversation it can serve at the same time."
+    example: "`--parallel 8` gives 8."
+  - term: "Smoke test"
+    def: "a quick run of everything to prove the setup works before real use."
+    example: "Day 1's `make smoke` also sends today's opening to the practice server."
+  - term: "Spend cap"
+    def: "a monthly limit on your Fireworks spending; at 100% Fireworks pauses the API."
+    example: "set on Day 1; today's paid run costs about $0.03."
+  - term: "Terminal"
+    def: "the window where you type commands."
+    example: "today uses two: one for llama.cpp, one for the scripts."
+  - term: "Token"
+    def: "a chunk of text, about three quarters of a word."
+    example: "1,000 tokens is roughly 750 words."
+  - term: "TTFT (time to first token)"
+    def: "how long until the first token (word piece) of the reply appears."
+    example: "740 ms for call 1, 36 ms for the rest in the lesson's sample."
+  - term: "Virtual environment (venv)"
+    def: "a private folder of Python packages for one project, turned on with `source .venv/bin/activate`."
+    example: "`mlx_lm.generate` works only with it turned on."
+  - term: "vLLM"
+    def: "an open-source engine for NVIDIA GPUs built for many users at once."
+    example: "it uses PagedAttention."
+  # First defined on Day 4, whose glossary starts every definition with a capital letter (reported to the lead)
+  - term: "Workload"
+    def: "one kind of job a customer runs."
+    example: "an agent that resends one long opening, today's workload."
+  # First defined on Day 10: text copied verbatim so the definitions agree
+  - term: "Model id"
+    def: "the exact name a program uses to pick a model on Fireworks."
+    example: "`accounts/fireworks/models/gpt-oss-120b`, the default in Day 5's script."
+  - term: "Sizing memo"
+    def: "a short document recommending how to run a customer's workload: how many copies, which option, what it costs, with the maths shown."
+    example: "Day 10's `results/SIZING_MEMO.md` quotes Day 5's speed-up."
