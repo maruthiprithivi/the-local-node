@@ -626,8 +626,8 @@ export function stepAfterReadme(step, model, ctx = {}) {
   if (say?.line || step.fields?.length) {
     out.push('## Explain what you learned');
     out.push(raw('<div class="kc-card kc-say kc not-content">',
-      say?.ask && `<p class="kc-ask"><span class="kc-label">When they ask</span> <em>${md(say.ask, opts)}</em></p>`,
-      say?.line && `<p class="kc-label kc-warm">You say</p><blockquote class="kc-you-say"><p>${md(say.line, opts)}</p></blockquote>`,
+      say?.ask && `<p class="kc-ask"><span class="kc-label">Question</span> <em>${md(say.ask, opts)}</em></p>`,
+      say?.line && `<p class="kc-label kc-warm">One clear answer</p><blockquote class="kc-you-say"><p>${md(say.line, opts)}</p></blockquote>`,
       say?.means?.length && raw('<div class="kc-means">', '<p class="kc-label">What this means</p>', '<ul>',
         say.means.map((m) => `<li><strong>“${md(m.phrase, opts)}”</strong>: ${md(m.meaning, opts)}</li>`), '</ul>', '</div>'),
       fieldsBlock(step.fields, day, opts),
@@ -973,8 +973,8 @@ export function wrapupPage(day, model) {
       '<p class="kc-intro">Under 20 seconds each. Record yourself once and listen back.</p>',
       sayers.map((s) => raw('<article class="kc-card kc-say kc-say-card">',
         `<div class="kc-say-top"><p class="kc-label kc-accent">Step ${s.n} · ${esc(s.title)}</p><label class="kc-check-box kc-said"><input type="checkbox" data-kit-said="${esc(s.id)}"><span>Said it</span></label></div>`,
-        s.say.ask && `<p class="kc-ask"><span class="kc-label">When they ask</span> <em>${md(s.say.ask, opts)}</em></p>`,
-        `<p class="kc-label kc-warm">You say</p><blockquote class="kc-you-say"><p>${md(s.say.line, opts)}</p></blockquote>`,
+        s.say.ask && `<p class="kc-ask"><span class="kc-label">Question</span> <em>${md(s.say.ask, opts)}</em></p>`,
+        `<p class="kc-label kc-warm">One clear answer</p><blockquote class="kc-you-say"><p>${md(s.say.line, opts)}</p></blockquote>`,
         s.say.means?.length && raw('<details class="kc-means-more">', '<summary>What this means</summary>', '<ul>',
           s.say.means.map((m) => `<li><strong>“${md(m.phrase, opts)}”</strong>: ${md(m.meaning, opts)}</li>`), '</ul>', '</details>'),
         '</article>')),
