@@ -1,6 +1,6 @@
 // Build-time content sync: reads the kit (read-only) and the course data (course/course.yaml, the day
 // content files, chapters.txt) and writes the Starlight pages, the sidebar, the course spine for kit.js,
-// the code zip and the lab book copies the web server publishes. Run from 05-web before `astro build`.
+// the code zip and the lab book copies the web server publishes. Run from website/ai-field-engineer before `astro build`.
 //   node scripts/sync.mjs            (KIT_DIR=/path/to/kit to override, STRICT=1 fails on warnings)
 // The guided course (docs/course-spec.md): scripts/course.mjs builds the model, scripts/course-pages.mjs
 // turns it into page bodies, and this file decides where each page goes and what links to what.
@@ -13,7 +13,7 @@ import { loadCourse, validateCourse } from './course.mjs';
 import * as P from './course-pages.mjs';
 
 const WEB = path.resolve(import.meta.dirname, '..');
-const KIT = path.resolve(process.env.KIT_DIR ?? path.join(WEB, '..'));
+const KIT = path.resolve(process.env.KIT_DIR ?? path.join(WEB, '../../tracks/ai-field-engineer'));
 const DOCS = path.join(WEB, 'src/content/docs');
 const GEN = path.join(WEB, 'src/generated');
 const LABBOOK_OUT = path.join(WEB, 'public/lab-book');

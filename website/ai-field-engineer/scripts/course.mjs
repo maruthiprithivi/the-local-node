@@ -931,7 +931,7 @@ function cli(argv) {
   }
   const day = arg('--day');
   if (day != null && !/^\d+$/.test(day)) { console.error(`--day needs a day number, got "${day}"`); return 2; }
-  const KIT = path.resolve(process.env.KIT_DIR ?? path.join(HERE_WEB, '..'));
+  const KIT = path.resolve(process.env.KIT_DIR ?? path.join(HERE_WEB, '../../tracks/ai-field-engineer'));
   const ctx = { ...kitContext(KIT, HERE_WEB), day: day == null ? undefined : Number(day), contentDir: arg('--content') };
   const model = loadCourse(ctx);
   const warnings = [];

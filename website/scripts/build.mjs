@@ -3,8 +3,9 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..');
-const track = path.join(root, 'tracks/ai-field-engineer');
-const web = path.join(track, '05-web');
+const repo = path.resolve(root, '..');
+const track = path.join(repo, 'tracks/ai-field-engineer');
+const web = path.join(root, 'ai-field-engineer');
 const output = path.join(root, 'dist');
 const dest = path.join(output, 'ai-field-engineer');
 const prefix = '/ai-field-engineer';

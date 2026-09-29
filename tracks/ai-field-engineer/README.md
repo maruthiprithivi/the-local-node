@@ -10,21 +10,20 @@ ai-field-engineer/
 ├── 02-lab-book/      two standalone visual guides (.html)
 ├── 03-labs/          runnable Python and shell labs, lessons 00–18
 ├── 04-video-source/  source for rendering the explainers
-├── 05-web/           website source and 12 days of lesson content
 └── assets/posters/   still images for this track's videos
 ```
 
 The video posters belong to this track. The publication banner concepts in the repository's [shared brand directory](https://github.com/maruthiprithivi/the-local-node/tree/main/assets/brand) are for future tracks, GitHub, and YouTube too.
 
-## Follow the course locally
+## Follow the labs locally
 
-From the repository root, run `npm ci`, then `npm run dev` to build and serve the site locally. To work through a lab, start in [`03-labs/README.md`](03-labs/README.md); each lesson folder has its own instructions and expected result. The source lessons for the website are in `05-web/course/content/`.
+Start in [`03-labs/README.md`](03-labs/README.md); each lesson folder has its own instructions and expected result. The [guided website](https://thelocalnode.dev/ai-field-engineer/) takes you through the labs in order.
 
 Some labs use paid cloud services. The course marks those steps and starts with spending controls. A local practice server is included for the first exercises. Keep API keys in your own environment; `.env.example` contains placeholders only.
 
 ## Improve a lesson
 
-Edit the matching YAML file in `05-web/course/content/` or the lab README and code in `03-labs/lessons/`. Run `npm run build` from the repository root to regenerate the site and check its local links. To update a video poster, install ffmpeg and run `npm run posters` from the root.
+Edit the lab README and code in `03-labs/lessons/`. The guided lesson text and website build instructions live in the repository's [website directory](https://github.com/maruthiprithivi/the-local-node/tree/main/website).
 
 ## The course, in order
 

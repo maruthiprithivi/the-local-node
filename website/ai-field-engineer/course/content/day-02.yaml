@@ -1,5 +1,4 @@
 # Day 2 · Local stack on the Mac. Plain-language content for the guided course.
-# Schema: 05-web/docs/course-spec.md section 3. Style: plain/style.md.
 # Every number traces to a kit file (paths relative to the kit root):
 #   L02   03-labs/lessons/02-three-local-servers/README.md (+ serve_llamacpp.sh, serve_mlx.sh, compare_backends.sh)
 #   L00   03-labs/lessons/00-setup/README.md line 23 (4.9 GB download), line 39 (273 GB/s, about 56 tok/s)

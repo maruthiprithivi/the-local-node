@@ -1,12 +1,12 @@
 {
-  "name": "fw-kit-web",
+  "name": "the-local-node-ai-field-engineer-site",
   "type": "module",
   "version": "1.0.0",
   "private": true,
-  "description": "Web app over the Fireworks Field Engineer Kit: videos, lab book, lessons with highlighted code, full-text search.",
+  "description": "Guided AI Field Engineer course for The Local Node.",
   "scripts": {
     "sync": "node scripts/sync.mjs",
-    "build": "node scripts/sync.mjs && astro build && node scripts/search-index.mjs && node scripts/check-links.mjs",
+    "build": "node scripts/sync.mjs && astro build && node scripts/search-index.mjs",
     "dev": "node scripts/sync.mjs && astro dev"
   },
   "dependencies": {

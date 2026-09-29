@@ -3,10 +3,11 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..');
-const track = path.join(root, 'tracks/ai-field-engineer');
+const repo = path.resolve(root, '..');
+const track = path.join(repo, 'tracks/ai-field-engineer');
 const out = path.join(track, 'assets/posters');
 fs.mkdirSync(out, { recursive: true });
-const times = new Map(fs.readFileSync(path.join(track, '05-web/posters.txt'), 'utf8')
+const times = new Map(fs.readFileSync(path.join(root, 'ai-field-engineer/posters.txt'), 'utf8')
   .split('\n').filter(line => line.trim() && !line.startsWith('#'))
   .map(line => line.trim().split(/\s+/)));
 for (const file of fs.readdirSync(path.join(track, '01-videos')).filter(f => f.endsWith('.mp4'))) {
