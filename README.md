@@ -1,6 +1,16 @@
 # The Local Node
 
-Open learning materials for people who build and explain technology. Each track lives in `tracks/` so future subjects can be added without changing the first one.
+Open learning materials for people who build and explain technology. Each subject has its own directory under `tracks/`. Publication-wide artwork lives separately in `assets/brand/`.
+
+```text
+the-local-node/
+├── tracks/
+│   └── ai-field-engineer/       lessons, labs, videos, and video posters
+├── assets/
+│   └── brand/                   shared artwork and generation prompts
+├── scripts/                     site build tools
+└── wrangler.jsonc               Cloudflare deployment settings
+```
 
 ## Learning tracks
 
@@ -18,7 +28,7 @@ npm run build
 npm run dev
 ```
 
-The build writes `dist/`, with one directory per learning track. `npm run deploy` publishes it with Cloudflare Wrangler when your Cloudflare account is authenticated. The AI Field Engineer track uses Astro Starlight and builds its pages from the Markdown, YAML, lab code, and videos in its directory.
+The build writes `dist/`, with one directory per learning track. `npm run deploy` publishes it with Cloudflare Wrangler when your Cloudflare account is authenticated. The AI Field Engineer track uses Astro Starlight and builds its pages from the YAML lessons, lab code, and videos in [`tracks/ai-field-engineer/`](tracks/ai-field-engineer/).
 
 ## Extend the site
 

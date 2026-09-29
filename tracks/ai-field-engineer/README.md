@@ -1,51 +1,30 @@
-# AI Engineering Field Kit: start here
+# AI Field Engineer
 
-> **Got this as 11 parts (`fw-kit-part01-of-11.zip` … `part11`)?** Put them in one folder and
-> unzip them all into the same place. They fill in one `fireworks-field-engineer-kit/` folder:
-> ```bash
-> cd ~/Downloads && for f in fw-kit-part*-of-11.zip; do unzip -oq "$f"; done
-> ```
-> (Double-clicking each one in Finder makes separate "… 2", "… 3" folders, so use the command above.)
+[Start the guided course](https://thelocalnode.dev/ai-field-engineer/) or use the source in this directory. The course teaches model serving, measurement, evaluation, and customer recommendations through 12 guided days. Fireworks is one example platform used in the labs.
 
-Hands-on material for learning AI engineering and field engineering, in one folder.
-It has three parts that work together, plus the source for the videos:
+## Where things are
 
-```
-fireworks-field-engineer-kit/
-├── 01-videos/        18 narrated explainers, numbered 01–18 (watch)
-├── 02-lab-book/      the lab book web page + the earlier field guide (read)
-├── 03-labs/          the code: lessons 00–18, one folder per lesson (run)
-└── 04-video-source/  Remotion + Kokoro project that made the videos (optional)
+```text
+ai-field-engineer/
+├── 01-videos/        18 narrated explainers (.mp4)
+├── 02-lab-book/      two standalone visual guides (.html)
+├── 03-labs/          runnable Python and shell labs, lessons 00–18
+├── 04-video-source/  source for rendering the explainers
+├── 05-web/           website source and 12 days of lesson content
+└── assets/posters/   still images for this track's videos
 ```
 
-**The loop for every topic:** watch the video (3–4 min) → read the matching lab card in the
-lab book → `cd 03-labs/lessons/NN-…`, read its README, run the scripts. Your numbers land in
-`03-labs/results/`, and lesson 15 turns them into a customer sizing memo.
+The video posters belong to this track. The publication banner concepts in the repository's [shared brand directory](https://github.com/maruthiprithivi/the-local-node/tree/main/assets/brand) are for future tracks, GitHub, and YouTube too.
 
----
+## Follow the course locally
 
-## Get started in 5 steps (about 15 minutes, nothing to download)
+From the repository root, run `npm ci`, then `npm run dev` to build and serve the site locally. To work through a lab, start in [`03-labs/README.md`](03-labs/README.md); each lesson folder has its own instructions and expected result. The source lessons for the website are in `05-web/course/content/`.
 
-1. **Open the lab book.** Double-click `02-lab-book/field-engineer-lab-book.html`. Keep it on the left of your screen.
-2. **Watch** `01-videos/01-inference-101.mp4`.
-3. **Set up the code** in a terminal on the right:
-   ```bash
-   cd fireworks-field-engineer-kit/03-labs
-   python3 -m venv .venv && source .venv/bin/activate
-   pip install -r requirements.txt && pip install -e .
-   cp .env.example .env
-   ```
-4. **Check it all works offline**, using a built-in fake model server:
-   ```bash
-   make mock &          # fake LLM server on :9000
-   make smoke           # runs every lesson end to end, ~2 min, should end "✓ smoke test passed"
-   ```
-5. **Start lesson 00:** `bash lessons/00-setup/setup_mac.sh` installs Ollama, llama.cpp and MLX. Then follow the table below.
+Some labs use paid cloud services. The course marks those steps and starts with spending controls. A local practice server is included for the first exercises. Keep API keys in your own environment; `.env.example` contains placeholders only.
 
-Fireworks costs money only in the lessons marked **$**. Run `make fw-check` after each one
-to confirm nothing is still billing.
+## Improve a lesson
 
----
+Edit the matching YAML file in `05-web/course/content/` or the lab README and code in `03-labs/lessons/`. Run `npm run build` from the repository root to regenerate the site and check its local links. To update a video poster, install ffmpeg and run `npm run posters` from the root.
 
 ## The course, in order
 
@@ -128,23 +107,6 @@ Total ≈ 57 minutes. The subtitles are burned in.
 
 Every lesson folder has a `README.md` with the same parts: what and why, the code to read first,
 commands to run, expected output, self-check questions and a short explanation of the result.
-
-## What's in 02-lab-book
-
-- `field-engineer-lab-book.html` is the main companion page. It covers the role, what Fireworks sells, spend control, all lab cards (F1–F7, L1–L9, T1–T3, each naming its lesson folder), calculators, your handbook mapped to practice, the 12-day plan and talk tracks. It works offline; a hosted copy is also in your Claude artifacts.
-- `inference-field-guide.html` is the earlier visual field guide, with interactive explainers and the frameworks chapter.
-
-## What's in 04-video-source (optional)
-
-This is the Remotion project that rendered the videos. Use it to change a script, the voice or
-the pacing. On your Mac:
-
-```bash
-cd 04-video-source && npm install && npx remotion browser ensure
-pip install mlx-audio misaki soundfile numpy
-python scripts/tts_mlx.py                 # regenerate narration with Kokoro on MLX
-npm run render                            # → out/<id>.mp4
-```
 
 ## If something doesn't work
 

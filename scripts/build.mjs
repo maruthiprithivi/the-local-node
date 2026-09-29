@@ -26,7 +26,7 @@ for (const file of fs.readdirSync(path.join(track, '01-videos')).filter(f => f.e
   const source = path.join(track, '01-videos', file);
   if (fs.statSync(source).size > 25 * 1024 * 1024) throw new Error(`${file} exceeds Cloudflare's 25 MiB asset limit`);
   fs.copyFileSync(source, path.join(dest, 'media/videos', file));
-  const poster = path.join(root, 'assets/posters', file.replace(/\.mp4$/, '.jpg'));
+  const poster = path.join(track, 'assets/posters', file.replace(/\.mp4$/, '.jpg'));
   if (!fs.existsSync(poster)) throw new Error(`Missing poster ${poster}; run npm run posters`);
   fs.copyFileSync(poster, path.join(dest, 'media/posters', path.basename(poster)));
 }

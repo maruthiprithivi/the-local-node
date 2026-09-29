@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..');
 const track = path.join(root, 'tracks/ai-field-engineer');
-const out = path.join(root, 'assets/posters');
+const out = path.join(track, 'assets/posters');
 fs.mkdirSync(out, { recursive: true });
 const times = new Map(fs.readFileSync(path.join(track, '05-web/posters.txt'), 'utf8')
   .split('\n').filter(line => line.trim() && !line.startsWith('#'))
