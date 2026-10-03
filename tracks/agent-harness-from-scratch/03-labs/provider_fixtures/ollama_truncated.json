@@ -1,0 +1,7 @@
+{
+  "message": {"role": "assistant", "content": "incomplete proposal", "tool_calls": [
+    {"function": {"name": "restart_service", "arguments": {"service": "toy-service"}}}
+  ]},
+  "done": true,
+  "done_reason": "length"
+}

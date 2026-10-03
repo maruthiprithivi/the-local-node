@@ -33,6 +33,10 @@ class RunResult:
     usage: dict = field(default_factory=dict)
 
 
+class ContextLimitError(ValueError):
+    """The current goal and its complete exchange cannot fit without data loss."""
+
+
 def build_context(history, max_chars=8192):
     """Keep instructions plus complete assistant/tool groups; mark lost evidence.
 
@@ -40,10 +44,10 @@ def build_context(history, max_chars=8192):
     intact. We drop complete oldest turns rather than orphaning tool results.
     """
     if max_chars < 256:
-        raise ValueError("context budget too small")
+        raise ContextLimitError("context budget too small")
     system = [dict(m) for m in history if m["role"] == "system"]
     if len(canonical(system)) > max_chars // 2:
-        raise ValueError("essential constraints exceed context budget")
+        raise ContextLimitError("essential constraints exceed context budget")
     groups = []
     for message in history:
         if message["role"] == "system":
@@ -51,18 +55,20 @@ def build_context(history, max_chars=8192):
         if message["role"] == "user" or not groups:
             groups.append([])
         groups[-1].append(dict(message))
-    retained = []
-    for group in reversed(groups):
-        if len(canonical(system + group + retained)) > max_chars - 120:
-            break
-        retained = group + retained
-    dropped = sum(len(g) for g in groups) - len(retained)
-    if dropped:
-        system.append({"role": "system", "content": f"[TRUNCATED: {dropped} old messages omitted; missing evidence must not be invented.]"})
-    context = system + retained
-    if len(canonical(context)) > max_chars:
-        raise ValueError("context exceeds budget")
-    return context
+    retained = [message for group in groups for message in group]
+    if len(canonical(system + retained)) <= max_chars:
+        return system + retained
+    dropped = 0
+    # Only complete OLD turns may be removed. Never remove the current user goal
+    # or split its assistant/tool exchange to make a request appear to fit.
+    for group in groups[:-1]:
+        dropped += len(group)
+        retained = retained[len(group):]
+        marker = {"role": "system", "content": f"[TRUNCATED: {dropped} old messages omitted; missing evidence must not be invented.]"}
+        context = system + [marker] + retained
+        if len(canonical(context)) <= max_chars:
+            return context
+    raise ContextLimitError("current turn and complete tool exchange exceed context budget")
 
 
 def retry_call(operation, *, retryable, attempts=3, clock=time.monotonic, sleep=time.sleep, cancelled=lambda: False, deadline=None, jitter=lambda: 0):
@@ -140,6 +146,8 @@ class Engine:
             try:
                 context = build_context(messages, max_chars=max(8192, self.limits.input_chars * 2))
                 reply = self.provider.complete(context, [t.spec() for t in self.registry.tools.values()])
+            except ContextLimitError:
+                return stop("context_limit")
             except InterruptedError:
                 return stop("cancelled")
             except TimeoutError:

@@ -115,3 +115,7 @@ Re-run checkpoint 23 to return to a known reference demonstration without
 changing your files. Preserve your own branch/diff before experimenting.
 
 Create a matrix table for every critical transition and add process-isolated hung-tool experiments only in a separately authorized disposable environment.
+
+## Reviewed boundary clarification
+
+Inject malformed duplicate replies through `faults.UncheckedFixtureProvider` only when testing the controller's `invalid_call_id` guard. Separately assert that normal `FakeProvider` rejects the same reply with category `duplicate_call_id`. Checkpoints distinguish these guards; neither path may execute a handler.

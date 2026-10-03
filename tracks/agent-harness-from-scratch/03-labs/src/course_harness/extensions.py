@@ -206,6 +206,17 @@ class MentionReceiver:
             comment = self.client.comment(payload["comment_id"])
             if (not self.client.permitted(payload["actor"]) or comment["actor"] != payload["actor"] or comment["revision"] != payload["revision"] or comment["bot"] or task["cancelled"]):
                 raise PermissionError("permission/comment changed")
+            if payload["base"] != self.client.head:
+                raise ValueError("stale base")
+            if payload["command"] == "plan":
+                world = FixtureWorld()
+                script = [Reply(calls=(ToolCall("plan-read", "read_file", {"path": "calculator.py"}),)), Reply("Inspect the calculator addition; propose a narrow patch and verify the resulting state before requesting publication approval.")]
+                result = Engine(FakeProvider(script), scenario_tools(world), Policy(allowed=frozenset({"read_file"}))).run("Plan the classroom calculator fix using read-only evidence.")
+                if result.stop_reason != "final":
+                    raise ValueError("read-only planning failed")
+                receipt = {"kind": "plan", "base": payload["base"], "path": "calculator.py", "observed": world.files["calculator.py"], "text": result.text}
+                self.queue.complete(task["id"], "mention-worker", receipt)
+                return {"task": task, "plan": receipt, "completed": True, "trace": result.trace + [{"event": "plan_completed"}]}
             branch = self.client.prepare(task["dedup_key"], base=payload["base"])
         except (PermissionError, ValueError):
             self.queue.reject(task["id"], "mention-worker", reason="current authorization or precondition failed")

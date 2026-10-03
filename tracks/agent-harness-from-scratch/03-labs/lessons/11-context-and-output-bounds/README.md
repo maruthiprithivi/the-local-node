@@ -104,3 +104,7 @@ Use the course rubric: needs guidance means you can follow the solution; indepen
 Compare two deterministic selection strategies against an outcome check.
 
 Keep this extension small and reversible. Commit your reviewed exercise diff on your learning branch before moving on. There is no capstone or separate final project.
+
+## Reviewed boundary clarification
+
+Current-turn retention: prune complete old turns only. Keep the current user goal and its entire recent tool exchange together. If they cannot fit alongside trusted constraints, the controller stops with `context_limit` before calling the provider. It must not silently send only a truncation marker.

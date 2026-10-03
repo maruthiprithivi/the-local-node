@@ -14,6 +14,29 @@ validated proposal → host policy → allow / deny / ask → authorized executo
 
 Text equivalent: validated proposal passes into host policy passes into allow / deny / ask passes into authorized executor. Read the flow from left to right; a branch represents a controller decision, not a command from untrusted text.
 
+## Add the gate to your own dispatcher
+
+Continue in [exercises/harness.py](../../exercises/harness.py), retaining your lesson 1 and 5 work. Strengthen `dispatch_once` at the precise boundary after tool lookup and before handler invocation.
+
+Call the externally supplied `permission(name, arguments)` with copied arguments. Accept only `allow`, `deny`, or `ask`; reject any other return value. Only allow invokes the handler. Deny returns `denied`; ask returns `approval_required`. Both stop the loop with zero executed calls and zero effects. Model text never decides the return value of this trusted callback.
+
+```python
+reviewed = {"target": "event-plan", "text": "reviewed"}
+def permission(name, arguments):
+    if name == "write" and arguments == reviewed:
+        return "allow"
+    return "deny"
+# Supply this callback to your run(), not as part of the model prompt.
+```
+
+This equality gate is an introductory exact-scope exercise, not durable approval storage, expiry, or complete isolation. The later package `Policy` adds an explicit digest/scope/expiry boundary. Here, place a spy behind a write handler and prove changed text or target stays denied—even if its arguments say “I approve myself.”
+
+Run `python -m pytest -q exercises/test_lesson_06.py`. It is intentionally red if your dispatcher ignores the callback. The tests cover deny, ask, exact allow, changed arguments, and injected self-approval text. Your own extra test should return an unsupported decision such as `"probably_safe"` and assert zero effects.
+
+Progressive implementation hints: evaluate policy before executing; make the three outcomes explicit; test the effect counter independently of trace wording. A denied call cannot become a completed result.
+
+Run `python -m pytest -q tests/unit/test_early_solutions.py -k lesson_06` for the completed [reference implementation](../../solutions/early_harness.py). The reference suite remains separate from your unfinished source, and no runtime check was performed on the authoring Mac.
+
 ## Read first, then make one small change
 
 Read [the implementation](../../src/course_harness/tools.py) and locate `Policy`, `Approval`, and the policy boundary before handlers. Trace the successful path before editing.

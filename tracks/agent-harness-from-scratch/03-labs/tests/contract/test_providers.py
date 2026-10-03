@@ -203,3 +203,11 @@ def test_deepseek_preserves_native_reasoning_history():
     reply = provider.complete(MESSAGES)
     provider.complete(MESSAGES + [assistant_message(reply)])
     assert transport.requests[1]["payload"]["messages"][1]["reasoning_content"] == "synthetic-native-content"
+
+
+def test_ollama_synchronous_length_stop_never_returns_proposed_calls():
+    raw = fixture("ollama_truncated")
+    provider = OllamaProvider("fixture-model", transport=FixtureTransport([raw]))
+    with pytest.raises(ProviderError) as failure:
+        provider.complete(MESSAGES)
+    assert failure.value.category == "truncated"

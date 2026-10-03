@@ -1,7 +1,8 @@
 import pytest
 
-from course_harness.core import Engine, Limits, build_context, retry_call
+from course_harness.core import Engine, Limits, ContextLimitError, build_context, retry_call
 from course_harness.providers import FakeProvider, Reply, ToolCall
+from course_harness.faults import UncheckedFixtureProvider
 from course_harness.tools import FixtureWorld, Policy, Registry, Tool, object_schema, scenario_tools, validate, Workspace, run_permitted
 
 
@@ -43,7 +44,8 @@ def test_lesson_05_matched_results_and_budget():
     assert next(m for m in result.messages if m["role"] == "tool")["tool_call_id"] == "a"
     e, _ = engine([Reply(calls=(ToolCall(str(i), "observe_health", {}),)) for i in range(3)], limits=Limits(steps=2))
     assert e.run("loop").stop_reason == "step_limit"
-    e, _ = engine([Reply(calls=(ToolCall("a", "observe_health", {}), ToolCall("a", "observe_health", {})))])
+    e, _ = engine([])
+    e.provider = UncheckedFixtureProvider([Reply(calls=(ToolCall("a", "observe_health", {}), ToolCall("a", "observe_health", {})))])
     assert e.run("duplicates").stop_reason == "invalid_call_id"
 
 
@@ -123,6 +125,29 @@ def test_lesson_11_context_retains_constraints_and_labels_loss():
     assert "TRUNCATED" in context[1]["content"]
     assert context[-1]["content"] == "new"
     assert len(history[1]["content"]) == 9000
+
+
+def test_lesson_11_oversized_current_exchange_fails_without_losing_goal():
+    history = [{"role": "system", "content": "retain policy"}, {"role": "user", "content": "inspect CURRENT task"}, {"role": "assistant", "content": "", "tool_calls": [{"id": "a", "type": "function", "function": {"name": "observe", "arguments": "{}"}}]}, {"role": "tool", "tool_call_id": "a", "content": "x" * 1000}]
+    with pytest.raises(ContextLimitError, match="current turn"):
+        build_context(history, 512)
+    assert history[1]["content"] == "inspect CURRENT task"
+    assert history[-1]["tool_call_id"] == "a"
+
+
+def test_lesson_11_current_exchange_preserved_while_old_turn_pruned():
+    history = [{"role": "system", "content": "retain policy"}, {"role": "user", "content": "old " + "x" * 1000}, {"role": "assistant", "content": "old answer"}, {"role": "user", "content": "CURRENT goal"}, {"role": "assistant", "content": "", "tool_calls": [{"id": "a", "type": "function", "function": {"name": "observe", "arguments": "{}"}}]}, {"role": "tool", "tool_call_id": "a", "content": "bounded observation"}]
+    context = build_context(history, 700)
+    assert context[-3:] == history[-3:]
+    assert context[0] == history[0]
+    assert "TRUNCATED" in context[1]["content"]
+
+
+def test_lesson_11_context_limit_stops_before_provider_call():
+    e, _ = engine([Reply("must not call")])
+    oversized_history = [{"role": "system", "content": "x" * 5000}]
+    assert e.run("CURRENT goal", oversized_history).stop_reason == "context_limit"
+    assert e.provider.requests == []
 
 
 def test_lesson_12_retry_cancel_and_terminal_failure():

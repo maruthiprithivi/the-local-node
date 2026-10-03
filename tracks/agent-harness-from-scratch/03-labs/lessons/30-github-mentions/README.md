@@ -111,3 +111,7 @@ Re-run checkpoint 30 to inspect the reference mechanism without overwriting
 your learner branch. Preserve your diff before experimenting.
 
 Study the actual Claude action and security guide linked in advanced-extensions.md. A separately reviewed live setup needs real auth, least-privilege grants, exact base trust and bounded spending. Inactive templates are examples only.
+
+## Reviewed boundary clarification
+
+The `plan` command performs a read-only controller run and stores a completed plan receipt. It creates no branch or PR and releases the worker immediately. Only `fix` prepares a disposable branch and waits for exact publication approval. Exercise a plan followed by a fix to prove the queue remains available.

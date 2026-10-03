@@ -128,6 +128,22 @@ def test_lesson_30_revoked_before_claim_is_terminal(mention):
     assert receiver.queue.task(admitted["task_id"])["status"] == "dead_letter"
 
 
+def test_lesson_30_plan_is_read_only_terminal_then_fix_can_claim(mention):
+    receiver, client, event = mention
+    client.comments[1]["body"] = "@course-harness plan"
+    planned = send(receiver, event)
+    result = receiver.prepare_next()
+    assert result["completed"] and result["plan"]["kind"] == "plan"
+    assert receiver.queue.task(planned["task_id"])["status"] == "completed"
+    assert not client.branches and not client.prs and not client.trace
+    assert "digest" not in result and "branch" not in result
+    client.comments[2] = dict(client.comments[1], body="@course-harness fix")
+    fixed = send(receiver, event | {"comment_id": 2})
+    prepared = receiver.prepare_next()
+    assert prepared["task"]["id"] == fixed["task_id"]
+    assert len(client.branches) == 1 and not client.prs
+
+
 @pytest.mark.parametrize("lesson", [29, 30], ids=["lesson_29", "lesson_30"])
 @pytest.mark.parametrize("scenario", ["coding", "sre", "automation"])
 def test_extension_checkpoints(lesson, scenario):

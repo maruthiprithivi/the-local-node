@@ -14,6 +14,27 @@ fixture prompt → FakeProvider → Reply → controller termination
 
 Text equivalent: fixture prompt passes into FakeProvider passes into Reply passes into controller termination. Read the flow from left to right; a branch represents a controller decision, not a command from untrusted text.
 
+## Build this boundary yourself before reading the completed package
+
+Start in [exercises/harness.py](../../exercises/harness.py), not the finished provider module. This one learner-owned file continues through lessons 5 and 6. It imports only standard-library helpers and contains real `NotImplementedError` TODOs.
+
+Implement `make_message`, `validate_reply`, and `ScriptedProvider.complete` in that order. A message has `role` and string `content`; allow system/user/assistant/tool roles and at most 1024 characters. A reply has exactly `text` and `call`. A final reply has `call=None`; a request has empty text and exactly one call dictionary with nonempty bounded `id`/`name` and JSON-object `arguments` of at most 512 UTF-8 bytes. Keep this small teaching contract distinct from the richer completed package types.
+
+```python
+# Your first target behavior, after implementing the TODOs:
+from exercises.harness import make_message, ScriptedProvider
+
+message = make_message("user", "inspect synthetic evidence")
+provider = ScriptedProvider([{"text": "fixture answer", "call": None}])
+assert provider.complete([message])["text"] == "fixture answer"
+```
+
+Run `python -m pytest -q exercises/test_lesson_01.py`. It is intentionally red at first; `NotImplementedError` is the starting evidence, not a repository regression. Implement a defensive copy so editing the original message cannot change a captured request. Malformed replies and exhausted scripts must raise useful `ValueError` failures.
+
+Progressive implementation hints: first return a validated message dictionary; then distinguish final versus request shape; finally capture a copied request and validate the next scripted reply. Catch `StopIteration` specifically to explain script exhaustion.
+
+The normal reference check is `python -m pytest -q tests/unit/test_early_solutions.py -k lesson_01`. It tests the separate completed [early_harness.py](../../solutions/early_harness.py), so it should pass independently of your unfinished starter. These commands await approved runtime validation; none were run on the authoring Mac. Add your own malformed-argument test before comparing the solution.
+
 ## Read first, then make one small change
 
 Read [the implementation](../../src/course_harness/providers.py) and locate `Reply`, `ToolCall`, and `FakeProvider`. Trace the successful path before editing.

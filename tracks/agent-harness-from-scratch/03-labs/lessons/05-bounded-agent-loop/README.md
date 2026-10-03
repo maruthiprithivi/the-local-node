@@ -14,6 +14,36 @@ model → validated tool request → tool result → model; controller budget gu
 
 Text equivalent: model passes into validated tool request passes into tool result passes into model; controller budget guards every edge. Read the flow from left to right; a branch represents a controller decision, not a command from untrusted text.
 
+## Construct one iteration, then add termination
+
+Continue editing the same [exercises/harness.py](../../exercises/harness.py) from lesson 1. Implement `dispatch_once` before `run`; do not import the finished `Engine` into your starter. The registry at this phase is simply an explicit dictionary mapping names to Python handlers.
+
+For `dispatch_once`: call the scripted provider; finish if its reply is final; otherwise look up the named handler, execute it on a copied argument dictionary, and append an assistant request and tool result. Encode the call ID with the result so evidence cannot be confused. Return `status`, `text`, `used_calls`, and a small readable event list.
+
+For `run`: start a fresh message history, validate positive integer ceilings, check them before another dispatch, count every provider invocation as a step, and count each executed handler as a call. In this deliberately small starter, reaching the call ceiling stops before another model call, even if that next reply might be final. This conservative rule differs from the richer package and must be explicit.
+
+```python
+from exercises.harness import ScriptedProvider, run
+provider = ScriptedProvider([
+    {"text": "", "call": {"id": "c1", "name": "count", "arguments": {}}},
+    {"text": "counted fixture", "call": None},
+])
+result = run(provider, "count", {"count": lambda args: {"count": 2}},
+             permission=lambda name, args: "allow", max_steps=3, max_calls=2)
+assert result["stop_reason"] == "final"
+assert result["steps"] == 2 and result["calls"] == 1
+```
+
+The explicit `permission` callback is the seam you strengthen in lesson 6; here it permits only the pure handlers you supplied. Implementing that seam must not grant shell/file access.
+
+Run `python -m pytest -q exercises/test_lesson_05.py`; it starts red until your lesson 1 and 5 implementations exist. Expected green behavior includes linked results, two-step success, bounded looping, call-limit stop before an extra effect, and unknown-tool rejection. Use handler spies and captured provider requests to demonstrate no extra work.
+
+Progressive implementation hints: first complete a final-only dispatch; then one named call with a matched result; finally wrap it in a loop whose checks occur before work. Keep loops out of the provider.
+
+Run `python -m pytest -q tests/unit/test_early_solutions.py -k lesson_05` for the completed reference contract. Compare [the separate implementation](../../solutions/early_harness.py) after attempting your own change. Neither command was executed on the authoring Mac.
+
+In the completed package, default `FakeProvider` rejects duplicate IDs before the engine, giving `duplicate_call_id` and an engine `provider_error` stop. An explicitly unsafe `faults.UncheckedFixtureProvider` is only a synthetic test double for probing the engine's independent `invalid_call_id` defense. The small learner starter permits one call per reply and does not yet deduplicate IDs across turns; add that as a labeled extension, never silently claim it already does.
+
 ## Read first, then make one small change
 
 Read [the implementation](../../src/course_harness/core.py) and locate `Engine.run`, `Limits`, and `RunResult`. Trace the successful path before editing.

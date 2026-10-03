@@ -69,6 +69,27 @@ allow disk for existing course media, npm dependencies and temporary fixtures.
 Expected validation session is under one hour, subject to dependency downloads.
 No worker/allocation or spend has been approved by these materials.
 
+The parent separately obtained approval for one bounded GCP validation session
+(Singapore Spot, at most one hour and US$2). Its sole provisioner is handling
+authentication; this document does not authorize additional allocation or spend.
+
+## Focused post-publication source repairs
+
+Separate provider/controller duplicate-ID guards now have targeted fixtures and
+negative-effect assertions. Context selection retains the complete current turn
+or stops explicitly before a provider call. Synchronous Ollama length exhaustion
+rejects truncated action proposals. Mention `plan` work completes read-only and
+releases its queue claim before a later `fix`. These repairs are source-authored;
+their regression tests remain unrun pending the approved worker.
+
+Lessons 01/05/06 now begin with one learner-owned `exercises/harness.py`, not the
+finished engine. Implement messages/reply validation, one dispatch, bounded loop
+and external policy gates in phases. `solutions/early_harness.py` is the completed
+reference. Default pytest includes `tests/unit/test_early_solutions.py`; explicit
+`python -m pytest -q exercises/test_lesson_01.py` (then 05/06) selects deliberately
+red starter tests until the learner implements each phase. Do not count those
+initial red tests as a reference-suite regression.
+
 From `03-labs/`, install the editable dev environment, then run
 `sh scripts/validate.sh`. From `website/agent-harness-from-scratch/`, run
 `npm ci --no-audit --no-fund` and `npm run build`. Then use the existing root

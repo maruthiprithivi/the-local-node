@@ -448,6 +448,8 @@ class OllamaProvider(_HTTPProvider):
         try:
             if raw.get("done") is not True:
                 raise ProviderError("truncated")
+            if raw.get("done_reason") == "length":
+                raise ProviderError("truncated")
             message = raw["message"]
             text = message.get("content", "")
             if not isinstance(text, str):

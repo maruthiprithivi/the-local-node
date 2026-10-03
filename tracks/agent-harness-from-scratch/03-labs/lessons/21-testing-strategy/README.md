@@ -115,3 +115,7 @@ Re-run checkpoint 21 to return to a known reference demonstration without
 changing your files. Preserve your own branch/diff before experimenting.
 
 Add Windows-specific subprocess cleanup coverage on a permitted Windows runner; document gaps rather than simulating proof from Linux.
+
+## Reviewed boundary clarification
+
+Test duplicate IDs at two boundaries: normal `FakeProvider` rejects the malformed reply with `ProviderError(category="duplicate_call_id")`; the controller consequently reports `provider_error`. The deliberate `faults.UncheckedFixtureProvider` bypasses only provider validation to exercise the independent controller `invalid_call_id` guard. Checkpoints assert both guards and zero tool effects. Never weaken the normal provider to make an engine test pass.
