@@ -1,0 +1,6 @@
+{
+  "message": {"role": "assistant", "content": "", "tool_calls": [
+    {"function": {"name": "read_status", "arguments": {"service": "demo"}}}
+  ]},
+  "done": true, "done_reason": "stop", "prompt_eval_count": 12, "eval_count": 7
+}

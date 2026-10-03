@@ -7,6 +7,7 @@ Open, practical learning materials for people who build and explain technology. 
 | Track | Start learning | Explore the source |
 | --- | --- | --- |
 | AI Field Engineer | [12-day guided course](https://thelocalnode.dev/ai-field-engineer/) | [Videos, guides, and runnable labs](tracks/ai-field-engineer/) |
+| Agent Harness from Scratch (in progress) | [Self-paced course map](tracks/agent-harness-from-scratch/02-lab-book/course-map.md) | [Python harness, lessons, and offline checks](tracks/agent-harness-from-scratch/) |
 
 The AI Field Engineer track starts with one model reply, then covers serving, benchmarking, evaluation, tuning, and customer recommendations. You can use the free local exercises before choosing any paid cloud labs.
 

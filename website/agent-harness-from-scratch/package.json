@@ -1,0 +1,21 @@
+{
+  "name": "the-local-node-agent-harness-site",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Framework-free Python harness course for The Local Node.",
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "build": "node scripts/sync.mjs && astro build",
+    "dev": "node scripts/sync.mjs && astro dev"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.42.4",
+    "@expressive-code/plugin-line-numbers": "^0.44.2",
+    "astro": "^7.3.5",
+    "fflate": "^0.8.3",
+    "pagefind": "^1.5.2",
+    "sharp": "^0.35.3",
+    "yaml": "^2.9.1"
+  }
+}

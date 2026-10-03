@@ -1,0 +1,5 @@
+data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"text":"Inspecting "}]}}]}
+
+data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"functionCall":{"id":"native-1","name":"read_status","args":{"service":"demo"}},"thoughtSignature":"synthetic-opaque-signature"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":7}}
+
+
