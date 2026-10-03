@@ -1,0 +1,6 @@
+[
+  {"key": "coding:toy-repository:revision-1", "payload": {"scenario": "coding", "event": "inspect", "dry_run": true}},
+  {"key": "sre:toy-service:health-1", "payload": {"scenario": "sre", "event": "health_observation", "dry_run": true}},
+  {"key": "automation:inbox:record-1", "payload": {"scenario": "automation", "event": "classify", "dry_run": true}},
+  {"key": "automation:inbox:record-1", "payload": {"scenario": "automation", "event": "classify", "dry_run": true}}
+]

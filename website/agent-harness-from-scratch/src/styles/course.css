@@ -1,0 +1,8 @@
+.harness-note,.harness-progress{padding:1rem;border:1px solid var(--sl-color-gray-4);border-radius:10px;margin-block:1rem;background:var(--kit-surface)}
+.harness-note strong{color:var(--sl-color-accent-high)}
+.harness-progress{display:flex;flex-wrap:wrap;align-items:center;gap:1rem}
+.harness-progress button{font:inherit;padding:.5rem .8rem;border-radius:6px;border:1px solid var(--sl-color-gray-4);background:var(--kit-surface);color:var(--sl-color-white);cursor:pointer}
+.harness-progress button:focus-visible{outline:2px solid var(--sl-color-accent);outline-offset:3px}
+.harness-progress p{margin:0}
+.harness-progress output{display:block;flex-basis:100%}
+.harness-navigation{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;margin-block:2rem}

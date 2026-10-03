@@ -1,0 +1,7 @@
+{
+  "candidates": [{"finishReason": "STOP", "content": {"role": "model", "parts": [
+    {"functionCall": {"id": "native-1", "name": "read_status", "args": {"service": "demo"}},
+     "thoughtSignature": "synthetic-opaque-signature"}
+  ]}}],
+  "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 7}
+}

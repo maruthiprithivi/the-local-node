@@ -1,0 +1,2 @@
+# Optional isolated example only. Never install for core/checkpoint tests.
+openai-agents==0.23.1

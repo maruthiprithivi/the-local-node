@@ -1,0 +1,21 @@
+# INACTIVE TEACHING TEMPLATE. Lives outside .github/workflows; no bot is enabled.
+# Read lesson30 and Claude's official security docs before choosing live setup.
+name: course-harness-mention-example
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+permissions:
+  contents: read
+jobs:
+  inspect-only:
+    if: github.event.comment.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      # Deliberately no checkout, secret, install, shell interpolation or model call.
+      # A real receiver must use authenticated Actions context, recheck actor/repo
+      # permissions/current commit, and admit to a durable bounded queue.
+      - name: Separate live setup decision required
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.notice('Inactive curriculum example: no live harness handler configured.');
