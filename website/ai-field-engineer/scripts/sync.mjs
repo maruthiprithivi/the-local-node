@@ -11,6 +11,7 @@ import vm from 'node:vm';
 import { zipSync } from 'fflate';
 import { loadCourse, validateCourse } from './course.mjs';
 import * as P from './course-pages.mjs';
+import { codeUrl, checkRepositoryLinks } from './repository.mjs';
 
 const WEB = path.resolve(import.meta.dirname, '..');
 const KIT = path.resolve(process.env.KIT_DIR ?? path.join(WEB, '../../tracks/ai-field-engineer'));
@@ -159,16 +160,6 @@ for (const f of fs.readdirSync(abs('01-videos')).filter((f) => f.endsWith('.mp4'
 }
 const videoByFile = new Map(videos.map((v) => [v.fileName, v]));
 
-// ---------- course days (which day each video / lesson belongs to) ----------
-const course = [
-  ...tableAfter(readme, '### Part 1:').map((r) => ({ part: 1, row: r })),
-  ...tableAfter(readme, '### Part 2:').map((r) => ({ part: 2, row: r })),
-].map(({ part, row: [day, watch, todo] }) => ({ part, day, watch, todo }));
-const part2Lessons = new Set(
-  course.filter((c) => c.part === 2).flatMap((c) => c.todo.match(/\d\d-[\w-]+/g) ?? [])
-    .filter((d) => !course.some((c) => c.part === 1 && c.todo.includes(d))),
-);
-
 // ---------- lab book ----------
 const LAB_BOOK = 'field-engineer-lab-book.html';
 const labbook = fs.readdirSync(abs('02-lab-book')).filter((f) => f.endsWith('.html')).sort().map((f) => ({
@@ -212,7 +203,7 @@ const lessons = fs.readdirSync(abs('03-labs/lessons'), { withFileTypes: true }).
   if (!lessonInfo.has(dir)) warn(`lesson ${dir} is not in the README lessons table`);
   return {
     dir, rel, md, title, label: shortLabel.get(dir) ?? title.split(':')[0], files, info: lessonInfo.get(dir),
-    slug: `lessons/${dir}`, route: `/lessons/${dir}/`, part: part2Lessons.has(dir) ? 2 : 1,
+    slug: `lessons/${dir}`, route: `/lessons/${dir}/`,
   };
 });
 const lessonByDir = new Map(lessons.map((l) => [l.dir, l]));
@@ -221,6 +212,7 @@ const lessonByNum = new Map(lessons.map((l) => [l.dir.slice(0, 2), l]));
 // ---------- the course (course/course.yaml + course/content/day-NN.yaml + chapters.txt) ----------
 // Content problems (docs/course-spec.md section 3) are warnings: STRICT builds fail on them.
 const model = loadCourse({ KIT, WEB, lessons, videos, narration, cardIds, readme, read });
+checkRepositoryLinks(model);
 {
   const notes = [];
   for (const p of validateCourse(model, { warnings: notes })) warn(`course: ${p}`);
@@ -473,6 +465,7 @@ function fileBlock(kitRel, name, open, weight) {
   return [
     `<details class="kit-file" id="${anchorFor(name)}" data-pagefind-weight="${weight}"${isOpen ? ' open' : ''}>`,
     `<summary><code>${esc(name)}</code> <span>${esc(note)}</span></summary>`,
+    `<p><a href="${esc(codeUrl(kitRel, 'blob'))}">View this file on GitHub</a></p>`,
     '',
     ...body,
     '',

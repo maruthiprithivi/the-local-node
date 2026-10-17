@@ -3,6 +3,13 @@
 > **Lab book:** Capstone section · Cost calculators · Talk tracks  **Watch:** video 8 `08-platform.mp4`
 > **Time:** 2 h  **Cost:** free
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 10 · Step 1: Sizing memo and 10-minute talk](https://thelocalnode.dev/ai-field-engineer/lessons/15-capstone/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 A Field Engineer is paid for the **recommendation**, not the benchmark. This lesson

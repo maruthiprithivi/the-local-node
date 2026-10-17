@@ -3,6 +3,13 @@
 > **Lab book:** Fireworks labs → **F1**  **Watch:** video 1 `01-inference-101.mp4`
 > **Time:** 30 min  **Cost:** free locally · about $0.02 on Fireworks
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 1 · Step 3: Measure TTFT and ITL](https://thelocalnode.dev/ai-field-engineer/lessons/01-latency-harness/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Every LLM request has two phases:

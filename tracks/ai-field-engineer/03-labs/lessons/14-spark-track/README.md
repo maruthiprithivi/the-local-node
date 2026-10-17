@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L9** · DGX Spark section  **Watch:** video 9 `09-serving-stack.mp4`, video 13 `13-scale-out.mp4`
 > **Time:** 2–3 h  **Cost:** free (your hardware)
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 9 · Step 3: The Spark track](https://thelocalnode.dev/ai-field-engineer/lessons/14-spark-track/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 The Mac covers the concepts. The Spark gives you the **production server stack** the job

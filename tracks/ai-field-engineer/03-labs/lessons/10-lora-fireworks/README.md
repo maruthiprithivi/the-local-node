@@ -3,6 +3,13 @@
 > **Lab book:** Fireworks labs → **F5** · Fine-tune cost calculator  **Watch:** video 6 `06-training.mp4`, video 12 `12-qlora.mp4`
 > **Time:** about 2 h (mostly waiting)  **Cost:** training costs cents; serving is **~1 h of a dedicated GPU** (check the rate)
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 7 · Step 2: LoRA on Fireworks](https://thelocalnode.dev/ai-field-engineer/lessons/10-lora-fireworks/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 **LoRA** leaves the big model frozen and trains a small "clip-on" adapter, often under

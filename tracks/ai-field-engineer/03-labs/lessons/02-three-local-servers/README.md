@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L2**  **Watch:** video 9 `09-serving-stack.mp4`
 > **Time:** 30 min  **Cost:** free
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 2 · Step 1: Serve one model three ways](https://thelocalnode.dev/ai-field-engineer/lessons/02-three-local-servers/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 An **inference server** turns a model file into an API. It owns the GPU memory,

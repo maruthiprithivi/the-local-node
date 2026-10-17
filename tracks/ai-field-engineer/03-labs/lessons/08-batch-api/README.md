@@ -3,6 +3,13 @@
 > **Lab book:** Fireworks labs → **F4**  **Watch:** video 8 `08-platform.mp4` (capacity modes)
 > **Time:** 20 min  **Cost:** 50% of serverless, which comes to fractions of a cent here
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 6 · Step 2: Batch API](https://thelocalnode.dev/ai-field-engineer/lessons/08-batch-api/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Not every request needs an answer in 300 ms. Evals, back-fills, nightly classification

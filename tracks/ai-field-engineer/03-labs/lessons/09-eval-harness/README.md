@@ -3,6 +3,13 @@
 > **Lab book:** Fireworks labs → **F6**  **Watch:** video 6 `06-training.mp4` (the "how do you know it worked" part)
 > **Time:** 1 h  **Cost:** free locally · about $0.10 with a Fireworks judge
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 7 · Step 1: Eval harness](https://thelocalnode.dev/ai-field-engineer/lessons/09-eval-harness/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Every customer conversation about models ends in a trade-off, and the table is how

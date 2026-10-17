@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L5**  **Watch:** video 2 `02-kv-cache.mp4`
 > **Time:** 45 min  **Cost:** free
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 4 · Step 2: KV cache and context length](https://thelocalnode.dev/ai-field-engineer/lessons/05-kv-cache/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 While a model writes, it keeps notes on every token it has seen so far (the **K**eys

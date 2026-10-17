@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L1** · Guardrails panel  **Watch:** video 9 `09-serving-stack.mp4` (first half)
 > **Time:** 15 min  **Cost:** free
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 1 · Step 2: Set up your Mac and the spend cap](https://thelocalnode.dev/ai-field-engineer/lessons/00-setup/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 You are building a small inference lab on your Mac: three local servers, one shared

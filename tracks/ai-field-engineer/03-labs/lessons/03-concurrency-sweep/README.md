@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L3**  **Watch:** video 10 `10-benchmarking.mp4`, video 5 `05-batching.mp4`
 > **Time:** 45 min  **Cost:** free
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 3 · Step 1: Concurrency sweep](https://thelocalnode.dev/ai-field-engineer/lessons/03-concurrency-sweep/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 A GPU decode step reads all the weights once, whether it serves 1 user or 16.

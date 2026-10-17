@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L4** · Ceiling calculator  **Watch:** video 4 `04-quantization.mp4`, video 3 `03-gpu-bandwidth.mp4`
 > **Time:** 45 min  **Cost:** free (≈17 GB download)
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 4 · Step 1: Quantization](https://thelocalnode.dev/ai-field-engineer/lessons/04-quantization/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Quantization stores each weight in fewer bits: 16 → 8 → 4. Think of it as a photo saved

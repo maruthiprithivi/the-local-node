@@ -6,9 +6,15 @@ Open, practical learning materials for people who build and explain technology. 
 
 | Track | Start learning | Explore the source |
 | --- | --- | --- |
-| AI Field Engineer | [12-day guided course](https://thelocalnode.dev/ai-field-engineer/) | [Videos, guides, and runnable labs](tracks/ai-field-engineer/) |
+| AI Field Engineer | [12-day guided course](https://thelocalnode.dev/ai-field-engineer/) | [Course sequence and runnable code](tracks/ai-field-engineer/COURSE.md) |
 
 The AI Field Engineer track starts with one model reply, then covers serving, benchmarking, evaluation, tuning, and customer recommendations. You can use the free local exercises before choosing any paid cloud labs.
+
+## Follow along
+
+Use the [course-to-code index](tracks/ai-field-engineer/COURSE.md) to follow the same sequence as the website. Every lab README links back to its lesson; website code sections link to the corresponding GitHub folder and file. The index is generated from the website course model so the order stays aligned.
+
+See [contributing](CONTRIBUTING.md) for lesson updates, alignment checks and the pre-push secret scan. Keep real credentials and private material out of this public repository; use your own environment values with the placeholder `.env.example`.
 
 ## In this repository
 

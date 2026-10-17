@@ -3,6 +3,13 @@
 > **Lab book:** Fireworks labs → **F3**  **Watch:** video 8 `08-platform.mp4` (integration section)
 > **Time:** 30 min  **Cost:** free locally · about $0.02 on Fireworks
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 6 · Step 1: Structured output](https://thelocalnode.dev/ai-field-engineer/lessons/07-structured-output/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Enterprise code parses the model's reply. If the reply isn't valid JSON, the pipeline

@@ -3,6 +3,13 @@
 > **Lab book:** Fireworks labs → **F7**  **Watch:** video 13 `13-scale-out.mp4`, video 5 `05-batching.mp4` (speculation part)
 > **Time:** 45 min  **Cost:** free locally · about 30–45 min of one deployment on Fireworks
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 9 · Step 2: Speculative decoding](https://thelocalnode.dev/ai-field-engineer/lessons/13-speculative-decoding/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Decode is slow because the big model writes one token per pass. **Speculative decoding**
