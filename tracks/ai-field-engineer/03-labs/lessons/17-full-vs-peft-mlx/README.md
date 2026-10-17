@@ -3,6 +3,13 @@
 > **Lab book:** Training labs → **T2**  **Watch:** videos 14 `14-full-finetuning.mp4`, 15 `15-sft.mp4`, 16 `16-peft.mp4`
 > **Time:** about 1 h (three short training runs)  **Cost:** free
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 11 · Step 2: Full vs LoRA vs DoRA](https://thelocalnode.dev/ai-field-engineer/lessons/17-full-vs-peft-mlx/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Videos 14–16 make three claims. This lesson tests all three on a real model:

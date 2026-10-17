@@ -3,6 +3,14 @@
 > **Lab book:** Training labs → **T1**  **Watch:** videos 14 `14-full-finetuning.mp4`, 16 `16-peft.mp4`, 17 `17-rlhf.mp4`, 18 `18-dpo.mp4`
 > **Time:** 30 min  **Cost:** free, pure numpy, runs anywhere in seconds
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 11 · Step 1: Training toys, part 1](https://thelocalnode.dev/ai-field-engineer/lessons/16-training-toy/)
+> - [Day 12 · Step 1: Training toys, part 2](https://thelocalnode.dev/ai-field-engineer/course/day-12/training-toys-part-2/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 Real training runs take minutes to hours, which makes it hard to *see* what an algorithm does.

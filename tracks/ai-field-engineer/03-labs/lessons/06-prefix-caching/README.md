@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L6** · Fireworks labs → **F2**  **Watch:** video 11 `11-prefix-caching.mp4`
 > **Time:** 30 min  **Cost:** free locally · about $0.03 on Fireworks
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 5 · Step 1: Prefix caching](https://thelocalnode.dev/ai-field-engineer/lessons/06-prefix-caching/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 An agent sends the *same* 3,000-token preamble (instructions, tool definitions, policy)

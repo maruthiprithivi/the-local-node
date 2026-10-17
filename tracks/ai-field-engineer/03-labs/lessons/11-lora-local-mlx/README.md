@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L8**  **Watch:** video 12 `12-qlora.mp4`
 > **Time:** 1–2 h  **Cost:** free
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 8 · Step 1: The same LoRA on your Mac](https://thelocalnode.dev/ai-field-engineer/lessons/11-lora-local-mlx/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 This is the same dataset and task as lesson 10, trained locally. Because the base model is

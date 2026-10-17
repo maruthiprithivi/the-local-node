@@ -3,6 +3,13 @@
 > **Lab book:** Training labs → **T3**  **Watch:** videos 17 `17-rlhf.mp4`, 18 `18-dpo.mp4`
 > **Time:** about 1 h on the Mac · Fireworks optional  **Cost:** free locally · cents to train plus deployment time on Fireworks
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 12 · Step 2: Preference tuning with DPO](https://thelocalnode.dev/ai-field-engineer/lessons/18-preference-dpo/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 SFT teaches *what* to answer. DPO teaches *which of two answers is better* using pairs

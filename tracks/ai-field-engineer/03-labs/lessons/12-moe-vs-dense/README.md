@@ -3,6 +3,13 @@
 > **Lab book:** Local labs → **L7** · Ceiling calculator (MoE rows)  **Watch:** video 7 `07-offloading.mp4`
 > **Time:** 30 min  **Cost:** free (≈19 GB download)
 
+<!-- course-links:start -->
+> **Follow this lesson on the website:**
+> - [Day 9 · Step 1: MoE vs dense](https://thelocalnode.dev/ai-field-engineer/lessons/12-moe-vs-dense/)
+>
+> [Full course sequence](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md)
+<!-- course-links:end -->
+
 ## What and why
 
 A **dense** model is one big team where everyone works on every token. A **Mixture of

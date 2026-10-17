@@ -12,6 +12,8 @@
 // Classes are prefixed kc- (styles in src/styles/course.css); each chunk root carries `kc not-content`, so
 // Starlight's markdown styles leave it alone.
 
+import { codeUrl } from './repository.mjs';
+
 const LAB_BOOK = '/lab-book/field-engineer-lab-book.html';
 const DOWNLOAD_ZIP = '/downloads/03-labs.zip';
 // The narrator of these videos ends by naming the next file; the course order differs (spec 5.4 item 4).
@@ -486,7 +488,7 @@ function runNotesBlock(notes, opts) {
  * are left out. rewrite (optional) is the site's link rewriter, applied to the README text only.
  */
 export function transformReadme(mdText, step, rewrite) {
-  const text = applyReplace(String(mdText ?? '').replace(/^﻿/, '').replace(/\r\n?/g, '\n'), step);
+  const text = applyReplace(String(mdText ?? '').replace(/^﻿/, '').replace(/\r\n?/g, '\n').replace(/<!-- course-links:start -->[\s\S]*?<!-- course-links:end -->\n*/g, ''), step);
   let lines = text.split('\n');
   let info = scan(lines);
   const drop = new Set();
@@ -698,6 +700,7 @@ export function stepCode(step, model, ctx) {
   if (!docs.length && !code.length) return '';
   const rctx = readmeCtx(step);
   return body('## Code in this step',
+    `<p><a href="${esc(codeUrl(l.rel))}">Open this lesson’s code on GitHub</a>. The folder README links back to this course step.</p>`,
     docs.map((f) => ctx.docBlock(`${l.rel}/${f}`, f, rctx)),
     code.map((f, i) => ctx.fileBlock(`${l.rel}/${f}`, f, i === 0 && 'first', 0.5)));
 }

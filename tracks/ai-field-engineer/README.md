@@ -27,29 +27,9 @@ Edit the lab README and code in `03-labs/lessons/`. The guided lesson text and w
 
 ## The course, in order
 
-Watch the video(s), then do the lesson. Lesson folders are in `03-labs/lessons/`.
+The [course-to-code index](https://github.com/maruthiprithivi/the-local-node/blob/main/tracks/ai-field-engineer/COURSE.md) follows the website's exact day and step order, including the split training lab. Open a website lesson from the index, or open its lab folder and use the backlink to return to that lesson.
 
-### Part 1: Serving and inference (days 1–10)
-
-| day | watch (`01-videos/`) | then do (`03-labs/lessons/`) | lab card | cost |
-|---|---|---|---|---|
-| 1 | `01-inference-101.mp4` · `09-serving-stack.mp4` (first half) | `00-setup` → `01-latency-harness` | L1 · F1 | ~$0.02 |
-| 2 | `09-serving-stack.mp4` | `02-three-local-servers` | L2 | free |
-| 3 | `10-benchmarking.mp4` · `05-batching.mp4` · `03-gpu-bandwidth.mp4` | `03-concurrency-sweep` | L3 | free |
-| 4 | `04-quantization.mp4` · `02-kv-cache.mp4` | `04-quantization` → `05-kv-cache` | L4 · L5 | free |
-| 5 | `11-prefix-caching.mp4` | `06-prefix-caching` | L6 · F2 | ~$0.03 |
-| 6 | `08-platform.mp4` | `07-structured-output` → `08-batch-api` | F3 · F4 | ~$0.03 |
-| 7 | `06-training.mp4` · `12-qlora.mp4` | `09-eval-harness` → `10-lora-fireworks` | F6 · F5 | **$** ~1 GPU-h |
-| 8 | `12-qlora.mp4` | `11-lora-local-mlx` | L8 | free |
-| 9 | `07-offloading.mp4` · `13-scale-out.mp4` | `12-moe-vs-dense` → `13-speculative-decoding` → `14-spark-track` | L7 · F7 · L9 | **$** ~½ GPU-h |
-| 10 | `08-platform.mp4` (again) | `15-capstone` | Capstone | free |
-
-### Part 2: How models are trained (days 11–12)
-
-| day | watch (`01-videos/`) | then do (`03-labs/lessons/`) | lab card | cost |
-|---|---|---|---|---|
-| 11 | `14-full-finetuning.mp4` · `15-sft.mp4` · `16-peft.mp4` | `16-training-toy` (part 1) → `17-full-vs-peft-mlx` | T1 · T2 | free |
-| 12 | `17-rlhf.mp4` · `18-dpo.mp4` | `16-training-toy` (part 2) → `18-preference-dpo` | T1 · T3 | free · **$** optional |
+The index and lab backlinks are generated from the website course model and checked in CI. Update them with `node website/ai-field-engineer/scripts/repository.mjs --write` from the repository root; see [contributing](https://github.com/maruthiprithivi/the-local-node/blob/main/CONTRIBUTING.md) for the complete workflow.
 
 ---
 

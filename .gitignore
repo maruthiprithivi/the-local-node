@@ -17,3 +17,15 @@ dist/
 *.log
 .wrangler/
 .DS_Store
+
+# Local credentials and private study material never belong in this public repository.
+.envrc
+.netrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.age
+/tracks/ai-field-engineer/04-video-source/foundations/
+/website/ai-field-engineer/course/content/foundations/
+/website/ai-field-engineer/public/media/foundations/
