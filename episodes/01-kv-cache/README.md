@@ -19,7 +19,7 @@ Run everything below from this folder.
 - Linux with an NVIDIA GPU
 - Ollama installed and running
 - Python 3.11 or newer
-- `nvidia-smi` on `PATH` if you want the GPU column. The script still finishes without it.
+- `nvidia-smi` on `PATH` if you want the GPU column. If `memory.used` is `[N/A]`, the script sums the Ollama and llama runner rows from compute-apps instead. The script still finishes without `nvidia-smi`.
 
 The chart also needs Node.js 22 or newer. You do not need it for the calculator or the measurement.
 
@@ -73,6 +73,8 @@ python kv_cache.py --gguf model.gguf
 
 `--gguf` reads the same keys out of the GGUF metadata and stops before the tensor bytes.
 
+Some models only keep a KV cache on some layers. A hybrid sets `full_attention_interval` (4 means one full-attention layer out of every four; the rest are linear or SSM and do not grow a cache with the context). `attention.recurrent_layers` in a GGUF, or `layer_types` in a config, names those layers one by one, and that list wins over the interval. Next-token prediction blocks (`nextn_predict_layers`, or `mtp_num_hidden_layers` on a config) are left out of the chat cache when they sit inside the block count. When the count is not smaller than the block count, the blocks are not in that list and are not subtracted. A config's `num_hidden_layers` is the trunk, so a separately listed MTP count is not subtracted from it. The formula then uses the full-attention count, and the report says how it got there. Sliding-attention layers still store K and V, so they are counted. The formula uses the full context you pass, which is larger than a short window.
+
 Where the two head counts differ, the report prints the group size. That is grouped query attention: several query heads share one KV head, and the cache shrinks by that factor. You read it off the model. You do not switch it on.
 
 A weight quantization such as `Q4_K_M` is printed separately. It does not change the cache width. The cache stays 2 bytes per value until you ask for another width:
@@ -106,16 +108,16 @@ The script writes `runs/kv-sweep.json` and `runs/kv-sweep.csv`. Those files are 
 | column | what it is |
 | --- | --- |
 | `predicted_kv_bytes` | the formula, cache only |
-| `measured_runtime_bytes` | `size` from Ollama's process list, weights included |
+| `measured_runtime_bytes` | `size` from Ollama's process list. This is weights plus compute buffers plus the cache, not the cache alone |
 | `measured_vram_bytes` | `size_vram` when Ollama reports it, otherwise empty |
-| `gpu_memory_bytes` | `nvidia-smi` memory.used, on Linux, when the tool is there |
-| `process_rss_bytes` | sum of resident memory for processes named ollama, a fallback |
-| `ttft_ms` | wall time to the first token on a second, already-loaded request |
+| `gpu_memory_bytes` | `nvidia-smi` memory.used, on Linux, when that query returns a number. If it returns `[N/A]`, the script sums `nvidia-smi --query-compute-apps=pid,used_memory` for the Ollama server and llama runners only |
+| `process_rss_bytes` | on macOS, resident memory of the Ollama server and runner, not the app window. Omitted on Linux, because CUDA memory is not in the resident set and the number stays flat |
+| `ttft_ms` | wall time to the first token on a second, already-loaded request. A thinking model's first thinking token counts. The request sends `think: false` when the server accepts it |
 | `load_ms` | time to the first token on the request that loaded the model |
 
 On a Mac the runtime size is the unified-memory figure. There is no separate GPU counter, and the JSON says so. On Linux, a missing `nvidia-smi` leaves `gpu_memory_bytes` empty and the sweep continues. A context the server refuses is one row with a note, not a failed run.
 
-`measured_runtime_bytes` will sit above `predicted_kv_bytes`, because the runtime size includes the weights. Compare the change from one context to the next. Doubling the context doubles the predicted cache. The runtime column should move with it, on top of a size that stays put.
+The measured total includes the weights and the compute buffers, not just the KV cache, so `measured_runtime_bytes` sits above `predicted_kv_bytes`. The growth between rungs is the part that tracks the cache. Doubling the context doubles the predicted cache. The runtime column should move with it, on top of a size that stays put. A hybrid model's prediction only counts full-attention layers, so it will be smaller than a count of every block. A short attention window can still make the live growth smaller than that prediction.
 
 To try a quantized cache, restart Ollama with `OLLAMA_KV_CACHE_TYPE=q8_0` (flash attention has to be on), then run the sweep again to a second file:
 
@@ -123,15 +125,17 @@ To try a quantized cache, restart Ollama with `OLLAMA_KV_CACHE_TYPE=q8_0` (flash
 python measure_kv.py --out runs/kv-sweep-q8
 ```
 
+`--out` is a prefix. `runs/kv-sweep-qwen3.8` writes `runs/kv-sweep-qwen3.8.json` and `runs/kv-sweep-qwen3.8.csv`, and the chart command printed at the end uses that JSON path.
+
 Compare the two runtime columns yourself. The calculator's `q8_0` column is the formula at 1 byte per value. Some runtimes also store a small scale beside each block, so a live number can sit a little above that column.
 
 ## 4. Whiteboard
 
-`whiteboard/kv-cache.excalidraw` is the hand-drawn scene: a memory bar (weights, then a KV cache that can grow), a grid of keys and values by layer and token, and the formula, including the 4 GiB to 1 GiB grouped-query step. Open it in [Excalidraw](https://excalidraw.com). Strokes are black on white.
+`whiteboard/kv-cache.excalidraw` is the hand-drawn scene: a memory bar (weights, then a KV cache that can grow), a grid of keys and values by layer and token, and the formula, including the 4 GiB to 1 GiB grouped-query step. The weights label sits on a solid white plate so it stays readable on the hatched fill. Open it in [Excalidraw](https://excalidraw.com). Strokes are black on white.
 
 ## 5. Render the chart
 
-The chart reads the measurement JSON: predicted cache against measured runtime memory, by context length. It is 1920x1080 at 24 fps. The bottom 150 px is left empty for captions. A sample file is built in, so the chart renders before you have a live run. The sample's measured series is the prediction plus a fixed 5 GiB. That stand-in is not a measurement.
+The chart reads the measurement JSON: predicted cache against measured runtime memory, by context length. It is 1920x1080 at 24 fps. The bottom 150 px is left empty for captions. The y-axis uses round GiB ticks. The last bar and its label finish, then the frame holds for at least 2 seconds. A sample file is built in, so the chart renders before you have a live run. The sample's measured series is the prediction plus a fixed 5 GiB, standing in for weights and compute buffers. That stand-in is not a measurement.
 
 ```bash
 cd chart

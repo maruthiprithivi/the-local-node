@@ -4,8 +4,9 @@ Episode 1 — sweep Ollama context length and record what the runtime reports.
 The prompt stays short on purpose. Ollama sizes the KV cache from num_ctx
 when the model loads, so this script unloads the model between rungs and
 reads /api/ps after each load. predicted_kv_bytes is the formula from
-kv_cache.py. measured_runtime_bytes is the size Ollama reports, which
-includes weights and other runtime memory.
+kv_cache.py. measured_runtime_bytes is the size Ollama reports. That
+total includes the weights and compute buffers, not just the KV cache.
+The growth from one context rung to the next is the part that tracks the cache.
 
     python measure_kv.py
     python measure_kv.py --pull
@@ -102,6 +103,31 @@ def bytes_for_kv_type(name: str | None) -> tuple[float, str, str | None]:
     return KV_WIDTHS[key], key, None
 
 
+_NOT_A_NUMBER = {"[N/A]", "N/A", "[NOT SUPPORTED]"}
+NUM_PREDICT = 64
+NUM_PREDICT_RETRY = 256
+
+
+def is_ollama_runner(command: str) -> bool:
+    """Server and runner processes only. The macOS app window is not one of them."""
+    lower = command.strip().lower()
+    if not lower:
+        return False
+    if re.search(r"(^|[\s/])llama-server(?:\.exe)?(?:\s|$)", lower):
+        return True
+    if re.search(r"(^|[\s/])llama(?:\.exe)?\s+runner(?:\s|$)", lower):
+        return True
+    if re.search(r"(^|[\s/])ollama(?:\.exe)?\s+serve(?:\s|$)", lower):
+        return True
+    if re.search(r"(^|[\s/])ollama(?:\.exe)?\s+runner(?:\s|$)", lower):
+        return True
+    # The GUI binary is `Ollama` inside Ollama.app and has no serve or runner argument.
+    # Match the lowercase CLI name only, so a bare `Ollama` window is left out.
+    if ".app" in lower:
+        return False
+    return re.search(r"(^|[\s/])ollama(?:\.exe)?$", command.strip()) is not None
+
+
 def parse_nvidia_smi(text: str) -> int | None:
     """Sum `nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits` (MiB) into bytes."""
     values: list[int] = []
@@ -109,9 +135,11 @@ def parse_nvidia_smi(text: str) -> int | None:
         cell = line.strip()
         if not cell or cell.lower().startswith("memory"):
             continue
-        if cell.upper() in {"[N/A]", "N/A", "[NOT SUPPORTED]"}:
+        if cell.upper() in _NOT_A_NUMBER:
             continue
         token = cell.split(",")[0].strip()
+        if token.upper() in _NOT_A_NUMBER:
+            continue
         try:
             values.append(int(token))
         except ValueError:
@@ -121,8 +149,78 @@ def parse_nvidia_smi(text: str) -> int | None:
     return sum(values) * 1024 * 1024
 
 
+def parse_ps_pids(text: str) -> set[int]:
+    """PIDs from `ps -axo pid=,command=` that are an Ollama server or a llama runner."""
+    pids: set[int] = set()
+    for line in text.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            continue
+        pid_text, command = parts
+        if not is_ollama_runner(command):
+            continue
+        try:
+            pids.add(int(pid_text))
+        except ValueError:
+            continue
+    return pids
+
+
+def parse_compute_apps(text: str, runner_pids: set[int]) -> int | None:
+    """Sum `nvidia-smi --query-compute-apps=pid,used_memory` (MiB) for runner pids, as bytes.
+
+    Used when `memory.used` comes back as [N/A], which happens on some boards.
+    Other compute apps on the same GPU are left out.
+    """
+    total = 0
+    found = False
+    for line in text.splitlines():
+        cell = line.strip()
+        if not cell or cell.lower().startswith("pid"):
+            continue
+        parts = [part.strip() for part in cell.split(",")]
+        if len(parts) < 2:
+            continue
+        if parts[0].upper() in _NOT_A_NUMBER or parts[1].upper() in _NOT_A_NUMBER:
+            continue
+        try:
+            pid = int(parts[0])
+            mib = int(parts[1])
+        except ValueError:
+            continue
+        if pid not in runner_pids:
+            continue
+        total += mib
+        found = True
+    if not found:
+        return None
+    return total * 1024 * 1024
+
+
+def gpu_bytes_from_smi(memory_used_text: str, compute_apps_text: str | None, ps_text: str) -> tuple[int | None, str | None]:
+    """Prefer memory.used. Fall back to the sum of Ollama and llama runner compute apps."""
+    parsed = parse_nvidia_smi(memory_used_text)
+    if parsed is not None:
+        return parsed, None
+    if compute_apps_text is None:
+        return None, "nvidia-smi ran but did not report a memory figure."
+    summed = parse_compute_apps(compute_apps_text, parse_ps_pids(ps_text))
+    if summed is None:
+        return None, (
+            "nvidia-smi memory.used was not a number, and no Ollama or llama runner was listed in compute-apps."
+        )
+    return summed, (
+        "nvidia-smi memory.used was not a number. GPU memory is the sum of Ollama and llama runner processes from compute-apps."
+    )
+
+
 def parse_ps_rss(text: str) -> int | None:
-    """Sum RSS (KiB) of processes whose command contains 'ollama', as bytes."""
+    """Sum RSS (KiB) of the Ollama server and runner processes, as bytes.
+
+    A command that only contains the app name, such as the macOS GUI, is not included.
+    On Linux this figure stays flat because CUDA memory is not in the resident set,
+    so the sweep omits it there.
+    """
     total = 0
     found = False
     for line in text.splitlines():
@@ -130,7 +228,7 @@ def parse_ps_rss(text: str) -> int | None:
         if len(parts) != 2:
             continue
         rss, command = parts
-        if "ollama" not in command.lower():
+        if not is_ollama_runner(command):
             continue
         try:
             total += int(rss)
@@ -150,49 +248,77 @@ def safe_detail(text: str) -> str:
     return cleaned
 
 
+def _run_command(argv: list[str]) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return subprocess.run(argv, capture_output=True, text=True, timeout=5, check=False)
+    except FileNotFoundError:
+        return None
+    except subprocess.TimeoutExpired:
+        raise
+
+
+def _read_gpu_memory() -> tuple[int | None, list[str]]:
+    try:
+        used = _run_command(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"])
+    except subprocess.TimeoutExpired:
+        return None, ["nvidia-smi timed out, so the GPU column is empty."]
+    if used is None:
+        return None, ["nvidia-smi is not on PATH, so the GPU column is empty."]
+    if used.returncode != 0:
+        return None, ["nvidia-smi failed, so the GPU column is empty."]
+    apps_text: str | None = None
+    ps_text = ""
+    if parse_nvidia_smi(used.stdout) is None:
+        try:
+            apps = _run_command(
+                ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"]
+            )
+        except subprocess.TimeoutExpired:
+            return None, ["nvidia-smi timed out, so the GPU column is empty."]
+        if apps is not None and apps.returncode == 0:
+            apps_text = apps.stdout
+            try:
+                ps = _run_command(["ps", "-axo", "pid=,command="])
+            except subprocess.TimeoutExpired:
+                ps = None
+            if ps is not None and ps.returncode == 0:
+                ps_text = ps.stdout
+    gpu_bytes, note = gpu_bytes_from_smi(used.stdout, apps_text, ps_text)
+    return gpu_bytes, [] if note is None else [note]
+
+
+def _read_rss() -> tuple[int | None, list[str]]:
+    try:
+        proc = _run_command(["ps", "-axo", "rss=,command="])
+    except subprocess.TimeoutExpired:
+        return None, ["ps timed out, so the process RSS column is empty."]
+    if proc is None:
+        return None, ["ps is not available, so the process RSS column is empty."]
+    if proc.returncode != 0:
+        return None, ["ps failed, so the process RSS column is empty."]
+    return parse_ps_rss(proc.stdout), []
+
+
 def collect_host_metrics() -> dict:
     """Optional counters. Missing tools become nulls and a note, never a crash."""
     notes: list[str] = []
-    gpu_bytes: int | None = None
     system = platform.system()
+    gpu_bytes: int | None = None
     if system == "Darwin":
         notes.append("macOS reports unified memory through Ollama's size. There is no separate GPU counter.")
+        notes.append("Process RSS sums the Ollama server and runner only, not the app window.")
     else:
-        try:
-            proc = subprocess.run(
-                ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-            if proc.returncode == 0:
-                gpu_bytes = parse_nvidia_smi(proc.stdout)
-                if gpu_bytes is None:
-                    notes.append("nvidia-smi ran but did not report a memory figure.")
-            else:
-                notes.append("nvidia-smi failed, so the GPU column is empty.")
-        except FileNotFoundError:
-            notes.append("nvidia-smi is not on PATH, so the GPU column is empty.")
-        except subprocess.TimeoutExpired:
-            notes.append("nvidia-smi timed out, so the GPU column is empty.")
-    rss_bytes: int | None = None
-    try:
-        proc = subprocess.run(
-            ["ps", "-axo", "rss=,comm="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
+        gpu_bytes, gpu_notes = _read_gpu_memory()
+        notes.extend(gpu_notes)
+    if system == "Linux":
+        rss_bytes = None
+        notes.append(
+            "Process RSS is omitted on Linux. Resident memory does not include CUDA allocations, "
+            "so it stays flat and is not the GPU figure."
         )
-        if proc.returncode == 0:
-            rss_bytes = parse_ps_rss(proc.stdout)
-        else:
-            notes.append("ps failed, so the process RSS column is empty.")
-    except FileNotFoundError:
-        notes.append("ps is not available, so the process RSS column is empty.")
-    except subprocess.TimeoutExpired:
-        notes.append("ps timed out, so the process RSS column is empty.")
+    else:
+        rss_bytes, rss_notes = _read_rss()
+        notes.extend(rss_notes)
     return {
         "os": system,
         "gpu_memory_bytes": gpu_bytes,
@@ -271,6 +397,38 @@ def _int_or_none(value: object) -> int | None:
     return None
 
 
+def token_text(obj: dict) -> str:
+    """First visible token. Thinking models put it in `thinking` and leave `response` empty."""
+    for key in ("response", "thinking"):
+        value = obj.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def stopped_on_length(final: dict | None) -> bool:
+    return isinstance(final, dict) and final.get("done_reason") == "length"
+
+
+def think_field_rejected(exc: BaseException) -> bool:
+    text = str(exc)
+    return "HTTP 400" in text or "HTTP 422" in text
+
+
+def build_generate_payload(model: str, num_ctx: int, num_predict: int, think: bool) -> dict:
+    payload = {
+        "model": model,
+        "prompt": PROMPT,
+        "stream": True,
+        "keep_alive": "10m",
+        "options": {"num_ctx": num_ctx, "num_predict": num_predict, "temperature": 0},
+    }
+    # think:false asks a thinking model to answer directly. Older servers reject the field.
+    if think:
+        payload["think"] = False
+    return payload
+
+
 def _stream_generate(base: str, payload: dict, timeout: float) -> tuple[float | None, dict | None]:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
@@ -300,7 +458,7 @@ def _stream_generate(base: str, payload: dict, timeout: float) -> tuple[float | 
                 continue
             if obj.get("error"):
                 raise RuntimeError(safe_detail(str(obj["error"])))
-            if ttft_ms is None and isinstance(obj.get("response"), str) and obj["response"]:
+            if ttft_ms is None and token_text(obj):
                 ttft_ms = (time.perf_counter() - start) * 1000
             if obj.get("done"):
                 final = obj
@@ -385,20 +543,32 @@ def _pull(base: str, model: str, timeout: float) -> None:
                 print(status, flush=True)
 
 
+def _generate(base: str, model: str, num_ctx: int, timeout: float) -> tuple[float | None, dict | None]:
+    """One generate. Prefer think:false, then a longer budget if the first token never arrives."""
+    think = True
+    try:
+        ttft, final = _stream_generate(base, build_generate_payload(model, num_ctx, NUM_PREDICT, True), timeout)
+    except RuntimeError as exc:
+        if not think_field_rejected(exc):
+            raise
+        think = False
+        ttft, final = _stream_generate(base, build_generate_payload(model, num_ctx, NUM_PREDICT, False), timeout)
+    if ttft is None and stopped_on_length(final):
+        ttft, final = _stream_generate(
+            base,
+            build_generate_payload(model, num_ctx, NUM_PREDICT_RETRY, think),
+            timeout,
+        )
+    return ttft, final
+
+
 def measure_once(base: str, model: str, num_ctx: int, host_metrics: dict, shape, timeout: float) -> dict:
     notes: list[str] = []
     _unload(base, model)
-    payload = {
-        "model": model,
-        "prompt": PROMPT,
-        "stream": True,
-        "keep_alive": "10m",
-        "options": {"num_ctx": num_ctx, "num_predict": 8, "temperature": 0},
-    }
     load_ms = None
     ttft_ms = None
     try:
-        load_ms, _final = _stream_generate(base, payload, timeout)
+        load_ms, _final = _generate(base, model, num_ctx, timeout)
         if load_ms is None:
             notes.append("the load request returned no token.")
     except RuntimeError as exc:
@@ -418,7 +588,7 @@ def measure_once(base: str, model: str, num_ctx: int, host_metrics: dict, shape,
     if size_note:
         notes.append(size_note)
     try:
-        ttft_ms, _final = _stream_generate(base, payload, timeout)
+        ttft_ms, _final = _generate(base, model, num_ctx, timeout)
         if ttft_ms is None:
             notes.append("the warm request returned no token.")
     except RuntimeError as exc:
@@ -438,10 +608,28 @@ def measure_once(base: str, model: str, num_ctx: int, host_metrics: dict, shape,
     )
 
 
+def output_paths(stem: Path) -> tuple[Path, Path]:
+    """Append .json and .csv.
+
+    Path.with_suffix would turn runs/kv-sweep-qwen3.8 into kv-sweep-qwen3.json,
+    because it treats .8 as a suffix. A stem that already ends in .json or .csv
+    is used as the prefix without doubling the extension.
+    """
+    text = str(stem)
+    for suffix in (".json", ".csv"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)]
+            break
+    return Path(text + ".json"), Path(text + ".csv")
+
+
+def chart_props_arg(json_path: Path, chart_dir: Path) -> str:
+    return Path(os.path.relpath(json_path.resolve(), chart_dir.resolve())).as_posix()
+
+
 def write_results(stem: Path, payload: dict) -> tuple[Path, Path]:
     stem.parent.mkdir(parents=True, exist_ok=True)
-    json_path = stem.with_suffix(".json")
-    csv_path = stem.with_suffix(".csv")
+    json_path, csv_path = output_paths(stem)
     json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     fields = [
         "num_ctx",
@@ -472,8 +660,8 @@ def _print_table(rows: list[dict]) -> None:
             f"{format_bytes(row['measured_runtime_bytes']):>14}  {ttft:>10}"
         )
     print()
-    print("Predicted is the KV cache only. Runtime size includes the weights and other overhead.")
-    print("Compare how the two columns change when the context doubles. Do not expect them to be equal.")
+    print("Predicted is the KV cache only. The measured total includes the weights and compute buffers, not just the cache.")
+    print("The growth between context rungs is the part that tracks the cache. Do not expect the two columns to be equal.")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -517,6 +705,8 @@ def main(argv: list[str] | None = None) -> int:
         if width_note:
             header_notes.append(width_note)
         print(f"{shape.name}: {shape.layers} layers, {shape.attention_heads} attention heads, {shape.kv_heads} KV heads, head dim {shape.head_dim}")
+        if shape.layer_note:
+            print(shape.layer_note)
         if shape.grouped:
             print(f"GQA group size {shape.group_size}: {shape.group_size} query heads share one KV head.")
         print(f"Predicting a {label} cache ({width:g} bytes per value).")
@@ -554,7 +744,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {display_path(csv_path)}")
         chart_dir = Path.cwd() / "chart"
         if (chart_dir / "package.json").is_file():
-            props = Path(os.path.relpath(json_path.resolve(), chart_dir.resolve())).as_posix()
+            props = chart_props_arg(json_path, chart_dir)
             print(f"Chart: cd chart && npm run render -- --props={props}")
         return 0
     except ValueError as exc:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import platform
 import struct
 import subprocess
 import sys
@@ -390,6 +391,202 @@ class SampleAssetsTest(unittest.TestCase):
         self.assertIn("1 GiB", text)
         self.assertNotIn("L1", text)
         self.assertNotRegex(text.lower(), r"\blevel\b")
+        backing = next(element for element in scene["elements"] if element.get("id") == "weights-label-back")
+        self.assertEqual(backing["backgroundColor"].lower(), "#ffffff")
+        self.assertEqual(backing["fillStyle"], "solid")
+        label = next(element for element in scene["elements"] if element.get("id") == "weights-label")
+        self.assertGreaterEqual(label["x"], backing["x"])
+        self.assertGreaterEqual(label["y"], backing["y"])
+        self.assertLessEqual(label["x"] + label["width"], backing["x"] + backing["width"])
+        self.assertLessEqual(label["y"] + label["height"], backing["y"] + backing["height"])
+
+
+def _dense(**overrides):
+    base = {
+        "num_hidden_layers": 32,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 32,
+        "head_dim": 128,
+    }
+    base.update(overrides)
+    return base
+
+
+class HybridLayersTest(unittest.TestCase):
+    def test_interval_keeps_one_layer_in_four(self):
+        shape = kv_cache.shape_from_config(_dense(full_attention_interval=4))
+        self.assertEqual(shape.layers, 8)
+        self.assertEqual(shape.block_count, 32)
+        self.assertIn("full_attention_interval is 4", shape.layer_note)
+        self.assertIn("1 of every 4", shape.layer_note)
+        self.assertIn("linear or SSM", shape.layer_note)
+        report = kv_cache.render_report(shape, tokens=8192, contexts=(8192,))
+        self.assertIn("2 x 8 x 32 x 128 x 2 x 8192 = 1 GiB", report)
+        self.assertNotIn("2 x 32 x 32 x 128 x 2 x 8192 = 4 GiB", report)
+
+    def test_nextn_inside_the_block_count_is_not_the_chat_cache(self):
+        meta = {
+            "general.architecture": "qwen35",
+            "qwen35.block_count": 33,
+            "qwen35.attention.head_count": 32,
+            "qwen35.attention.head_count_kv": 32,
+            "qwen35.attention.key_length": 128,
+            "qwen35.full_attention_interval": 4,
+            "qwen35.nextn_predict_layers": 1,
+        }
+        shape = kv_cache.shape_from_gguf_metadata(meta)
+        self.assertEqual(shape.layers, 8)
+        self.assertIn("next-token prediction", shape.layer_note)
+        self.assertIn("not counted", shape.layer_note)
+        self.assertEqual(kv_cache.kv_bytes_for(shape, 8192), GIB)
+
+    def test_nextn_that_is_not_inside_the_block_count_is_not_subtracted(self):
+        meta = {
+            "general.architecture": "qwen35",
+            "qwen35.block_count": 32,
+            "qwen35.attention.head_count": 32,
+            "qwen35.attention.head_count_kv": 32,
+            "qwen35.attention.key_length": 128,
+            "qwen35.nextn_predict_layers": 32,
+        }
+        shape = kv_cache.shape_from_gguf_metadata(meta)
+        self.assertEqual(shape.layers, 32)
+        self.assertIn("not subtracted", shape.layer_note)
+        self.assertEqual(kv_cache.kv_bytes_for(shape, 8192), 4 * GIB)
+
+    def test_recurrent_layer_list_wins_over_the_interval(self):
+        recurrent = [((index + 1) % 4 != 0) for index in range(32)]
+        meta = {
+            "general.architecture": "qwen35",
+            "qwen35.block_count": 32,
+            "qwen35.attention.head_count": 32,
+            "qwen35.attention.head_count_kv": 8,
+            "qwen35.attention.key_length": 128,
+            "qwen35.full_attention_interval": 2,
+            "qwen35.attention.recurrent_layers": recurrent,
+        }
+        shape = kv_cache.shape_from_gguf_metadata(meta)
+        self.assertEqual(shape.layers, 8)
+        self.assertIn("recurrent", shape.layer_note)
+        self.assertIn("wins over full_attention_interval", shape.layer_note)
+        self.assertEqual(kv_cache.kv_bytes_for(shape, 8192), GIB // 4)
+
+    def test_head_counts_come_from_the_full_attention_layers(self):
+        heads = []
+        kv_heads = []
+        for index in range(8):
+            full = (index + 1) % 4 == 0
+            heads.append(32 if full else 16)
+            kv_heads.append(8 if full else 1)
+        meta = {
+            "general.architecture": "qwen35",
+            "qwen35.block_count": 8,
+            "qwen35.attention.head_count": heads,
+            "qwen35.attention.head_count_kv": kv_heads,
+            "qwen35.attention.key_length": 128,
+            "qwen35.full_attention_interval": 4,
+        }
+        shape = kv_cache.shape_from_gguf_metadata(meta)
+        self.assertEqual(shape.layers, 2)
+        self.assertEqual(shape.attention_heads, 32)
+        self.assertEqual(shape.kv_heads, 8)
+
+    def test_config_layer_types_win_and_separate_mtp_is_not_subtracted(self):
+        types = ["linear_attention", "linear_attention", "linear_attention", "full_attention"] * 8
+        shape = kv_cache.shape_from_config(
+            _dense(full_attention_interval=2, layer_types=types, mtp_num_hidden_layers=1)
+        )
+        self.assertEqual(shape.layers, 8)
+        self.assertEqual(shape.nextn_layers, 1)
+        self.assertIn("wins over full_attention_interval", shape.layer_note)
+        self.assertIn("listed separately", shape.layer_note)
+        self.assertEqual(kv_cache.kv_bytes_for(shape, 8192), GIB)
+
+    def test_config_drops_mtp_layers_appended_to_layer_types(self):
+        types = ["linear_attention", "linear_attention", "linear_attention", "full_attention"] * 8
+        types.append("full_attention")
+        shape = kv_cache.shape_from_config(
+            _dense(layer_types=types, mtp_num_hidden_layers=1)
+        )
+        self.assertEqual(shape.layers, 8)
+        self.assertIn("appended", shape.layer_note)
+        self.assertIn("not counted", shape.layer_note)
+
+    def test_sliding_attention_still_stores_kv(self):
+        types = ["linear_attention", "sliding_attention"] * 4
+        shape = kv_cache.shape_from_config(
+            _dense(num_hidden_layers=8, layer_types=types)
+        )
+        self.assertEqual(shape.layers, 4)
+        self.assertIn("sliding-attention", shape.layer_note)
+
+    def test_a_model_with_no_full_attention_layers_is_rejected(self):
+        with self.assertRaises(ValueError):
+            kv_cache.shape_from_config(_dense(num_hidden_layers=4, layer_types=["linear_attention"] * 4))
+
+
+class MeasurementFixesTest(unittest.TestCase):
+    def test_gpu_memory_falls_back_to_runner_compute_apps(self):
+        apps = "111, 2048\n222, 1024\n333, 4096\n"
+        ps = "111 ollama serve\n222 /usr/bin/ollama runner --model x\n333 python train.py\n"
+        used, note = measure_kv.gpu_bytes_from_smi("[N/A]\n", apps, ps)
+        self.assertEqual(used, (2048 + 1024) * 1024 * 1024)
+        self.assertIn("compute-apps", note)
+        direct, direct_note = measure_kv.gpu_bytes_from_smi("512\n", apps, ps)
+        self.assertEqual(direct, 512 * 1024 * 1024)
+        self.assertIsNone(direct_note)
+        empty, empty_note = measure_kv.gpu_bytes_from_smi("[N/A]\n", "333, 4096\n", ps)
+        self.assertIsNone(empty)
+        self.assertIn("no Ollama or llama runner", empty_note)
+
+    def test_rss_matches_the_server_and_runner_not_the_app_window(self):
+        text = "\n".join(
+            [
+                "9000 /Applications/Ollama.app/Contents/MacOS/Ollama",
+                "1500 /Applications/Ollama.app/Contents/Resources/ollama serve",
+                "2200 /Applications/Ollama.app/Contents/Resources/ollama runner --model x",
+                "400 llama-server --port 8080",
+                "50 sshd",
+            ]
+        )
+        self.assertEqual(measure_kv.parse_ps_rss(text), (1500 + 2200 + 400) * 1024)
+        self.assertFalse(measure_kv.is_ollama_runner("/Applications/Ollama.app/Contents/MacOS/Ollama"))
+        self.assertFalse(measure_kv.is_ollama_runner("Ollama"))
+        self.assertTrue(measure_kv.is_ollama_runner("ollama"))
+
+    def test_linux_omits_process_rss(self):
+        if platform.system() != "Linux":
+            self.skipTest("RSS is omitted only on Linux")
+        metrics = measure_kv.collect_host_metrics()
+        self.assertIsNone(metrics["process_rss_bytes"])
+        self.assertTrue(any("omitted on Linux" in note for note in metrics["notes"]))
+
+    def test_thinking_token_counts_and_the_budget_is_larger_than_8(self):
+        self.assertEqual(measure_kv.token_text({"response": "", "thinking": "The", "done_reason": "length"}), "The")
+        self.assertEqual(measure_kv.token_text({"response": "ok", "thinking": ""}), "ok")
+        self.assertEqual(measure_kv.token_text({"response": "", "thinking": ""}), "")
+        self.assertTrue(measure_kv.stopped_on_length({"done": True, "done_reason": "length", "response": ""}))
+        self.assertFalse(measure_kv.stopped_on_length({"done": True, "done_reason": "stop", "response": "ok"}))
+        self.assertGreaterEqual(measure_kv.NUM_PREDICT, 32)
+        self.assertGreater(measure_kv.NUM_PREDICT_RETRY, measure_kv.NUM_PREDICT)
+        payload = measure_kv.build_generate_payload("qwen3:8b", 8192, measure_kv.NUM_PREDICT, True)
+        self.assertEqual(payload["think"], False)
+        self.assertEqual(payload["options"]["num_predict"], measure_kv.NUM_PREDICT)
+        self.assertNotIn("think", measure_kv.build_generate_payload("qwen3:8b", 8192, 8, False))
+        self.assertTrue(measure_kv.think_field_rejected(RuntimeError("Ollama returned HTTP 400 while generating.")))
+
+    def test_output_prefix_keeps_a_dotted_model_name(self):
+        json_path, csv_path = measure_kv.output_paths(Path("runs/kv-sweep-qwen3.8"))
+        self.assertEqual(json_path.as_posix(), "runs/kv-sweep-qwen3.8.json")
+        self.assertEqual(csv_path.as_posix(), "runs/kv-sweep-qwen3.8.csv")
+        props = measure_kv.chart_props_arg(
+            Path("/work/episodes/01-kv-cache/runs/kv-sweep-qwen3.8.json"),
+            Path("/work/episodes/01-kv-cache/chart"),
+        )
+        self.assertEqual(props, "../runs/kv-sweep-qwen3.8.json")
+        with tempfile.TemporaryDirectory() as tmp:
+            written, _csv = measure_kv.write_results(Path(tmp) / "kv-sweep-qwen3.8", {"rows": []})
+        self.assertEqual(written.name, "kv-sweep-qwen3.8.json")
 
 
 if __name__ == "__main__":

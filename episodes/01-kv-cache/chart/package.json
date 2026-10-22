@@ -6,7 +6,7 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts KVCacheChart out/kv-cache.mp4",
-    "still": "remotion still src/index.ts KVCacheChart out/kv-cache.png --frame=240",
+    "still": "remotion still src/index.ts KVCacheChart out/kv-cache.png --frame=264",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

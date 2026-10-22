@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { CAPTION_BAND, HEIGHT, theme, WIDTH } from "./theme";
+import { CAPTION_BAND, FPS, HEIGHT, theme, WIDTH } from "./theme";
 
 export type MeasurementRow = {
   num_ctx: number;
@@ -28,6 +28,10 @@ export type ChartProps = {
 
 const GIB = 1024 ** 3;
 const SAFE_HEIGHT = HEIGHT - CAPTION_BAND;
+const INTRO_FRAMES = 28;
+const HOLD_SECONDS = 2;
+// Extra frames past the 2s hold so the last label is not still landing on the final frames.
+const HOLD_PAD = 12;
 
 const formatGib = (bytes: number): string => {
   const gib = bytes / GIB;
@@ -35,11 +39,55 @@ const formatGib = (bytes: number): string => {
   return gib.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
 };
 
+const formatTick = (gib: number): string => {
+  if (Math.abs(gib - Math.round(gib)) < 1e-6) return String(Math.round(gib));
+  return gib.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+};
+
+/** Nice GiB steps so the axis reads 0, 5, 10, 20 rather than fractions of the tallest bar. */
+export const roundAxis = (maxBytes: number): { topBytes: number; ticks: number[] } => {
+  const maxGib = Math.max(maxBytes, 1) / GIB;
+  const steps: number[] = [];
+  for (const base of [1, 2, 2.5, 5]) {
+    for (let exp = -2; exp <= 4; exp++) steps.push(base * 10 ** exp);
+  }
+  steps.sort((a, b) => a - b);
+  let step = steps[steps.length - 1];
+  for (const candidate of steps) {
+    const intervals = Math.ceil(maxGib / candidate - 1e-9);
+    if (intervals >= 3 && intervals <= 6) {
+      step = candidate;
+      break;
+    }
+  }
+  const intervals = Math.max(1, Math.ceil(maxGib / step - 1e-9));
+  const top = intervals * step;
+  const ticks = Array.from({ length: intervals + 1 }, (_, index) => index * step);
+  return { topBytes: top * GIB, ticks };
+};
+
+/** Last bar and its label reach full size at least HOLD_SECONDS before the final frame. */
+export const barSpan = (rowCount: number, durationInFrames: number, fps: number): number => {
+  const rows = Math.max(1, rowCount);
+  const hold = Math.round(fps * HOLD_SECONDS);
+  const grow = 0.7;
+  const denom = rows - 1 + grow;
+  const room = durationInFrames - 1 - hold - HOLD_PAD - INTRO_FRAMES;
+  return Math.max(8, Math.floor(room / denom));
+};
+
+export const chartDuration = (rowCount: number, fps: number = FPS): number => {
+  const rows = Math.max(1, rowCount);
+  const span = 32;
+  const finish = INTRO_FRAMES + (rows - 1 + 0.7) * span;
+  return Math.max(fps * 12, Math.ceil(finish + fps * HOLD_SECONDS + HOLD_PAD));
+};
+
 const formatContext = (tokens: number): string => tokens.toLocaleString("en-US");
 
 export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const { durationInFrames, fps } = useVideoConfig();
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error("The measurements file needs a non-empty rows array.");
   }
@@ -48,6 +96,7 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
     1,
     ...sorted.flatMap((row) => [row.predicted_kv_bytes, row.measured_runtime_bytes ?? 0]),
   );
+  const axis = roundAxis(maxBytes);
   const axisOpacity = interpolate(frame, [0, 18], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -62,8 +111,7 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
   const plotHeight = plot.bottom - plot.top;
   const groupWidth = plotWidth / sorted.length;
   const barWidth = Math.min(52, groupWidth * 0.26);
-  const span = Math.max(16, Math.floor((durationInFrames - 48) / sorted.length));
-  const ticks = 4;
+  const span = barSpan(sorted.length, durationInFrames, fps);
   const showGap = sorted.some(
     (row) => row.measured_runtime_bytes != null && row.measured_runtime_bytes > row.predicted_kv_bytes,
   );
@@ -105,16 +153,16 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
           </div>
           {showGap ? (
             <div style={{ marginTop: 10, fontSize: 18, color: theme.muted }}>
-              measured includes the weights and other overhead
+              measured total includes weights and compute buffers
             </div>
           ) : null}
         </div>
 
         <svg width={WIDTH} height={SAFE_HEIGHT} style={{ position: "absolute", inset: 0, opacity: axisOpacity }}>
-          {Array.from({ length: ticks + 1 }, (_, index) => {
-            const fraction = index / ticks;
+          {axis.ticks.map((tick, index) => {
+            const fraction = tick / (axis.topBytes / GIB);
             const y = plot.bottom - plotHeight * fraction;
-            const label = formatGib((maxBytes * fraction));
+            const label = formatTick(tick);
             return (
               <g key={index}>
                 <line x1={plot.left} x2={plot.right} y1={y} y2={y} stroke={theme.grid} strokeWidth={1} />
@@ -156,9 +204,9 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
             extrapolateRight: "clamp",
           });
           const cx = plot.left + groupWidth * index + groupWidth / 2;
-          const predictedHeight = (row.predicted_kv_bytes / maxBytes) * plotHeight * grow;
+          const predictedHeight = (row.predicted_kv_bytes / axis.topBytes) * plotHeight * grow;
           const measuredHeight =
-            row.measured_runtime_bytes == null ? 0 : (row.measured_runtime_bytes / maxBytes) * plotHeight * grow;
+            row.measured_runtime_bytes == null ? 0 : (row.measured_runtime_bytes / axis.topBytes) * plotHeight * grow;
           const predictedX = cx - barWidth - 6;
           const measuredX = cx + 6;
           return (

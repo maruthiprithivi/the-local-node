@@ -5,7 +5,9 @@ Episode 1 — KV cache size from a model's real shape.
 
 The 2 is one key and one value. kv_heads is lower than the attention-head
 count when the model was trained with grouped query attention. Only tokens
-changes while you chat. A quantized cache changes bytes.
+changes while you chat. A quantized cache changes bytes. Hybrid models
+store that cache on the full-attention layers only. Linear and SSM layers
+do not, and next-token prediction blocks are not the chat cache.
 
     python kv_cache.py --example
     python kv_cache.py --ollama llama3.2:1b
@@ -78,6 +80,10 @@ class ModelShape:
     source: str = ""
     head_dim_note: str = ""
     weight_quant: str | None = None
+    block_count: int = 0
+    full_attention_interval: int | None = None
+    nextn_layers: int = 0
+    layer_note: str = ""
 
     @property
     def group_size(self) -> int:
@@ -179,6 +185,240 @@ def _positive_int(value: object, label: str) -> int:
     return number
 
 
+def _whole_number(value: object, label: str, *, allow_zero: bool = False) -> int:
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError(f"{label} is not a whole number")
+        value = int(value)
+    if isinstance(value, bool) or value is None or isinstance(value, (str, list)):
+        raise ValueError(f"{label} is missing")
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} is not an integer") from exc
+    if number < 0 or (number == 0 and not allow_zero):
+        raise ValueError(f"{label} must be a positive integer")
+    return number
+
+
+def _optional_int(value: object, label: str, *, allow_zero: bool = False) -> int | None:
+    if value is None:
+        return None
+    return _whole_number(value, label, allow_zero=allow_zero)
+
+
+def _bool_list(value: object, label: str) -> list[bool] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{label} must be a non-empty list")
+    flags: list[bool] = []
+    for item in value:
+        if isinstance(item, bool):
+            flags.append(item)
+        elif isinstance(item, int) and not isinstance(item, bool) and item in (0, 1):
+            flags.append(bool(item))
+        else:
+            raise ValueError(f"{label} must be booleans")
+    return flags
+
+
+# full_attention and sliding_attention store K and V. linear_attention does not.
+_KV_LAYER_TYPES = {"full_attention", "sliding_attention"}
+_LINEAR_LAYER_TYPES = {"linear_attention"}
+
+
+def _kv_flags_from_types(layer_types: list) -> list[bool]:
+    flags: list[bool] = []
+    for item in layer_types:
+        if not isinstance(item, str):
+            raise ValueError("layer_types must be strings")
+        key = item.strip().lower()
+        if key in _KV_LAYER_TYPES:
+            flags.append(True)
+        elif key in _LINEAR_LAYER_TYPES:
+            flags.append(False)
+        else:
+            raise ValueError(f"unrecognized layer type {item}")
+    return flags
+
+
+def attention_layout(
+    block_count: int,
+    *,
+    interval: int | None = None,
+    recurrent: list[bool] | None = None,
+    nextn: int | None = None,
+    keeps_kv: list[bool] | None = None,
+    mtp_listed_separately: int = 0,
+    mtp_appended: int = 0,
+    sliding: int = 0,
+) -> tuple[list[int], str, int | None, int]:
+    """Indices of trunk layers that store a growing chat KV cache.
+
+    A full-attention interval of 4 means layers 4, 8, 12, ... (1-based).
+    The rest of the trunk is linear or SSM. An explicit recurrent-layer
+    list, or a config layer_types list, wins over the interval.
+
+    Next-token / MTP blocks are excluded only when they sit inside
+    block_count (the count is strictly larger than the MTP count). A count
+    that is not smaller than block_count is a declared key whose blocks are
+    not in this list, so it is not subtracted.
+    """
+    if block_count <= 0:
+        raise ValueError("layers must be a positive integer")
+    nextn_n = 0 if nextn is None else nextn
+    if nextn_n < 0:
+        raise ValueError("next-token prediction layers must be zero or more")
+    if interval is not None and interval <= 0:
+        raise ValueError("full_attention_interval must be a positive integer")
+    mtp_inside = 0 < nextn_n < block_count
+    trunk = block_count - nextn_n if mtp_inside else block_count
+    if keeps_kv is not None:
+        if len(keeps_kv) != trunk and not (mtp_inside and len(keeps_kv) == block_count):
+            raise ValueError("layer_types does not match the layer count")
+        flags = keeps_kv[:trunk]
+        indices = [index for index, keeps in enumerate(flags) if keeps]
+        source = "types"
+    elif recurrent is not None:
+        if len(recurrent) == trunk or (mtp_inside and len(recurrent) == block_count):
+            flags = recurrent[:trunk]
+        elif len(recurrent) == block_count:
+            flags = recurrent
+        else:
+            raise ValueError("attention.recurrent_layers does not match the block count")
+        indices = [index for index, is_recurrent in enumerate(flags) if not is_recurrent]
+        source = "recurrent"
+    elif interval is not None and interval > 1:
+        indices = [index for index in range(trunk) if (index + 1) % interval == 0]
+        source = "interval"
+    else:
+        indices = list(range(trunk))
+        source = "all"
+    if not indices:
+        raise ValueError("this model has no full-attention layers, so the KV formula does not apply")
+    note = _layout_note(
+        block_count=block_count,
+        trunk=trunk,
+        indices=indices,
+        interval=interval,
+        source=source,
+        nextn_n=nextn_n,
+        mtp_inside=mtp_inside,
+        mtp_listed_separately=mtp_listed_separately,
+        mtp_appended=mtp_appended,
+        recurrent_skipped=(trunk - len(indices)) if source == "recurrent" else 0,
+        sliding=sliding,
+    )
+    return indices, note, interval, nextn_n
+
+
+def _layout_note(
+    *,
+    block_count: int,
+    trunk: int,
+    indices: list[int],
+    interval: int | None,
+    source: str,
+    nextn_n: int,
+    mtp_inside: bool,
+    mtp_listed_separately: int,
+    mtp_appended: int,
+    recurrent_skipped: int,
+    sliding: int,
+) -> str:
+    kv = len(indices)
+    declared_outside = nextn_n >= block_count and nextn_n > 0
+    hybrid = (
+        source in {"interval", "recurrent", "types"}
+        or mtp_inside
+        or mtp_listed_separately > 0
+        or mtp_appended > 0
+        or declared_outside
+    )
+    plain = (
+        kv == block_count
+        and source == "all"
+        and mtp_listed_separately == 0
+        and mtp_appended == 0
+        and not declared_outside
+    )
+    if not hybrid or plain:
+        return ""
+    sentences: list[str] = []
+    if kv != block_count:
+        sentences.append(f"{kv} of {block_count} blocks keep a growing KV cache.")
+    if source == "interval" and interval is not None and interval > 1:
+        sentences.append(
+            f"full_attention_interval is {interval}, so 1 of every {interval} layers is full attention. "
+            "The other layers are linear or SSM and do not grow a cache with the context."
+        )
+    elif source == "recurrent":
+        sentences.append(
+            f"{recurrent_skipped} trunk layers are marked recurrent (linear or SSM) and are not in the cache."
+        )
+    elif source == "types":
+        linear = trunk - kv
+        if linear:
+            win = " layer_types names the full-attention layers."
+            if interval is not None and interval > 1:
+                win = " layer_types names the full-attention layers, so that list wins over full_attention_interval."
+            sentences.append(f"{linear} trunk layers are linear attention and are not in the cache.{win}")
+        elif interval is not None and interval > 1:
+            sentences.append(
+                "layer_types names every trunk layer as full attention, so that list wins over full_attention_interval."
+            )
+    if source == "recurrent" and interval is not None and interval > 1:
+        sentences.append("attention.recurrent_layers names those layers, so it wins over full_attention_interval.")
+    if sliding > 0:
+        if sliding == 1:
+            sentences.append(
+                "1 sliding-attention layer stores K and V, so it is counted. "
+                "The formula still uses the full context you pass, which is larger than a short window."
+            )
+        else:
+            sentences.append(
+                f"{sliding} sliding-attention layers store K and V, so they are counted. "
+                "The formula still uses the full context you pass, which is larger than a short window."
+            )
+    if mtp_inside:
+        noun = "block" if nextn_n == 1 else "blocks"
+        verb = "is" if nextn_n == 1 else "are"
+        sentences.append(
+            f"{nextn_n} next-token prediction {noun} {verb} inside the block count and not counted. "
+            "Those layers are not the chat KV cache."
+        )
+    elif nextn_n >= block_count and nextn_n > 0:
+        sentences.append(
+            "A next-token prediction count was set but it is not smaller than the block count, "
+            "so those blocks are not inside this count and were not subtracted."
+        )
+    if mtp_listed_separately > 0:
+        noun = "layer" if mtp_listed_separately == 1 else "layers"
+        verb = "is" if mtp_listed_separately == 1 else "are"
+        sentences.append(
+            f"{mtp_listed_separately} next-token prediction {noun} {verb} listed separately from the "
+            "layer count, so it is not in the chat cache."
+        )
+    if mtp_appended > 0:
+        noun = "block" if mtp_appended == 1 else "blocks"
+        verb = "was" if mtp_appended == 1 else "were"
+        sentences.append(
+            f"{mtp_appended} next-token prediction {noun} {verb} appended to layer_types and not counted. "
+            "Those layers are not the chat KV cache."
+        )
+    if kv == block_count and not sentences:
+        return ""
+    return " ".join(sentences)
+
+
+def _count_for_layers(value: object, label: str, indices: list[int], block_count: int) -> int:
+    """Use one shape. A per-block list contributes only the KV layers."""
+    if isinstance(value, list) and len(value) == block_count:
+        return _positive_int([value[index] for index in indices], label)
+    return _positive_int(value, label)
+
+
 def _check_shape(layers: int, attention_heads: int, kv_heads: int, head_dim: int) -> None:
     if kv_heads > attention_heads:
         raise ValueError("KV heads cannot be greater than attention heads")
@@ -200,6 +440,10 @@ def shape_from_counts(
     source: str = "",
     head_dim_note: str = "",
     weight_quant: str | None = None,
+    block_count: int = 0,
+    full_attention_interval: int | None = None,
+    nextn_layers: int = 0,
+    layer_note: str = "",
 ) -> ModelShape:
     _check_shape(layers, attention_heads, kv_heads, head_dim)
     if bytes_per_value <= 0:
@@ -215,6 +459,10 @@ def shape_from_counts(
         source=source,
         head_dim_note=head_dim_note,
         weight_quant=weight_quant,
+        block_count=block_count,
+        full_attention_interval=full_attention_interval,
+        nextn_layers=nextn_layers,
+        layer_note=layer_note,
     )
 
 
@@ -236,10 +484,31 @@ def shape_from_gguf_metadata(
     arch = meta.get("general.architecture")
     if not isinstance(arch, str) or not arch:
         raise ValueError("model info has no general.architecture")
-    layers = _positive_int(_meta_value(meta, arch, "block_count"), "layers")
-    attention_heads = _positive_int(_meta_value(meta, arch, "attention.head_count"), "attention heads")
+    block_count = _positive_int(_meta_value(meta, arch, "block_count"), "layers")
+    interval = _optional_int(_meta_value(meta, arch, "full_attention_interval"), "full_attention_interval")
+    nextn = _optional_int(
+        _meta_value(meta, arch, "nextn_predict_layers"),
+        "next-token prediction layers",
+        allow_zero=True,
+    )
+    recurrent = _bool_list(
+        _meta_value(meta, arch, "attention.recurrent_layers"),
+        "attention.recurrent_layers",
+    )
+    indices, layer_note, _interval, nextn_n = attention_layout(
+        block_count,
+        interval=interval,
+        recurrent=recurrent,
+        nextn=nextn,
+    )
+    attention_heads = _count_for_layers(
+        _meta_value(meta, arch, "attention.head_count"),
+        "attention heads",
+        indices,
+        block_count,
+    )
     kv_raw = _meta_value(meta, arch, "attention.head_count_kv")
-    kv_heads = attention_heads if kv_raw is None else _positive_int(kv_raw, "KV heads")
+    kv_heads = attention_heads if kv_raw is None else _count_for_layers(kv_raw, "KV heads", indices, block_count)
     key_length = _meta_value(meta, arch, "attention.key_length", "attention.value_length")
     note = ""
     if key_length is None:
@@ -249,9 +518,9 @@ def shape_from_gguf_metadata(
         head_dim = embedding // attention_heads
         note = "embedding length / attention heads"
     else:
-        head_dim = _positive_int(key_length, "head dim")
+        head_dim = _count_for_layers(key_length, "head dim", indices, block_count)
     return shape_from_counts(
-        layers=layers,
+        layers=len(indices),
         attention_heads=attention_heads,
         kv_heads=kv_heads,
         head_dim=head_dim,
@@ -259,6 +528,10 @@ def shape_from_gguf_metadata(
         source=source,
         head_dim_note=note,
         weight_quant=weight_quant,
+        block_count=block_count,
+        full_attention_interval=interval if interval and interval > 1 else None,
+        nextn_layers=nextn_n,
+        layer_note=layer_note,
     )
 
 
@@ -282,18 +555,84 @@ def _config_value(block: dict, *keys: str) -> object | None:
     return None
 
 
+def _config_value_any(block: dict, root: dict, *keys: str) -> object | None:
+    value = _config_value(block, *keys)
+    if value is None and block is not root:
+        return _config_value(root, *keys)
+    return value
+
+
+def _trim_mtp_tail(value: object, block_count: int, mtp: int, trimmed: bool) -> object:
+    if trimmed and isinstance(value, list) and len(value) == block_count + mtp:
+        return value[:block_count]
+    return value
+
+
 def shape_from_config(cfg: dict, *, name: str = "config.json", source: str = "config.json") -> ModelShape:
     if not isinstance(cfg, dict):
         raise ValueError("config.json must be a JSON object")
     block = _config_block(cfg)
-    layers = _positive_int(_config_value(block, "num_hidden_layers", "n_layer", "num_layers"), "layers")
-    attention_heads = _positive_int(
-        _config_value(block, "num_attention_heads", "n_head", "num_heads"),
-        "attention heads",
+    block_count = _positive_int(_config_value(block, "num_hidden_layers", "n_layer", "num_layers"), "layers")
+    interval = _optional_int(
+        _config_value_any(block, cfg, "full_attention_interval"),
+        "full_attention_interval",
     )
-    kv_raw = _config_value(block, "num_key_value_heads", "num_kv_heads", "n_head_kv")
-    kv_heads = attention_heads if kv_raw is None else _positive_int(kv_raw, "KV heads")
-    head_dim_raw = _config_value(block, "head_dim", "attention_head_dim")
+    mtp = _optional_int(
+        _config_value_any(block, cfg, "mtp_num_hidden_layers", "num_nextn_predict_layers"),
+        "next-token prediction layers",
+        allow_zero=True,
+    )
+    raw_types = _config_value_any(block, cfg, "layer_types")
+    keeps_kv = None
+    sliding = 0
+    mtp_separate = 0
+    mtp_appended = 0
+    if raw_types is not None:
+        if not isinstance(raw_types, list) or not raw_types:
+            raise ValueError("layer_types must be a non-empty list")
+        types = list(raw_types)
+        if mtp and len(types) == block_count + mtp:
+            types = types[:block_count]
+            mtp_appended = mtp
+        elif mtp and len(types) == block_count:
+            mtp_separate = mtp
+        keeps_kv = _kv_flags_from_types(types)
+        sliding = sum(1 for item in types if isinstance(item, str) and item.strip().lower() == "sliding_attention")
+    elif mtp:
+        # num_hidden_layers is the trunk. MTP listed beside it is not inside that count.
+        mtp_separate = mtp
+    indices, layer_note, _interval, _nextn = attention_layout(
+        block_count,
+        interval=interval,
+        keeps_kv=keeps_kv,
+        mtp_listed_separately=mtp_separate,
+        mtp_appended=mtp_appended,
+        sliding=sliding,
+    )
+    attention_heads = _count_for_layers(
+        _trim_mtp_tail(
+            _config_value(block, "num_attention_heads", "n_head", "num_heads"),
+            block_count,
+            mtp or 0,
+            bool(mtp_appended),
+        ),
+        "attention heads",
+        indices,
+        block_count,
+    )
+    kv_raw = _trim_mtp_tail(
+        _config_value(block, "num_key_value_heads", "num_kv_heads", "n_head_kv"),
+        block_count,
+        mtp or 0,
+        bool(mtp_appended),
+    )
+    kv_heads = attention_heads if kv_raw is None else _count_for_layers(kv_raw, "KV heads", indices, block_count)
+    head_dim_raw = _trim_mtp_tail(
+        _config_value(block, "head_dim", "attention_head_dim"),
+        block_count,
+        mtp or 0,
+        bool(mtp_appended),
+    )
     note = ""
     if head_dim_raw is None:
         hidden = _positive_int(_config_value(block, "hidden_size", "n_embd", "d_model"), "hidden size")
@@ -302,7 +641,7 @@ def shape_from_config(cfg: dict, *, name: str = "config.json", source: str = "co
         head_dim = hidden // attention_heads
         note = "hidden size / attention heads"
     else:
-        head_dim = _positive_int(head_dim_raw, "head dim")
+        head_dim = _count_for_layers(head_dim_raw, "head dim", indices, block_count)
     dtype_raw = _config_value(block, "torch_dtype", "dtype")
     if dtype_raw is None:
         dtype_raw = cfg.get("torch_dtype") or cfg.get("dtype")
@@ -315,7 +654,7 @@ def shape_from_config(cfg: dict, *, name: str = "config.json", source: str = "co
         width = _DTYPE_BYTES[key]
         dtype_name = "bf16" if "bfloat" in key or key == "bf16" else ("f32" if width == 4 else "f16")
     return shape_from_counts(
-        layers=layers,
+        layers=len(indices),
         attention_heads=attention_heads,
         kv_heads=kv_heads,
         head_dim=head_dim,
@@ -324,6 +663,10 @@ def shape_from_config(cfg: dict, *, name: str = "config.json", source: str = "co
         name=name,
         source=source,
         head_dim_note=note,
+        block_count=block_count,
+        full_attention_interval=interval if interval and interval > 1 else None,
+        nextn_layers=mtp or 0,
+        layer_note=layer_note,
     )
 
 
@@ -514,6 +857,8 @@ def render_report(
     if shape.source:
         lines.append(f"source: {shape.source}")
     lines.append(f"layers: {shape.layers}")
+    if shape.layer_note:
+        lines.append(shape.layer_note)
     lines.append(f"attention heads: {shape.attention_heads}")
     lines.append(f"kv_heads: {shape.kv_heads}")
     head = f"head dim: {shape.head_dim}"
