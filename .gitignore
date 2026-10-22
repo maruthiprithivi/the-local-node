@@ -6,6 +6,7 @@ dist/
 **/__pycache__/
 **/.venv/
 **/results/
+episodes/01-kv-cache/runs/
 **/out/
 .env
 .env.*

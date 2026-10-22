@@ -1,0 +1,84 @@
+{
+  "model": "example shape",
+  "source": "sample",
+  "os": "sample",
+  "kv_cache_type": "f16",
+  "shape": {
+    "layers": 32,
+    "attention_heads": 32,
+    "kv_heads": 32,
+    "head_dim": 128,
+    "bytes_per_value": 2
+  },
+  "notes": [
+    "Sample rows so the chart renders before a live run. There is no GPU or process figure, so the chart draws predicted growth from the shortest context. The formula line shows the total at the longest context. measured_runtime_bytes is the predicted cache plus a fixed 5 GiB and is left in the file. It is not a measurement."
+  ],
+  "rows": [
+    {
+      "num_ctx": 1024,
+      "predicted_kv_bytes": 536870912,
+      "measured_runtime_bytes": 5905580032,
+      "measured_vram_bytes": null,
+      "gpu_memory_bytes": null,
+      "process_rss_bytes": null,
+      "ttft_ms": null,
+      "load_ms": null,
+      "notes": ""
+    },
+    {
+      "num_ctx": 2048,
+      "predicted_kv_bytes": 1073741824,
+      "measured_runtime_bytes": 6442450944,
+      "measured_vram_bytes": null,
+      "gpu_memory_bytes": null,
+      "process_rss_bytes": null,
+      "ttft_ms": null,
+      "load_ms": null,
+      "notes": ""
+    },
+    {
+      "num_ctx": 4096,
+      "predicted_kv_bytes": 2147483648,
+      "measured_runtime_bytes": 7516192768,
+      "measured_vram_bytes": null,
+      "gpu_memory_bytes": null,
+      "process_rss_bytes": null,
+      "ttft_ms": null,
+      "load_ms": null,
+      "notes": ""
+    },
+    {
+      "num_ctx": 8192,
+      "predicted_kv_bytes": 4294967296,
+      "measured_runtime_bytes": 9663676416,
+      "measured_vram_bytes": null,
+      "gpu_memory_bytes": null,
+      "process_rss_bytes": null,
+      "ttft_ms": null,
+      "load_ms": null,
+      "notes": ""
+    },
+    {
+      "num_ctx": 16384,
+      "predicted_kv_bytes": 8589934592,
+      "measured_runtime_bytes": 13958643712,
+      "measured_vram_bytes": null,
+      "gpu_memory_bytes": null,
+      "process_rss_bytes": null,
+      "ttft_ms": null,
+      "load_ms": null,
+      "notes": ""
+    },
+    {
+      "num_ctx": 32768,
+      "predicted_kv_bytes": 17179869184,
+      "measured_runtime_bytes": 22548578304,
+      "measured_vram_bytes": null,
+      "gpu_memory_bytes": null,
+      "process_rss_bytes": null,
+      "ttft_ms": null,
+      "load_ms": null,
+      "notes": ""
+    }
+  ]
+}

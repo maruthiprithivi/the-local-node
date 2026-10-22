@@ -1,0 +1,24 @@
+{
+  "name": "ep01-kv-cache-chart",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Predicted versus measured KV cache chart for episode 1.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts KVCacheChart out/kv-cache.mp4",
+    "still": "remotion still src/index.ts KVCacheChart out/kv-cache.png --frame=264",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/series.check.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.527",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.527"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "typescript": "5.9.3"
+  }
+}
