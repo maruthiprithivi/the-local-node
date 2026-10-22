@@ -19,6 +19,7 @@ See [contributing](CONTRIBUTING.md) for lesson updates, alignment checks and the
 ## In this repository
 
 - [`tracks/`](tracks/) contains the learning materials, with one directory per topic.
+- [`episodes/01-kv-cache/`](episodes/01-kv-cache/) is the follow-along kit for episode one. It sizes a model's KV cache, measures that cache on Ollama, and renders the chart.
 - [`website/`](website/) contains the code that publishes the guided courses.
 - [`assets/brand/`](assets/brand/) contains shared artwork for The Local Node.
 
