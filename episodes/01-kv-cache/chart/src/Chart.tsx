@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { chooseMeasured } from "./series";
+import { chartSeries } from "./series";
 import { CAPTION_BAND, FPS, HEIGHT, theme, WIDTH } from "./theme";
 
 export type MeasurementRow = {
@@ -98,10 +98,11 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
     throw new Error("The measurements file needs a non-empty rows array.");
   }
   const sorted = [...rows].sort((a, b) => a.num_ctx - b.num_ctx);
-  const measured = chooseMeasured(sorted);
+  const series = chartSeries(sorted);
   const maxBytes = Math.max(
     1,
-    ...sorted.flatMap((row, index) => [row.predicted_kv_bytes, Math.max(0, measured.growth[index] ?? 0)]),
+    ...series.predicted.map((value) => Math.max(0, value ?? 0)),
+    ...series.measured.map((value) => Math.max(0, value ?? 0)),
   );
   const axis = roundAxis(maxBytes);
   const axisOpacity = interpolate(frame, [0, 18], [0, 1], {
@@ -135,26 +136,36 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
       <div style={{ height: SAFE_HEIGHT, overflow: "hidden", position: "relative" }}>
         <div style={{ position: "absolute", left: 72, top: 36, opacity: titleOpacity }}>
           <div style={{ fontFamily: theme.serif, fontStyle: "italic", fontSize: 64, lineHeight: 1 }}>
-            {measured.label ? "Predicted vs measured" : "Predicted KV cache"}
+            {series.measuredLabel ? "Predicted vs measured" : "Predicted KV cache growth"}
           </div>
           <div style={{ marginTop: 14, fontSize: 22, color: theme.muted }}>{model}</div>
           {shapeLine ? <div style={{ marginTop: 6, fontSize: 20, color: theme.muted }}>{shapeLine}</div> : null}
           {gqaLine ? <div style={{ marginTop: 4, fontSize: 20, color: theme.muted }}>{gqaLine}</div> : null}
         </div>
 
-        <div style={{ position: "absolute", right: 72, top: 48, textAlign: "right", opacity: titleOpacity }}>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 22, fontSize: 20 }}>
+        <div
+          style={{
+            position: "absolute",
+            right: 72,
+            top: 48,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 8,
+            fontSize: 20,
+            opacity: titleOpacity,
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 18, height: 18, background: theme.predicted, display: "inline-block" }} />
+            {series.predictedLabel}
+          </span>
+          {series.measuredLabel ? (
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 18, height: 18, background: theme.predicted, display: "inline-block" }} />
-              predicted KV cache
+              <span style={{ width: 18, height: 18, background: theme.measured, display: "inline-block" }} />
+              {series.measuredLabel}
             </span>
-            {measured.label ? (
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 18, height: 18, background: theme.measured, display: "inline-block" }} />
-                {measured.label}
-              </span>
-            ) : null}
-          </div>
+          ) : null}
         </div>
 
         <svg width={WIDTH} height={SAFE_HEIGHT} style={{ position: "absolute", inset: 0, opacity: axisOpacity }}>
@@ -189,6 +200,11 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
           <text x={72} y={900} fill={theme.muted} fontSize={20} fontFamily={theme.mono}>
             2 x layers x kv_heads x head_dim x bytes x tokens
           </text>
+          {series.longest ? (
+            <text x={plot.right} y={900} fill={theme.muted} fontSize={20} textAnchor="end" fontFamily={theme.mono}>
+              {formatGib(series.longest.predicted_kv_bytes)} GiB predicted at {formatContext(series.longest.num_ctx)} tokens
+            </text>
+          ) : null}
         </svg>
 
         {sorted.map((row, index) => {
@@ -203,10 +219,13 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
             extrapolateRight: "clamp",
           });
           const cx = plot.left + groupWidth * index + groupWidth / 2;
-          const growth = measured.growth[index];
-          const predictedHeight = (row.predicted_kv_bytes / axis.topBytes) * plotHeight * grow;
-          const measuredHeight = growth == null ? 0 : (Math.max(0, growth) / axis.topBytes) * plotHeight * grow;
-          const predictedX = measured.label ? cx - barWidth - 6 : cx - barWidth / 2;
+          const predictedGrowth = series.predicted[index];
+          const measuredGrowth = series.measured[index];
+          const predictedHeight =
+            predictedGrowth == null ? 0 : (Math.max(0, predictedGrowth) / axis.topBytes) * plotHeight * grow;
+          const measuredHeight =
+            measuredGrowth == null ? 0 : (Math.max(0, measuredGrowth) / axis.topBytes) * plotHeight * grow;
+          const predictedX = series.measuredLabel ? cx - barWidth - 6 : cx - barWidth / 2;
           const measuredX = cx + 6;
           return (
             <React.Fragment key={row.num_ctx}>
@@ -220,7 +239,7 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
                   background: theme.predicted,
                 }}
               />
-              {growth != null ? (
+              {measuredGrowth != null ? (
                 <div
                   style={{
                     position: "absolute",
@@ -258,11 +277,13 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
                   fontFamily: theme.mono,
                 }}
               >
-                <span style={{ color: theme.predicted }}>{formatGib(row.predicted_kv_bytes)}</span>
-                {growth != null ? (
+                {predictedGrowth != null ? (
+                  <span style={{ color: theme.predicted }}>{formatGib(predictedGrowth)}</span>
+                ) : null}
+                {measuredGrowth != null ? (
                   <>
                     <span style={{ color: theme.muted }}> / </span>
-                    <span style={{ color: theme.measured }}>{formatGib(growth)}</span>
+                    <span style={{ color: theme.measured }}>{formatGib(measuredGrowth)}</span>
                   </>
                 ) : null}
               </div>

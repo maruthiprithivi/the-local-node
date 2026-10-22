@@ -7,9 +7,10 @@ reads /api/ps after each load. predicted_kv_bytes is the formula from
 kv_cache.py. measured_runtime_bytes is the size Ollama reports. That
 total includes the weights and compute buffers, not just the KV cache.
 The growth from one context rung to the next is the part that tracks the cache.
-The chart plots that growth: attributed GPU memory when gpu_attribution is
-set, and process RSS when the row says unavailable. Ollama's reported size
-stays in the file.
+The chart plots predicted and measured growth from the same context:
+attributed GPU memory when gpu_attribution is set, and process RSS when
+the row says unavailable. The formula line shows the total predicted cache
+at the longest context. Ollama's reported size stays in the file.
 
     python measure_kv.py
     python measure_kv.py --pull
