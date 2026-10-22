@@ -1,6 +1,6 @@
 # Episode 1: why your 8B model runs out of memory
 
-This folder is the live demo for the episode. Clone the repo, open this folder, and run the same commands on your own machine. The weights stay one size. The KV cache grows with every token, and it grows again with every parallel chat.
+This folder is the live demo for the episode. Clone the repo, open this folder, and run the same commands on your own machine. The [playbook](../../PLAYBOOK.md) is the standard way to reproduce any episode demo end to end. The weights stay one size. The KV cache grows with every token, and it grows again with every parallel chat.
 
 The calculator reads the real shape (layers, KV heads, head dim, dtype) and prints the formula. The measurement script asks a local Ollama server for the memory it reports at several context lengths, plus the time to the first token. The chart draws those two series.
 
