@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { chartSeries } from "./series";
+import { CHART_PLOT, LABEL_FONT_PX, chartSeries, comparisonSubtitle, formatBarValue, formatTotalGb, placeRungLabels, rungBars } from "./series";
 import { CAPTION_BAND, FPS, HEIGHT, theme, WIDTH } from "./theme";
 
 export type MeasurementRow = {
@@ -32,27 +32,24 @@ export type ChartProps = {
   kv_cache_type?: string;
 };
 
-const GIB = 1024 ** 3;
+const GB = 1e9;
 const SAFE_HEIGHT = HEIGHT - CAPTION_BAND;
 const INTRO_FRAMES = 28;
 const HOLD_SECONDS = 2;
 // Extra frames past the 2s hold so the last label is not still landing on the final frames.
 const HOLD_PAD = 12;
 
-const formatGib = (bytes: number): string => {
-  const gib = bytes / GIB;
-  if (Math.abs(gib - Math.round(gib)) < 1e-9) return String(Math.round(gib));
-  return gib.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
-};
+const LABEL_FONT = LABEL_FONT_PX;
+const CAPTION_FONT = 'ui-sans-serif, system-ui, "Segoe UI", sans-serif';
 
 const formatTick = (gib: number): string => {
   if (Math.abs(gib - Math.round(gib)) < 1e-6) return String(Math.round(gib));
   return gib.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 };
 
-/** Nice GiB steps so the axis reads 0, 5, 10, 20 rather than fractions of the tallest bar. */
+/** Nice decimal-GB steps so the axis reads 0, 0.5, 1, 2 rather than fractions of the tallest bar. */
 export const roundAxis = (maxBytes: number): { topBytes: number; ticks: number[] } => {
-  const maxGib = Math.max(maxBytes, 1) / GIB;
+  const maxGb = Math.max(maxBytes, 1) / GB;
   const steps: number[] = [];
   for (const base of [1, 2, 2.5, 5]) {
     for (let exp = -2; exp <= 4; exp++) steps.push(base * 10 ** exp);
@@ -60,16 +57,16 @@ export const roundAxis = (maxBytes: number): { topBytes: number; ticks: number[]
   steps.sort((a, b) => a - b);
   let step = steps[steps.length - 1];
   for (const candidate of steps) {
-    const intervals = Math.ceil(maxGib / candidate - 1e-9);
+    const intervals = Math.ceil(maxGb / candidate - 1e-9);
     if (intervals >= 3 && intervals <= 6) {
       step = candidate;
       break;
     }
   }
-  const intervals = Math.max(1, Math.ceil(maxGib / step - 1e-9));
+  const intervals = Math.max(1, Math.ceil(maxGb / step - 1e-9));
   const top = intervals * step;
   const ticks = Array.from({ length: intervals + 1 }, (_, index) => index * step);
-  return { topBytes: top * GIB, ticks };
+  return { topBytes: top * GB, ticks };
 };
 
 /** Last bar and its label reach full size at least HOLD_SECONDS before the final frame. */
@@ -114,11 +111,9 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
     extrapolateRight: "clamp",
   });
 
-  const plot = { left: 148, right: 1840, top: 236, bottom: 740 };
-  const plotWidth = plot.right - plot.left;
+  const plot = CHART_PLOT;
   const plotHeight = plot.bottom - plot.top;
-  const groupWidth = plotWidth / sorted.length;
-  const barWidth = Math.min(52, groupWidth * 0.26);
+  const hasMeasured = series.measuredLabel != null;
   const span = barSpan(sorted.length, durationInFrames, fps);
   const kvLayers = shape ? (shape.kv_layers ?? shape.layers) : 0;
   const shapeLine = shape
@@ -134,25 +129,44 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
   return (
     <AbsoluteFill style={{ backgroundColor: theme.bg, fontFamily: theme.mono, color: theme.ink }}>
       <div style={{ height: SAFE_HEIGHT, overflow: "hidden", position: "relative" }}>
-        <div style={{ position: "absolute", left: 72, top: 36, opacity: titleOpacity }}>
-          <div style={{ fontFamily: theme.serif, fontStyle: "italic", fontSize: 64, lineHeight: 1 }}>
+        <div style={{ position: "absolute", left: 72, top: 28, right: 640, opacity: titleOpacity }}>
+          <div style={{ fontFamily: theme.serif, fontStyle: "italic", fontSize: 52, lineHeight: 1 }}>
             {series.measuredLabel ? "Predicted vs measured" : "Predicted KV cache growth"}
           </div>
-          <div style={{ marginTop: 14, fontSize: 22, color: theme.muted }}>{model}</div>
-          {shapeLine ? <div style={{ marginTop: 6, fontSize: 20, color: theme.muted }}>{shapeLine}</div> : null}
-          {gqaLine ? <div style={{ marginTop: 4, fontSize: 20, color: theme.muted }}>{gqaLine}</div> : null}
+        </div>
+        {series.baselineTokens != null ? (
+          <div
+            style={{
+              position: "absolute",
+              left: 72,
+              right: 72,
+              top: 108,
+              fontSize: LABEL_FONT,
+              lineHeight: 1.2,
+              color: theme.ink,
+              fontFamily: CAPTION_FONT,
+              opacity: titleOpacity,
+            }}
+          >
+            {comparisonSubtitle(series.baselineTokens)}
+          </div>
+        ) : null}
+        <div style={{ position: "absolute", left: 72, top: 152, opacity: titleOpacity }}>
+          <div style={{ fontSize: LABEL_FONT, color: theme.muted }}>{model}</div>
+          {shapeLine ? <div style={{ marginTop: 6, fontSize: LABEL_FONT, color: theme.muted }}>{shapeLine}</div> : null}
+          {gqaLine ? <div style={{ marginTop: 4, fontSize: LABEL_FONT, color: theme.muted }}>{gqaLine}</div> : null}
         </div>
 
         <div
           style={{
             position: "absolute",
             right: 72,
-            top: 48,
+            top: 32,
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
-            gap: 8,
-            fontSize: 20,
+            gap: 10,
+            fontSize: LABEL_FONT,
             opacity: titleOpacity,
           }}
         >
@@ -168,41 +182,45 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
           ) : null}
         </div>
 
+        <div
+          style={{
+            position: "absolute",
+            left: plot.left,
+            top: plot.top - 78,
+            fontSize: LABEL_FONT,
+            lineHeight: 1,
+            color: theme.muted,
+            fontFamily: theme.mono,
+            opacity: axisOpacity,
+          }}
+        >
+          extra memory used (GB)
+        </div>
+
         <svg width={WIDTH} height={SAFE_HEIGHT} style={{ position: "absolute", inset: 0, opacity: axisOpacity }}>
           {axis.ticks.map((tick, index) => {
-            const fraction = tick / (axis.topBytes / GIB);
+            const fraction = tick / (axis.topBytes / GB);
             const y = plot.bottom - plotHeight * fraction;
             const label = formatTick(tick);
             return (
               <g key={index}>
                 <line x1={plot.left} x2={plot.right} y1={y} y2={y} stroke={theme.grid} strokeWidth={1} />
-                <text x={plot.left - 16} y={y + 6} fill={theme.muted} fontSize={18} textAnchor="end" fontFamily={theme.mono}>
+                <text x={plot.left - 18} y={y + 9} fill={theme.muted} fontSize={LABEL_FONT} textAnchor="end" fontFamily={theme.mono}>
                   {label}
                 </text>
               </g>
             );
           })}
-          <text
-            x={28}
-            y={(plot.top + plot.bottom) / 2}
-            fill={theme.muted}
-            fontSize={16}
-            textAnchor="middle"
-            fontFamily={theme.mono}
-            transform={`rotate(-90 28 ${(plot.top + plot.bottom) / 2})`}
-          >
-            GiB
-          </text>
           <line x1={plot.left} x2={plot.right} y1={plot.bottom} y2={plot.bottom} stroke={theme.ink} strokeWidth={1.5} />
-          <text x={(plot.left + plot.right) / 2} y={860} fill={theme.muted} fontSize={20} textAnchor="middle" fontFamily={theme.mono}>
+          <text x={(plot.left + plot.right) / 2} y={820} fill={theme.muted} fontSize={LABEL_FONT} textAnchor="middle" fontFamily={theme.mono}>
             context length (tokens)
           </text>
-          <text x={72} y={900} fill={theme.muted} fontSize={20} fontFamily={theme.mono}>
+          <text x={72} y={880} fill={theme.muted} fontSize={LABEL_FONT} fontFamily={theme.mono}>
             2 x layers x kv_heads x head_dim x bytes x tokens
           </text>
           {series.longest ? (
-            <text x={plot.right} y={900} fill={theme.muted} fontSize={20} textAnchor="end" fontFamily={theme.mono}>
-              {formatGib(series.longest.predicted_kv_bytes)} GiB predicted at {formatContext(series.longest.num_ctx)} tokens
+            <text x={plot.right} y={880} fill={theme.muted} fontSize={LABEL_FONT} textAnchor="end" fontFamily={theme.mono}>
+              {formatTotalGb(series.longest.predicted_kv_bytes)} predicted at {formatContext(series.longest.num_ctx)} tokens
             </text>
           ) : null}
         </svg>
@@ -218,15 +236,28 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           });
-          const cx = plot.left + groupWidth * index + groupWidth / 2;
+          const bars = rungBars(sorted.length, index, hasMeasured);
+          const { barWidth, predictedX, measuredX, cx, groupWidth } = bars;
           const predictedGrowth = series.predicted[index];
           const measuredGrowth = series.measured[index];
+          const onBaseline = index === series.baselineIndex;
+          const predictedText = predictedGrowth == null ? null : formatBarValue(predictedGrowth);
+          const measuredText = measuredGrowth == null ? null : formatBarValue(measuredGrowth);
           const predictedHeight =
             predictedGrowth == null ? 0 : (Math.max(0, predictedGrowth) / axis.topBytes) * plotHeight * grow;
           const measuredHeight =
             measuredGrowth == null ? 0 : (Math.max(0, measuredGrowth) / axis.topBytes) * plotHeight * grow;
-          const predictedX = series.measuredLabel ? cx - barWidth - 6 : cx - barWidth / 2;
-          const measuredX = cx + 6;
+          const labels = placeRungLabels({
+            predictedText,
+            measuredText,
+            predictedX,
+            measuredX,
+            predictedTop: Math.max(plot.top - 36, plot.bottom - predictedHeight - 36),
+            measuredTop: Math.max(plot.top - 36, plot.bottom - measuredHeight - 36),
+            barWidth,
+            fontSize: LABEL_FONT,
+            minTop: plot.top - 36,
+          });
           return (
             <React.Fragment key={row.num_ctx}>
               <div
@@ -258,35 +289,69 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
                   top: plot.bottom + 14,
                   width: groupWidth,
                   textAlign: "center",
-                  fontSize: 20,
+                  fontSize: LABEL_FONT,
                   color: theme.ink,
                   fontFamily: theme.mono,
                 }}
               >
                 {formatContext(row.num_ctx)}
               </div>
-              <div
-                style={{
-                  position: "absolute",
-                  left: cx - groupWidth / 2,
-                  top: plot.bottom + 40,
-                  width: groupWidth,
-                  textAlign: "center",
-                  fontSize: 16,
-                  opacity: labelOpacity,
-                  fontFamily: theme.mono,
-                }}
-              >
-                {predictedGrowth != null ? (
-                  <span style={{ color: theme.predicted }}>{formatGib(predictedGrowth)}</span>
-                ) : null}
-                {measuredGrowth != null ? (
-                  <>
-                    <span style={{ color: theme.muted }}> / </span>
-                    <span style={{ color: theme.measured }}>{formatGib(measuredGrowth)}</span>
-                  </>
-                ) : null}
-              </div>
+              {labels.predicted && predictedText != null ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: labels.predicted.x,
+                    top: labels.predicted.y,
+                    width: labels.predicted.w,
+                    height: labels.predicted.h,
+                    textAlign: "center",
+                    fontSize: LABEL_FONT,
+                    lineHeight: 1,
+                    color: theme.predicted,
+                    fontFamily: CAPTION_FONT,
+                    opacity: labelOpacity,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {predictedText}
+                </div>
+              ) : null}
+              {labels.measured && measuredText != null ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: labels.measured.x,
+                    top: labels.measured.y,
+                    width: labels.measured.w,
+                    height: labels.measured.h,
+                    textAlign: "center",
+                    fontSize: LABEL_FONT,
+                    lineHeight: 1,
+                    color: theme.measured,
+                    fontFamily: CAPTION_FONT,
+                    opacity: labelOpacity,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {measuredText}
+                </div>
+              ) : null}
+              {onBaseline ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: cx - groupWidth / 2,
+                    top: plot.bottom + 52,
+                    width: groupWidth,
+                    textAlign: "center",
+                    fontSize: LABEL_FONT,
+                    color: theme.ink,
+                    fontFamily: CAPTION_FONT,
+                  }}
+                >
+                  baseline
+                </div>
+              ) : null}
             </React.Fragment>
           );
         })}

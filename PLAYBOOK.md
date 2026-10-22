@@ -154,7 +154,7 @@ npm run still
 npm run render -- --props=../runs/kv-sweep.json
 ```
 
-`npm run render` writes `chart/out/kv-cache.mp4`. `npm run still` writes one frame. Both series on a live file are growth from the same baseline context. The formula line shows the total predicted cache at the longest context.
+`npm run render` writes `chart/out/kv-cache.mp4`. `npm run still` writes one frame. Both series on a live file are growth from the same baseline context. Labels use decimal GB (`bytes / 1e9`): a number on each bar, such as `2.1` and `2.5`, with `baseline` under the shortest rung. The axis title is `extra memory used (GB)`. The formula line shows the total predicted cache at the longest context.
 
 Whiteboard: open `whiteboard/kv-cache.excalidraw` in [Excalidraw](https://excalidraw.com). Strokes are black on white.
 
