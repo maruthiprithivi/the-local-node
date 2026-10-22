@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chartSeries, comparisonSubtitle, formatBarValue, formatTotalGb } from "./series.ts";
+import {
+  CHART_PLOT,
+  LABEL_FONT_PX,
+  boxesIntersect,
+  chartSeries,
+  comparisonSubtitle,
+  formatBarValue,
+  formatTotalGb,
+  placeRungLabels,
+  rungBars,
+} from "./series.ts";
 
 const MIB = 1024 * 1024;
 
@@ -110,4 +120,62 @@ test("viewer labels use decimal GB and MB, and exact zero stays 0", () => {
     comparisonSubtitle(1024),
     "Extra memory needed as the conversation gets longer, compared with a 1,024-token chat",
   );
+});
+
+const llamaFixtures = [
+  { num_ctx: 512, predicted: 0, measured: 0 },
+  { num_ctx: 1024, predicted: 17e6, measured: 18e6 },
+  { num_ctx: 2048, predicted: 50e6, measured: 65e6 },
+  { num_ctx: 4096, predicted: 200e6, measured: 260e6 },
+  { num_ctx: 8192, predicted: 800e6, measured: 1.1e9 },
+];
+
+test("llama rung labels do not overlap", () => {
+  assert.equal(formatBarValue(17e6), "17 MB");
+  assert.equal(formatBarValue(18e6), "18 MB");
+  assert.equal(formatBarValue(50e6), "50 MB");
+  assert.equal(formatBarValue(65e6), "65 MB");
+
+  const plotHeight = CHART_PLOT.bottom - CHART_PLOT.top;
+  const topBytes = 2.5e9;
+  const fontSize = LABEL_FONT_PX;
+  for (const [index, rung] of llamaFixtures.entries()) {
+    const bars = rungBars(llamaFixtures.length, index, true);
+    const predictedText = formatBarValue(rung.predicted);
+    const measuredText = formatBarValue(rung.measured);
+    const predictedHeight = (Math.max(0, rung.predicted) / topBytes) * plotHeight;
+    const measuredHeight = (Math.max(0, rung.measured) / topBytes) * plotHeight;
+    const tops = {
+      predictedTop: Math.max(CHART_PLOT.top - 36, CHART_PLOT.bottom - predictedHeight - 36),
+      measuredTop: Math.max(CHART_PLOT.top - 36, CHART_PLOT.bottom - measuredHeight - 36),
+    };
+    const naive = placeRungLabels({
+      predictedText,
+      measuredText,
+      predictedX: bars.predictedX,
+      measuredX: bars.measuredX,
+      ...tops,
+      barWidth: bars.barWidth,
+      fontSize,
+      minTop: CHART_PLOT.top - 36,
+      avoidCollision: false,
+    });
+    const placed = placeRungLabels({
+      predictedText,
+      measuredText,
+      predictedX: bars.predictedX,
+      measuredX: bars.measuredX,
+      ...tops,
+      barWidth: bars.barWidth,
+      fontSize,
+      minTop: CHART_PLOT.top - 36,
+    });
+    assert.ok(placed.predicted);
+    assert.ok(placed.measured);
+    assert.equal(boxesIntersect(placed.predicted, placed.measured), false);
+    if (rung.num_ctx === 1024 || rung.num_ctx === 2048) {
+      assert.equal(boxesIntersect(naive.predicted, naive.measured), true);
+      assert.ok(placed.measured.y + placed.measured.h <= placed.predicted.y);
+    }
+  }
 });

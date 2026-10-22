@@ -39,6 +39,78 @@ export const comparisonSubtitle = (baselineTokens: number): string => {
 
 export const formatTotalGb = (bytes: number): string => `${(Math.round(Math.abs(bytes) / GB * 10) / 10).toFixed(1)} GB`;
 
+export const CHART_PLOT = { left: 156, right: 1840, top: 400, bottom: 700 };
+export const LABEL_FONT_PX = 28;
+
+export type LabelBox = { x: number; y: number; w: number; h: number };
+
+/** Wide enough to cover the glyphs at this size, so a pass here means the text does not touch. */
+export const labelTextWidth = (text: string, fontSize: number): number => {
+  let em = 0;
+  for (const char of text) {
+    if (char === " ") em += 0.33;
+    else if (char === "." || char === ",") em += 0.32;
+    else if (char === "-") em += 0.4;
+    else if (char >= "0" && char <= "9") em += 0.62;
+    else em += 0.72;
+  }
+  return Math.ceil(em * fontSize);
+};
+
+export const boxesIntersect = (a: LabelBox, b: LabelBox): boolean =>
+  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+export const rungBars = (rowCount: number, index: number, hasMeasured: boolean) => {
+  const plotWidth = CHART_PLOT.right - CHART_PLOT.left;
+  const groupWidth = plotWidth / Math.max(1, rowCount);
+  const barWidth = Math.min(52, groupWidth * 0.26);
+  const cx = CHART_PLOT.left + groupWidth * index + groupWidth / 2;
+  const predictedX = hasMeasured ? cx - barWidth - 6 : cx - barWidth / 2;
+  const measuredX = cx + 6;
+  return { barWidth, predictedX, measuredX, cx, groupWidth };
+};
+
+const boxOnBar = (text: string, barX: number, barWidth: number, top: number, fontSize: number): LabelBox => {
+  const w = labelTextWidth(text, fontSize);
+  return { x: barX + barWidth / 2 - w / 2, y: top, w, h: fontSize };
+};
+
+/**
+ * One number sits on top of each bar. When the two boxes in a rung would
+ * meet, the measured label moves above the predicted one.
+ */
+export const placeRungLabels = (opts: {
+  predictedText: string | null;
+  measuredText: string | null;
+  predictedX: number;
+  measuredX: number;
+  predictedTop: number;
+  measuredTop: number;
+  barWidth: number;
+  fontSize: number;
+  minTop: number;
+  avoidCollision?: boolean;
+}): { predicted: LabelBox | null; measured: LabelBox | null } => {
+  const { fontSize } = opts;
+  let predicted = opts.predictedText
+    ? boxOnBar(opts.predictedText, opts.predictedX, opts.barWidth, opts.predictedTop, fontSize)
+    : null;
+  let measured = opts.measuredText
+    ? boxOnBar(opts.measuredText, opts.measuredX, opts.barWidth, opts.measuredTop, fontSize)
+    : null;
+  if (opts.avoidCollision === false || !predicted || !measured || !boxesIntersect(predicted, measured)) {
+    return { predicted, measured };
+  }
+  const gap = 6;
+  measured = { ...measured, y: predicted.y - fontSize - gap };
+  if (measured.y < opts.minTop) {
+    const shift = opts.minTop - measured.y;
+    measured = { ...measured, y: measured.y + shift };
+    predicted = { ...predicted, y: predicted.y + shift };
+  }
+  return { predicted, measured };
+};
+
 export type MeasuredChoice = {
   /** Honest legend text. Null when the file has neither an attributed GPU column nor process RSS. */
   label: string | null;

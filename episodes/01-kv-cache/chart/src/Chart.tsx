@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { chartSeries, comparisonSubtitle, formatBarValue, formatTotalGb } from "./series";
+import { CHART_PLOT, LABEL_FONT_PX, chartSeries, comparisonSubtitle, formatBarValue, formatTotalGb, placeRungLabels, rungBars } from "./series";
 import { CAPTION_BAND, FPS, HEIGHT, theme, WIDTH } from "./theme";
 
 export type MeasurementRow = {
@@ -39,7 +39,7 @@ const HOLD_SECONDS = 2;
 // Extra frames past the 2s hold so the last label is not still landing on the final frames.
 const HOLD_PAD = 12;
 
-const LABEL_FONT = 28;
+const LABEL_FONT = LABEL_FONT_PX;
 const CAPTION_FONT = 'ui-sans-serif, system-ui, "Segoe UI", sans-serif';
 
 const formatTick = (gib: number): string => {
@@ -111,11 +111,9 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
     extrapolateRight: "clamp",
   });
 
-  const plot = { left: 156, right: 1840, top: 400, bottom: 700 };
-  const plotWidth = plot.right - plot.left;
+  const plot = CHART_PLOT;
   const plotHeight = plot.bottom - plot.top;
-  const groupWidth = plotWidth / sorted.length;
-  const barWidth = Math.min(52, groupWidth * 0.26);
+  const hasMeasured = series.measuredLabel != null;
   const span = barSpan(sorted.length, durationInFrames, fps);
   const kvLayers = shape ? (shape.kv_layers ?? shape.layers) : 0;
   const shapeLine = shape
@@ -238,7 +236,8 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           });
-          const cx = plot.left + groupWidth * index + groupWidth / 2;
+          const bars = rungBars(sorted.length, index, hasMeasured);
+          const { barWidth, predictedX, measuredX, cx, groupWidth } = bars;
           const predictedGrowth = series.predicted[index];
           const measuredGrowth = series.measured[index];
           const onBaseline = index === series.baselineIndex;
@@ -248,8 +247,17 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
             predictedGrowth == null ? 0 : (Math.max(0, predictedGrowth) / axis.topBytes) * plotHeight * grow;
           const measuredHeight =
             measuredGrowth == null ? 0 : (Math.max(0, measuredGrowth) / axis.topBytes) * plotHeight * grow;
-          const predictedX = series.measuredLabel ? cx - barWidth - 6 : cx - barWidth / 2;
-          const measuredX = cx + 6;
+          const labels = placeRungLabels({
+            predictedText,
+            measuredText,
+            predictedX,
+            measuredX,
+            predictedTop: Math.max(plot.top - 36, plot.bottom - predictedHeight - 36),
+            measuredTop: Math.max(plot.top - 36, plot.bottom - measuredHeight - 36),
+            barWidth,
+            fontSize: LABEL_FONT,
+            minTop: plot.top - 36,
+          });
           return (
             <React.Fragment key={row.num_ctx}>
               <div
@@ -288,13 +296,14 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
               >
                 {formatContext(row.num_ctx)}
               </div>
-              {predictedText != null ? (
+              {labels.predicted && predictedText != null ? (
                 <div
                   style={{
                     position: "absolute",
-                    left: predictedX - 24,
-                    top: Math.max(plot.top - 36, plot.bottom - predictedHeight - 36),
-                    width: barWidth + 48,
+                    left: labels.predicted.x,
+                    top: labels.predicted.y,
+                    width: labels.predicted.w,
+                    height: labels.predicted.h,
                     textAlign: "center",
                     fontSize: LABEL_FONT,
                     lineHeight: 1,
@@ -307,13 +316,14 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
                   {predictedText}
                 </div>
               ) : null}
-              {measuredText != null ? (
+              {labels.measured && measuredText != null ? (
                 <div
                   style={{
                     position: "absolute",
-                    left: measuredX - 24,
-                    top: Math.max(plot.top - 36, plot.bottom - measuredHeight - 36),
-                    width: barWidth + 48,
+                    left: labels.measured.x,
+                    top: labels.measured.y,
+                    width: labels.measured.w,
+                    height: labels.measured.h,
                     textAlign: "center",
                     fontSize: LABEL_FONT,
                     lineHeight: 1,
