@@ -12,7 +12,35 @@ export type SeriesRow = {
   gpu_attribution?: string | null;
 };
 
-export const PREDICTED_LABEL = "predicted KV cache growth";
+export const PREDICTED_LABEL = "predicted (KV cache math)";
+export const MEASURED_LABEL = "measured on this machine";
+
+const GIB = 1024 ** 3;
+const MIB = 1024 ** 2;
+
+/** Bytes are GiB. The chart labels that unit GB. Under 0.1 GB, switch to whole MB. */
+export const formatViewerMemory = (bytes: number): string => {
+  const sign = bytes < 0 ? "-" : "+";
+  const abs = Math.abs(bytes);
+  if (abs === 0) return "+0.0 GB";
+  const gb = abs / GIB;
+  if (gb < 0.1) return `${sign}${Math.round(abs / MIB)} MB`;
+  return `${sign}${(Math.round(gb * 10) / 10).toFixed(1)} GB`;
+};
+
+/** The shortest rung says baseline. Every later rung names the series. */
+export const growthCaption = (bytes: number, role: "predicted" | "measured", isBaseline: boolean): string => {
+  if (isBaseline) return "baseline";
+  const noun = role === "predicted" ? "predicted" : "measured";
+  return `${formatViewerMemory(bytes)} ${noun}`;
+};
+
+export const comparisonSubtitle = (baselineTokens: number): string => {
+  const count = baselineTokens.toLocaleString("en-US");
+  return `Extra memory needed as the conversation gets longer, compared with a ${count}-token chat`;
+};
+
+export const formatTotalGb = (bytes: number): string => `${(Math.round(Math.abs(bytes) / GIB * 10) / 10).toFixed(1)} GB`;
 
 export type MeasuredChoice = {
   /** Honest legend text. Null when the file has neither an attributed GPU column nor process RSS. */
@@ -26,8 +54,14 @@ export type MeasuredChoice = {
 export type ChartSeries = {
   predictedLabel: typeof PREDICTED_LABEL;
   predicted: Array<number | null>;
-  measuredLabel: string | null;
+  measuredLabel: typeof MEASURED_LABEL | null;
+  /** Which measured column was drawn. The legend text stays the same either way. */
+  measuredKind: "gpu" | "rss" | null;
   measured: Array<number | null>;
+  /** Context the growth is compared with. */
+  baselineTokens: number | null;
+  /** Index of that context in `rows`, when the file has a prediction or a measurement. */
+  baselineIndex: number | null;
   /** Absolute predicted cache at the longest context, for the formula line. */
   longest: { num_ctx: number; predicted_kv_bytes: number } | null;
 };
@@ -81,18 +115,14 @@ const rssBytes = (row: SeriesRow): number | null => (isBytes(row.process_rss_byt
 export const chartSeries = (rows: SeriesRow[]): ChartSeries => {
   const gpu = growthFrom(rows, gpuBytes);
   const rss = growthFrom(rows, rssBytes);
-  const measured = gpu.baselineIndex != null ? gpu : rss;
-  const measuredLabel =
-    gpu.baselineIndex != null
-      ? "measured GPU memory growth"
-      : rss.baselineIndex != null
-        ? "measured process RSS growth"
-        : null;
+  const measuredKind = gpu.baselineIndex != null ? "gpu" : rss.baselineIndex != null ? "rss" : null;
+  const measured = measuredKind === "gpu" ? gpu : rss;
   const predictedPresent = presentValues(rows, predictedBytes);
   const predictedBaseline =
     measured.baselineIndex != null && predictedBytes(rows[measured.baselineIndex]) != null
       ? measured.baselineIndex
       : predictedPresent.sort((a, b) => a.ctx - b.ctx || a.index - b.index)[0]?.index;
+  const baselineIndex = predictedBaseline ?? measured.baselineIndex ?? null;
   const baselinePredicted = predictedBaseline == null ? null : predictedBytes(rows[predictedBaseline]);
   const predicted = rows.map((row) => {
     const value = predictedBytes(row);
@@ -102,8 +132,11 @@ export const chartSeries = (rows: SeriesRow[]): ChartSeries => {
   return {
     predictedLabel: PREDICTED_LABEL,
     predicted,
-    measuredLabel,
+    measuredLabel: measuredKind ? MEASURED_LABEL : null,
+    measuredKind,
     measured: measured.growth,
+    baselineTokens: baselineIndex == null ? null : rows[baselineIndex].num_ctx,
+    baselineIndex,
     longest: longest ? { num_ctx: longest.ctx, predicted_kv_bytes: longest.value } : null,
   };
 };
