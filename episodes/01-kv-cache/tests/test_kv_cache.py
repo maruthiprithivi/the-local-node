@@ -283,9 +283,9 @@ class MeasureHelpersTest(unittest.TestCase):
         self.assertIsNone(measure_kv.parse_nvidia_smi("[N/A]\n"))
         self.assertEqual(measure_kv.parse_nvidia_smi("1024\n2048\n"), 3072 * 1024 * 1024)
         self.assertIsNone(measure_kv.parse_nvidia_smi("nope\n"))
-        text = "1000 ollama\n2000 ollama runner\n50 sshd\n"
+        text = "1 0 1000 ollama\n2 1 2000 ollama runner\n3 0 50 sshd\n"
         self.assertEqual(measure_kv.parse_ps_rss(text), 3000 * 1024)
-        self.assertIsNone(measure_kv.parse_ps_rss("50 sshd\n"))
+        self.assertIsNone(measure_kv.parse_ps_rss("3 0 50 sshd\n"))
 
     def test_safe_detail_drops_paths(self):
         self.assertEqual(measure_kv.safe_detail("model runner stopped"), "model runner stopped")
@@ -421,8 +421,13 @@ class HybridLayersTest(unittest.TestCase):
         self.assertIn("1 of every 4", shape.layer_note)
         self.assertIn("linear or SSM", shape.layer_note)
         report = kv_cache.render_report(shape, tokens=8192, contexts=(8192,))
+        self.assertIn("blocks: 32, KV layers: 8", report)
         self.assertIn("2 x 8 x 32 x 128 x 2 x 8192 = 1 GiB", report)
         self.assertNotIn("2 x 32 x 32 x 128 x 2 x 8192 = 4 GiB", report)
+        fields = kv_cache.shape_fields(shape)
+        self.assertEqual(fields["blocks"], 32)
+        self.assertEqual(fields["kv_layers"], 8)
+        self.assertEqual(fields["layers"], 8)
 
     def test_nextn_inside_the_block_count_is_not_the_chat_cache(self):
         meta = {
@@ -528,28 +533,91 @@ class HybridLayersTest(unittest.TestCase):
 class MeasurementFixesTest(unittest.TestCase):
     def test_gpu_memory_falls_back_to_runner_compute_apps(self):
         apps = "111, 2048\n222, 1024\n333, 4096\n"
-        ps = "111 ollama serve\n222 /usr/bin/ollama runner --model x\n333 python train.py\n"
-        used, note = measure_kv.gpu_bytes_from_smi("[N/A]\n", apps, ps)
-        self.assertEqual(used, (2048 + 1024) * 1024 * 1024)
-        self.assertIn("compute-apps", note)
-        direct, direct_note = measure_kv.gpu_bytes_from_smi("512\n", apps, ps)
+        used, note, token = measure_kv.gpu_bytes_from_smi(
+            "[N/A]\n",
+            apps,
+            {222},
+            "new runner PID after this load (222)",
+        )
+        self.assertEqual(used, 1024 * 1024 * 1024)
+        self.assertNotEqual(used, (2048 + 1024) * 1024 * 1024)
+        self.assertIn("pid 222", note)
+        self.assertIn("new runner PID", note)
+        self.assertEqual(token, "compute-apps")
+        direct, direct_note, direct_token = measure_kv.gpu_bytes_from_smi("512\n", apps, {222})
         self.assertEqual(direct, 512 * 1024 * 1024)
-        self.assertIsNone(direct_note)
-        empty, empty_note = measure_kv.gpu_bytes_from_smi("[N/A]\n", "333, 4096\n", ps)
+        self.assertIn("whole GPU", direct_note)
+        self.assertEqual(direct_token, "memory.used")
+        empty, empty_note, empty_token = measure_kv.gpu_bytes_from_smi(
+            "[N/A]\n",
+            "333, 4096\n",
+            {222},
+            "new runner PID after this load (222)",
+        )
         self.assertIsNone(empty)
-        self.assertIn("no Ollama or llama runner", empty_note)
+        self.assertIn("not listed in compute-apps", empty_note)
+        self.assertEqual(empty_token, "unattributed")
+
+    def test_runner_attribution_ignores_a_model_already_resident(self):
+        pids, token, approach = measure_kv.select_model_runners({111}, {111, 222})
+        self.assertEqual(pids, {222})
+        self.assertEqual(token, "new-pid")
+        self.assertIn("new runner PID", approach)
+        reported, reported_token, _approach = measure_kv.select_model_runners({111}, {111, 222}, {444})
+        self.assertEqual(reported, {444})
+        self.assertEqual(reported_token, "ollama-pid")
+        stale, stale_token, stale_approach = measure_kv.select_model_runners({111, 222}, {111, 222})
+        self.assertEqual(stale, set())
+        self.assertEqual(stale_token, "unattributed")
+        self.assertIn("several Ollama runners", stale_approach)
+        only, only_token, _only_approach = measure_kv.select_model_runners({111}, {111})
+        self.assertEqual(only, {111})
+        self.assertEqual(only_token, "only-runner")
+
+    def test_gpu_file_note_matches_rows_that_have_figures(self):
+        rows = [
+            {"gpu_memory_bytes": 10, "gpu_attribution": "new-pid"},
+            {"gpu_memory_bytes": 12, "gpu_attribution": "new-pid"},
+        ]
+        note = measure_kv.gpu_file_note("compute-apps", rows)
+        self.assertIn("2 of 2", note)
+        self.assertNotIn("no runner", note)
+        self.assertNotIn("no Ollama", note)
+        empty = measure_kv.gpu_file_note("compute-apps", [{"gpu_memory_bytes": None, "gpu_attribution": "unattributed"}])
+        self.assertIn("no row", empty)
+        mac = measure_kv.gpu_file_note("unavailable", [{"gpu_memory_bytes": None, "gpu_attribution": "unavailable"}])
+        self.assertNotIn("no runner", mac)
+        self.assertIn("GPU column is empty", mac)
+
+    def test_llama_server_counts_only_when_ollama_is_an_ancestor(self):
+        text = "\n".join(
+            [
+                "10 1 100 ollama serve",
+                "20 10 10 bash",
+                "21 20 700 llama-server --port 1",
+                "30 1 1400 llama-server --port 2",
+            ]
+        )
+        self.assertEqual(measure_kv.parse_ps_rss(text), (100 + 700) * 1024)
+        self.assertIn("--keep-others", measure_kv.unload_note(None, True))
+        self.assertIn("none were unloaded", measure_kv.unload_note([], False))
+        self.assertIn("qwen3:8b", measure_kv.unload_note(["qwen3:8b"], False))
 
     def test_rss_matches_the_server_and_runner_not_the_app_window(self):
         text = "\n".join(
             [
-                "9000 /Applications/Ollama.app/Contents/MacOS/Ollama",
-                "1500 /Applications/Ollama.app/Contents/Resources/ollama serve",
-                "2200 /Applications/Ollama.app/Contents/Resources/ollama runner --model x",
-                "400 llama-server --port 8080",
-                "50 sshd",
+                "9 1 9000 /Applications/Ollama.app/Contents/MacOS/Ollama",
+                "10 1 1500 /Applications/Ollama.app/Contents/Resources/ollama serve",
+                "11 10 2200 /Applications/Ollama.app/Contents/Resources/ollama runner --model x",
+                "12 1 400 llama-server --port 8080",
+                "13 10 800 llama-server --model x",
+                "14 11 500 llama runner --model x",
+                "15 1 50 sshd",
             ]
         )
-        self.assertEqual(measure_kv.parse_ps_rss(text), (1500 + 2200 + 400) * 1024)
+        self.assertEqual(measure_kv.parse_ps_rss(text), (1500 + 2200 + 800 + 500) * 1024)
+        self.assertFalse(measure_kv.is_ollama_runner("llama-server --port 8080"))
+        self.assertTrue(measure_kv.is_llama_runner("llama-server --port 8080"))
         self.assertFalse(measure_kv.is_ollama_runner("/Applications/Ollama.app/Contents/MacOS/Ollama"))
         self.assertFalse(measure_kv.is_ollama_runner("Ollama"))
         self.assertTrue(measure_kv.is_ollama_runner("ollama"))

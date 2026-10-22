@@ -19,7 +19,7 @@ Run everything below from this folder.
 - Linux with an NVIDIA GPU
 - Ollama installed and running
 - Python 3.11 or newer
-- `nvidia-smi` on `PATH` if you want the GPU column. If `memory.used` is `[N/A]`, the script sums the Ollama and llama runner rows from compute-apps instead. The script still finishes without `nvidia-smi`.
+- `nvidia-smi` on `PATH` if you want the GPU column. If `memory.used` is `[N/A]`, each row sums compute-apps for the runner that appeared for this model. The script still finishes without `nvidia-smi`.
 
 The chart also needs Node.js 22 or newer. You do not need it for the calculator or the measurement.
 
@@ -110,14 +110,17 @@ The script writes `runs/kv-sweep.json` and `runs/kv-sweep.csv`. Those files are 
 | `predicted_kv_bytes` | the formula, cache only |
 | `measured_runtime_bytes` | `size` from Ollama's process list. This is weights plus compute buffers plus the cache, not the cache alone |
 | `measured_vram_bytes` | `size_vram` when Ollama reports it, otherwise empty |
-| `gpu_memory_bytes` | `nvidia-smi` memory.used, on Linux, when that query returns a number. If it returns `[N/A]`, the script sums `nvidia-smi --query-compute-apps=pid,used_memory` for the Ollama server and llama runners only |
-| `process_rss_bytes` | on macOS, resident memory of the Ollama server and runner, not the app window. Omitted on Linux, because CUDA memory is not in the resident set and the number stays flat |
+| `gpu_memory_bytes` | `nvidia-smi` memory.used when that query returns a number. If it returns `[N/A]`, the row sums `nvidia-smi --query-compute-apps=pid,used_memory` for the runner serving this model: the PID Ollama reports, or the new runner PID after the load. Other resident runners are not added in |
+| `gpu_attribution` | which of those approaches produced the GPU figure (`ollama-pid`, `new-pid`, `only-runner`, `memory.used`, or `unattributed`) |
+| `process_rss_bytes` | on macOS, the Ollama server plus runners Ollama spawned. A standalone `llama-server` is left out unless its parent chain reaches Ollama. Omitted on Linux, because CUDA memory is not in the resident set and the number stays flat |
 | `ttft_ms` | wall time to the first token on a second, already-loaded request. A thinking model's first thinking token counts. The request sends `think: false` when the server accepts it |
 | `load_ms` | time to the first token on the request that loaded the model |
 
 On a Mac the runtime size is the unified-memory figure. There is no separate GPU counter, and the JSON says so. On Linux, a missing `nvidia-smi` leaves `gpu_memory_bytes` empty and the sweep continues. A context the server refuses is one row with a note, not a failed run.
 
-The measured total includes the weights and the compute buffers, not just the KV cache, so `measured_runtime_bytes` sits above `predicted_kv_bytes`. The growth between rungs is the part that tracks the cache. Doubling the context doubles the predicted cache. The runtime column should move with it, on top of a size that stays put. A hybrid model's prediction only counts full-attention layers, so it will be smaller than a count of every block. A short attention window can still make the live growth smaller than that prediction.
+The measured total includes the weights and the compute buffers, not just the KV cache, so `measured_runtime_bytes` sits above `predicted_kv_bytes`. Ollama's reported model size is an estimate, and it moves in steps rather than with every extra token. Use the GPU figure, or the process growth between rungs, for the cache. Doubling the context doubles the predicted cache. That growth should show up on top of a size that stays put. A hybrid model's prediction only counts full-attention layers, so it will be smaller than a count of every block. The report prints both, for example `blocks: 65, KV layers: 16`, and the JSON shape carries `blocks` and `kv_layers`. A short attention window can still make the live growth smaller than that prediction.
+
+Other models that are already loaded are unloaded before the sweep, so an older runner does not sit inside every GPU row. Pass `--keep-others` to leave them loaded. Each row's note says which attribution was used. The file-level note counts how many rows actually got a GPU figure, instead of repeating a probe from before the model was loaded.
 
 To try a quantized cache, restart Ollama with `OLLAMA_KV_CACHE_TYPE=q8_0` (flash attention has to be on), then run the sweep again to a second file:
 

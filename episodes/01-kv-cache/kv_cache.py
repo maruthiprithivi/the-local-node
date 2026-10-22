@@ -822,6 +822,28 @@ def _width_label(name: str, width: float) -> str:
     return f"{name} ({text} {unit})"
 
 
+def layer_count_line(shape: ModelShape) -> str:
+    """Hybrid models keep a KV cache on only some blocks, so print both counts."""
+    blocks = shape.block_count
+    if blocks and blocks != shape.layers:
+        return f"blocks: {blocks}, KV layers: {shape.layers}"
+    return f"layers: {shape.layers}"
+
+
+def shape_fields(shape: ModelShape) -> dict:
+    """JSON shape. `layers` is the KV-layer count the formula multiplies."""
+    blocks = shape.block_count if shape.block_count else shape.layers
+    return {
+        "layers": shape.layers,
+        "kv_layers": shape.layers,
+        "blocks": blocks,
+        "attention_heads": shape.attention_heads,
+        "kv_heads": shape.kv_heads,
+        "head_dim": shape.head_dim,
+        "bytes_per_value": shape.bytes_per_value,
+    }
+
+
 def _gqa_lines(shape: ModelShape, tokens: int, chats: int) -> list[str]:
     group = shape.group_size
     if not shape.grouped:
@@ -856,7 +878,7 @@ def render_report(
     lines.append(title)
     if shape.source:
         lines.append(f"source: {shape.source}")
-    lines.append(f"layers: {shape.layers}")
+    lines.append(layer_count_line(shape))
     if shape.layer_note:
         lines.append(shape.layer_note)
     lines.append(f"attention heads: {shape.attention_heads}")

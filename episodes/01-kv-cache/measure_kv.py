@@ -41,11 +41,13 @@ from kv_cache import (
     KV_WIDTHS,
     format_bytes,
     kv_bytes_for,
+    layer_count_line,
     load_ollama,
     ollama_base,
     ollama_host_label,
     ollama_json,
     parse_contexts,
+    shape_fields,
 )
 
 DEFAULT_MODEL = "llama3.2:1b"
@@ -108,24 +110,47 @@ NUM_PREDICT = 64
 NUM_PREDICT_RETRY = 256
 
 
-def is_ollama_runner(command: str) -> bool:
-    """Server and runner processes only. The macOS app window is not one of them."""
+def is_llama_runner(command: str) -> bool:
+    """A llama.cpp server or runner. Counted only when Ollama spawned it."""
     lower = command.strip().lower()
     if not lower:
         return False
     if re.search(r"(^|[\s/])llama-server(?:\.exe)?(?:\s|$)", lower):
         return True
-    if re.search(r"(^|[\s/])llama(?:\.exe)?\s+runner(?:\s|$)", lower):
-        return True
+    return re.search(r"(^|[\s/])llama(?:\.exe)?\s+runner(?:\s|$)", lower) is not None
+
+
+def is_ollama_server(command: str) -> bool:
+    """`ollama serve` or the bare `ollama` CLI. Not the app window, not a runner."""
+    lower = command.strip().lower()
+    if not lower or is_llama_runner(command):
+        return False
     if re.search(r"(^|[\s/])ollama(?:\.exe)?\s+serve(?:\s|$)", lower):
         return True
     if re.search(r"(^|[\s/])ollama(?:\.exe)?\s+runner(?:\s|$)", lower):
-        return True
-    # The GUI binary is `Ollama` inside Ollama.app and has no serve or runner argument.
-    # Match the lowercase CLI name only, so a bare `Ollama` window is left out.
+        return False
     if ".app" in lower:
         return False
     return re.search(r"(^|[\s/])ollama(?:\.exe)?$", command.strip()) is not None
+
+
+def is_ollama_worker(command: str) -> bool:
+    lower = command.strip().lower()
+    return re.search(r"(^|[\s/])ollama(?:\.exe)?\s+runner(?:\s|$)", lower) is not None
+
+
+def is_ollama_process(command: str) -> bool:
+    """Ollama's own server or runner. A standalone llama-server is not one of these."""
+    return is_ollama_server(command) or is_ollama_worker(command)
+
+
+def is_ollama_runner(command: str) -> bool:
+    """Ollama's own server and runner. The macOS app window is not one of them.
+
+    llama-server is intentionally not matched here. A copy from another project
+    shares that name, so it counts only when its parent chain reaches Ollama.
+    """
+    return is_ollama_process(command)
 
 
 def parse_nvidia_smi(text: str) -> int | None:
@@ -149,21 +174,108 @@ def parse_nvidia_smi(text: str) -> int | None:
     return sum(values) * 1024 * 1024
 
 
-def parse_ps_pids(text: str) -> set[int]:
-    """PIDs from `ps -axo pid=,command=` that are an Ollama server or a llama runner."""
-    pids: set[int] = set()
+@dataclass(frozen=True)
+class Process:
+    pid: int
+    ppid: int
+    rss_kib: int
+    command: str
+
+
+def parse_processes(text: str) -> list[Process]:
+    """`ps -axo pid=,ppid=,rss=,command=`."""
+    rows: list[Process] = []
     for line in text.splitlines():
-        parts = line.split(None, 1)
-        if len(parts) != 2:
-            continue
-        pid_text, command = parts
-        if not is_ollama_runner(command):
+        parts = line.split(None, 3)
+        if len(parts) < 4:
             continue
         try:
-            pids.add(int(pid_text))
+            pid = int(parts[0])
+            ppid = int(parts[1])
+            rss = int(parts[2])
         except ValueError:
             continue
+        rows.append(Process(pid, ppid, rss, parts[3]))
+    return rows
+
+
+def spawned_by_ollama(proc: Process, by_pid: dict[int, Process]) -> bool:
+    """Walk ppid until an Ollama server or runner is the ancestor."""
+    pid = proc.ppid
+    seen: set[int] = set()
+    while pid > 0 and pid not in seen:
+        seen.add(pid)
+        parent = by_pid.get(pid)
+        if parent is None:
+            return False
+        if is_ollama_process(parent.command):
+            return True
+        pid = parent.ppid
+    return False
+
+
+def owned_runner_pids(procs: list[Process]) -> set[int]:
+    """Runners that belong to Ollama.
+
+    `ollama runner` is Ollama's own process. `llama-server` and `llama runner`
+    count only when walking their parents reaches that Ollama process.
+    """
+    by_pid = {proc.pid: proc for proc in procs}
+    pids: set[int] = set()
+    for proc in procs:
+        if is_ollama_worker(proc.command):
+            pids.add(proc.pid)
+        elif is_llama_runner(proc.command) and spawned_by_ollama(proc, by_pid):
+            pids.add(proc.pid)
     return pids
+
+
+def ollama_server_pids(procs: list[Process]) -> set[int]:
+    return {proc.pid for proc in procs if is_ollama_server(proc.command)}
+
+
+def select_model_runners(
+    before: set[int],
+    after: set[int],
+    reported: set[int] | None = None,
+) -> tuple[set[int], str, str]:
+    """Pick the runner serving the swept model.
+
+    Returns pids, a short token recorded on the row, and a sentence for the note.
+    A PID Ollama reports wins. Otherwise the PID that appeared after this load.
+    A single runner left resident is used when nothing new appeared. Several
+    older runners are not summed together.
+    """
+    reported_pids = {pid for pid in (reported or set()) if isinstance(pid, int) and pid > 0}
+    if reported_pids:
+        ids = ", ".join(str(pid) for pid in sorted(reported_pids))
+        return reported_pids, "ollama-pid", f"PID reported by Ollama ({ids})"
+    appeared = set(after) - set(before)
+    if appeared:
+        ids = ", ".join(str(pid) for pid in sorted(appeared))
+        return appeared, "new-pid", f"new runner PID after this load ({ids})"
+    if len(after) == 1:
+        pid = next(iter(after))
+        return set(after), "only-runner", f"the only Ollama runner still resident (pid {pid})"
+    if not after:
+        return set(), "unattributed", "no Ollama runner was resident after the load"
+    return (
+        set(),
+        "unattributed",
+        "several Ollama runners stayed resident and none was new, so this row does not sum them",
+    )
+
+
+def pids_from_running(running: dict | None) -> set[int]:
+    """PID fields when Ollama's process list includes them. Many builds do not."""
+    if not isinstance(running, dict):
+        return set()
+    found: set[int] = set()
+    for key in ("pid", "runner_pid"):
+        number = _int_or_none(running.get(key))
+        if number and number > 0:
+            found.add(number)
+    return found
 
 
 def parse_compute_apps(text: str, runner_pids: set[int]) -> int | None:
@@ -197,47 +309,93 @@ def parse_compute_apps(text: str, runner_pids: set[int]) -> int | None:
     return total * 1024 * 1024
 
 
-def gpu_bytes_from_smi(memory_used_text: str, compute_apps_text: str | None, ps_text: str) -> tuple[int | None, str | None]:
-    """Prefer memory.used. Fall back to the sum of Ollama and llama runner compute apps."""
+def gpu_bytes_from_smi(
+    memory_used_text: str,
+    compute_apps_text: str | None,
+    runner_pids: set[int] | None = None,
+    approach: str = "",
+) -> tuple[int | None, str | None, str]:
+    """Prefer memory.used. Otherwise sum compute-apps for the attributed runner pids.
+
+    Returns bytes, a row note, and the attribution token.
+    """
     parsed = parse_nvidia_smi(memory_used_text)
     if parsed is not None:
-        return parsed, None
+        return parsed, "GPU memory is nvidia-smi memory.used for the whole GPU.", "memory.used"
     if compute_apps_text is None:
-        return None, "nvidia-smi ran but did not report a memory figure."
-    summed = parse_compute_apps(compute_apps_text, parse_ps_pids(ps_text))
-    if summed is None:
-        return None, (
-            "nvidia-smi memory.used was not a number, and no Ollama or llama runner was listed in compute-apps."
+        return None, "nvidia-smi ran but did not report a memory figure.", "unavailable"
+    targets = runner_pids or set()
+    if not targets:
+        detail = approach or "no runner was attributed to this model"
+        return (
+            None,
+            f"nvidia-smi memory.used was not a number, and {detail}.",
+            "unattributed",
         )
-    return summed, (
-        "nvidia-smi memory.used was not a number. GPU memory is the sum of Ollama and llama runner processes from compute-apps."
+    summed = parse_compute_apps(compute_apps_text, targets)
+    ids = ", ".join(str(pid) for pid in sorted(targets))
+    how = approach or "the runner attributed to this model"
+    if summed is None:
+        return (
+            None,
+            f"nvidia-smi memory.used was not a number. Approach: {how}. pid {ids} was not listed in compute-apps.",
+            "unattributed",
+        )
+    return (
+        summed,
+        f"nvidia-smi memory.used was not a number. GPU memory is compute-apps for pid {ids}. Approach: {how}.",
+        "compute-apps",
     )
 
 
-def parse_ps_rss(text: str) -> int | None:
-    """Sum RSS (KiB) of the Ollama server and runner processes, as bytes.
-
-    A command that only contains the app name, such as the macOS GUI, is not included.
-    On Linux this figure stays flat because CUDA memory is not in the resident set,
-    so the sweep omits it there.
-    """
+def rss_for_pids(procs: list[Process], pids: set[int]) -> int | None:
     total = 0
     found = False
-    for line in text.splitlines():
-        parts = line.split(None, 1)
-        if len(parts) != 2:
+    for proc in procs:
+        if proc.pid not in pids:
             continue
-        rss, command = parts
-        if not is_ollama_runner(command):
-            continue
-        try:
-            total += int(rss)
-        except ValueError:
-            continue
+        total += proc.rss_kib
         found = True
     if not found:
         return None
     return total * 1024
+
+
+def parse_ps_rss(text: str) -> int | None:
+    """Sum RSS of the Ollama server and runners Ollama spawned.
+
+    A standalone llama-server, and the macOS app window, are left out.
+    On Linux the sweep omits RSS anyway, because CUDA memory is not in it.
+    """
+    procs = parse_processes(text)
+    if not procs:
+        return None
+    pids = ollama_server_pids(procs) | owned_runner_pids(procs)
+    return rss_for_pids(procs, pids)
+
+
+def gpu_file_note(mode: str, rows: list[dict]) -> str:
+    """One file-level sentence that matches the rows actually written."""
+    filled = sum(1 for row in rows if row.get("gpu_memory_bytes") is not None)
+    total = len(rows)
+    if mode == "unavailable":
+        return "No separate GPU counter was read, so the GPU column is empty."
+    if mode == "missing":
+        return "nvidia-smi is not on PATH, so the GPU column is empty."
+    if mode == "failed":
+        return "nvidia-smi failed, so the GPU column is empty."
+    if mode == "timeout":
+        return "nvidia-smi timed out, so the GPU column is empty."
+    if mode == "memory.used":
+        return f"GPU memory is nvidia-smi memory.used for the whole GPU ({filled} of {total} rows)."
+    if filled:
+        return (
+            "nvidia-smi memory.used was not a number. "
+            f"{filled} of {total} rows record compute-apps memory for the runner serving this model."
+        )
+    return (
+        "nvidia-smi memory.used was not a number, and no row found a runner for this model in compute-apps."
+    )
 
 
 def safe_detail(text: str) -> str:
@@ -257,71 +415,89 @@ def _run_command(argv: list[str]) -> subprocess.CompletedProcess[str] | None:
         raise
 
 
-def _read_gpu_memory() -> tuple[int | None, list[str]]:
+PS_ARGV = ["ps", "-axo", "pid=,ppid=,rss=,command="]
+NVIDIA_USED_ARGV = ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"]
+NVIDIA_APPS_ARGV = ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"]
+
+
+def nvidia_probe() -> str:
+    """How this machine reports GPU memory. Does not claim a runner was missing."""
     try:
-        used = _run_command(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"])
+        used = _run_command(NVIDIA_USED_ARGV)
     except subprocess.TimeoutExpired:
-        return None, ["nvidia-smi timed out, so the GPU column is empty."]
+        return "timeout"
     if used is None:
-        return None, ["nvidia-smi is not on PATH, so the GPU column is empty."]
+        return "missing"
     if used.returncode != 0:
-        return None, ["nvidia-smi failed, so the GPU column is empty."]
+        return "failed"
+    if parse_nvidia_smi(used.stdout) is not None:
+        return "memory.used"
+    return "compute-apps"
+
+
+def read_processes() -> tuple[list[Process], str | None]:
+    try:
+        proc = _run_command(PS_ARGV)
+    except subprocess.TimeoutExpired:
+        return [], "ps timed out, so the process RSS column is empty."
+    if proc is None:
+        return [], "ps is not available, so the process RSS column is empty."
+    if proc.returncode != 0:
+        return [], "ps failed, so the process RSS column is empty."
+    return parse_processes(proc.stdout), None
+
+
+def read_gpu_for_runners(runner_pids: set[int], approach: str, approach_token: str) -> tuple[int | None, str, str]:
+    """Bytes, row note, and attribution token for one loaded model."""
+    try:
+        used = _run_command(NVIDIA_USED_ARGV)
+    except subprocess.TimeoutExpired:
+        return None, "nvidia-smi timed out, so the GPU column is empty.", "unavailable"
+    if used is None:
+        return None, "nvidia-smi is not on PATH, so the GPU column is empty.", "unavailable"
+    if used.returncode != 0:
+        return None, "nvidia-smi failed, so the GPU column is empty.", "unavailable"
     apps_text: str | None = None
-    ps_text = ""
     if parse_nvidia_smi(used.stdout) is None:
         try:
-            apps = _run_command(
-                ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"]
-            )
+            apps = _run_command(NVIDIA_APPS_ARGV)
         except subprocess.TimeoutExpired:
-            return None, ["nvidia-smi timed out, so the GPU column is empty."]
+            return None, "nvidia-smi timed out, so the GPU column is empty.", "unavailable"
         if apps is not None and apps.returncode == 0:
             apps_text = apps.stdout
-            try:
-                ps = _run_command(["ps", "-axo", "pid=,command="])
-            except subprocess.TimeoutExpired:
-                ps = None
-            if ps is not None and ps.returncode == 0:
-                ps_text = ps.stdout
-    gpu_bytes, note = gpu_bytes_from_smi(used.stdout, apps_text, ps_text)
-    return gpu_bytes, [] if note is None else [note]
-
-
-def _read_rss() -> tuple[int | None, list[str]]:
-    try:
-        proc = _run_command(["ps", "-axo", "rss=,command="])
-    except subprocess.TimeoutExpired:
-        return None, ["ps timed out, so the process RSS column is empty."]
-    if proc is None:
-        return None, ["ps is not available, so the process RSS column is empty."]
-    if proc.returncode != 0:
-        return None, ["ps failed, so the process RSS column is empty."]
-    return parse_ps_rss(proc.stdout), []
+    gpu_bytes, note, token = gpu_bytes_from_smi(used.stdout, apps_text, runner_pids, approach)
+    if token == "memory.used":
+        return gpu_bytes, note or "", "memory.used"
+    return gpu_bytes, note or "", approach_token or "unattributed"
 
 
 def collect_host_metrics() -> dict:
-    """Optional counters. Missing tools become nulls and a note, never a crash."""
+    """Static host notes. GPU bytes are filled per row, after a model is resident."""
     notes: list[str] = []
     system = platform.system()
-    gpu_bytes: int | None = None
+    mode = nvidia_probe() if system != "Darwin" else "unavailable"
     if system == "Darwin":
         notes.append("macOS reports unified memory through Ollama's size. There is no separate GPU counter.")
-        notes.append("Process RSS sums the Ollama server and runner only, not the app window.")
-    else:
-        gpu_bytes, gpu_notes = _read_gpu_memory()
-        notes.extend(gpu_notes)
+        notes.append(
+            "Process RSS sums the Ollama server and runners Ollama spawned, not the app window "
+            "and not a standalone llama-server."
+        )
+    rss_bytes = None
     if system == "Linux":
-        rss_bytes = None
         notes.append(
             "Process RSS is omitted on Linux. Resident memory does not include CUDA allocations, "
             "so it stays flat and is not the GPU figure."
         )
     else:
-        rss_bytes, rss_notes = _read_rss()
-        notes.extend(rss_notes)
+        procs, rss_note = read_processes()
+        if rss_note:
+            notes.append(rss_note)
+        elif procs:
+            rss_bytes = rss_for_pids(procs, ollama_server_pids(procs) | owned_runner_pids(procs))
     return {
         "os": system,
-        "gpu_memory_bytes": gpu_bytes,
+        "nvidia_mode": mode,
+        "gpu_memory_bytes": None,
         "process_rss_bytes": rss_bytes,
         "notes": notes,
     }
@@ -338,6 +514,7 @@ def build_row(
     ttft_ms: float | None,
     load_ms: float | None,
     notes: str,
+    gpu_attribution: str = "",
 ) -> dict:
     return {
         "num_ctx": num_ctx,
@@ -345,6 +522,7 @@ def build_row(
         "measured_runtime_bytes": measured_runtime_bytes,
         "measured_vram_bytes": measured_vram_bytes,
         "gpu_memory_bytes": gpu_memory_bytes,
+        "gpu_attribution": gpu_attribution,
         "process_rss_bytes": process_rss_bytes,
         "ttft_ms": None if ttft_ms is None else round(ttft_ms, 1),
         "load_ms": None if load_ms is None else round(load_ms, 1),
@@ -481,18 +659,20 @@ def _unload(base: str, model: str) -> None:
         time.sleep(0.4)
 
 
-def _read_runtime_size(base: str, model: str) -> tuple[int | None, int | None, str]:
+def _read_runtime_size(base: str, model: str) -> tuple[int | None, int | None, str, set[int]]:
     notes = []
     last_runtime = None
     last_vram = None
+    reported: set[int] = set()
     deadline = time.perf_counter() + 5
     while True:
         try:
             ps = ollama_json(base, "/api/ps", timeout=10)
         except RuntimeError:
-            return None, None, "Ollama did not return a process list."
+            return None, None, "Ollama did not return a process list.", set()
         running = _find_running(ps, model)
         if running is not None:
+            reported = pids_from_running(running)
             last_runtime = _int_or_none(running.get("size"))
             last_vram = _int_or_none(running.get("size_vram"))
             if last_runtime:
@@ -507,7 +687,51 @@ def _read_runtime_size(base: str, model: str) -> tuple[int | None, int | None, s
         last_runtime = None
     if last_vram == 0:
         last_vram = None
-    return last_runtime, last_vram, " ".join(notes)
+    return last_runtime, last_vram, " ".join(notes), reported
+
+
+def _resident_names(payload: dict) -> list[str]:
+    models = payload.get("models")
+    if not isinstance(models, list):
+        return []
+    names = []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        for key in ("name", "model"):
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                names.append(value.strip())
+                break
+    return names
+
+
+def unload_other_models(base: str, keep: str) -> list[str]:
+    """Ask Ollama to drop every resident model except the one being swept."""
+    try:
+        ps = ollama_json(base, "/api/ps", timeout=10)
+    except RuntimeError:
+        return []
+    unloaded: list[str] = []
+    seen: set[str] = set()
+    for name in _resident_names(ps):
+        if name in seen or is_installed([name], keep) or name == keep:
+            continue
+        seen.add(name)
+        _unload(base, name)
+        unloaded.append(name)
+    return unloaded
+
+
+def unload_note(names: list[str] | None, keep_others: bool) -> str:
+    if keep_others:
+        return "Other resident models were left loaded (--keep-others)."
+    if not names:
+        return "No other models were resident, so none were unloaded."
+    safe = [name for name in names if "/" not in name and "\\" not in name]
+    if len(safe) != len(names):
+        return f"Unloaded {len(names)} other resident models before the sweep."
+    return "Unloaded other resident models before the sweep: " + ", ".join(safe) + "."
 
 
 def _pull(base: str, model: str, timeout: float) -> None:
@@ -562,9 +786,17 @@ def _generate(base: str, model: str, num_ctx: int, timeout: float) -> tuple[floa
     return ttft, final
 
 
+def _row_rss(procs: list[Process], targets: set[int]) -> int | None:
+    if platform.system() == "Linux":
+        return None
+    return rss_for_pids(procs, ollama_server_pids(procs) | targets)
+
+
 def measure_once(base: str, model: str, num_ctx: int, host_metrics: dict, shape, timeout: float) -> dict:
     notes: list[str] = []
     _unload(base, model)
+    before_procs, _ps_note = read_processes()
+    before = owned_runner_pids(before_procs)
     load_ms = None
     ttft_ms = None
     try:
@@ -578,13 +810,14 @@ def measure_once(base: str, model: str, num_ctx: int, host_metrics: dict, shape,
             shape=shape,
             measured_runtime_bytes=None,
             measured_vram_bytes=None,
-            gpu_memory_bytes=host_metrics.get("gpu_memory_bytes"),
-            process_rss_bytes=host_metrics.get("process_rss_bytes"),
+            gpu_memory_bytes=None,
+            process_rss_bytes=None,
             ttft_ms=None,
             load_ms=None,
             notes=" ".join(notes),
+            gpu_attribution="unavailable",
         )
-    runtime_bytes, vram_bytes, size_note = _read_runtime_size(base, model)
+    runtime_bytes, vram_bytes, size_note, reported = _read_runtime_size(base, model)
     if size_note:
         notes.append(size_note)
     try:
@@ -593,18 +826,29 @@ def measure_once(base: str, model: str, num_ctx: int, host_metrics: dict, shape,
             notes.append("the warm request returned no token.")
     except RuntimeError as exc:
         notes.append(str(exc))
-    # Refresh optional counters after the model is resident. Failures stay in the header notes.
-    fresh = collect_host_metrics()
+    procs, ps_note = read_processes()
+    if ps_note and platform.system() != "Linux":
+        notes.append(ps_note)
+    targets, token, approach = select_model_runners(before, owned_runner_pids(procs), reported)
+    mode = host_metrics.get("nvidia_mode")
+    if mode in {"compute-apps", "memory.used"}:
+        gpu_bytes, gpu_note, attribution = read_gpu_for_runners(targets, approach, token)
+        if gpu_note:
+            notes.append(gpu_note)
+    else:
+        gpu_bytes = None
+        attribution = "unavailable"
     return build_row(
         num_ctx=num_ctx,
         shape=shape,
         measured_runtime_bytes=runtime_bytes,
         measured_vram_bytes=vram_bytes,
-        gpu_memory_bytes=fresh.get("gpu_memory_bytes"),
-        process_rss_bytes=fresh.get("process_rss_bytes"),
+        gpu_memory_bytes=gpu_bytes,
+        process_rss_bytes=_row_rss(procs, targets),
         ttft_ms=ttft_ms,
         load_ms=load_ms,
         notes=" ".join(notes),
+        gpu_attribution=attribution,
     )
 
 
@@ -637,6 +881,7 @@ def write_results(stem: Path, payload: dict) -> tuple[Path, Path]:
         "measured_runtime_bytes",
         "measured_vram_bytes",
         "gpu_memory_bytes",
+        "gpu_attribution",
         "process_rss_bytes",
         "ttft_ms",
         "load_ms",
@@ -661,7 +906,7 @@ def _print_table(rows: list[dict]) -> None:
         )
     print()
     print("Predicted is the KV cache only. The measured total includes the weights and compute buffers, not just the cache.")
-    print("The growth between context rungs is the part that tracks the cache. Do not expect the two columns to be equal.")
+    print("Ollama's reported model size is an estimate that moves in steps. Use the GPU or process growth between rungs for the cache.")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -669,6 +914,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Ollama model name (default {DEFAULT_MODEL})")
     parser.add_argument("--contexts", default=",".join(str(n) for n in DEFAULT_CONTEXTS))
     parser.add_argument("--pull", action="store_true", help="download the model if it is not installed")
+    parser.add_argument(
+        "--keep-others",
+        action="store_true",
+        help="leave other resident models loaded. By default they are unloaded so their runners are not in the GPU figure",
+    )
     parser.add_argument("--host", help="Ollama base URL. Defaults to OLLAMA_HOST or localhost:11434")
     parser.add_argument("--timeout", type=float, default=300, help="seconds to wait for one generate request")
     parser.add_argument(
@@ -704,7 +954,20 @@ def main(argv: list[str] | None = None) -> int:
         header_notes = list(host_metrics["notes"])
         if width_note:
             header_notes.append(width_note)
-        print(f"{shape.name}: {shape.layers} layers, {shape.attention_heads} attention heads, {shape.kv_heads} KV heads, head dim {shape.head_dim}")
+        if args.keep_others:
+            header_notes.append(unload_note(None, True))
+        else:
+            try:
+                unloaded = unload_other_models(base, args.model)
+            except RuntimeError:
+                unloaded = None
+                header_notes.append("Could not list resident models, so other models were left loaded.")
+            else:
+                header_notes.append(unload_note(unloaded, False))
+        print(
+            f"{shape.name}: {layer_count_line(shape)}, {shape.attention_heads} attention heads, "
+            f"{shape.kv_heads} KV heads, head dim {shape.head_dim}"
+        )
         if shape.layer_note:
             print(shape.layer_note)
         if shape.grouped:
@@ -725,16 +988,11 @@ def main(argv: list[str] | None = None) -> int:
             "source": "ollama",
             "os": host_metrics["os"],
             "kv_cache_type": label,
-            "shape": {
-                "layers": shape.layers,
-                "attention_heads": shape.attention_heads,
-                "kv_heads": shape.kv_heads,
-                "head_dim": shape.head_dim,
-                "bytes_per_value": shape.bytes_per_value,
-            },
+            "shape": shape_fields(shape),
             "notes": header_notes,
             "rows": rows,
         }
+        header_notes.append(gpu_file_note(host_metrics.get("nvidia_mode") or "missing", rows))
         out = args.out
         if not out.is_absolute():
             out = Path.cwd() / out

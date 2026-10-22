@@ -16,6 +16,8 @@ export type ChartProps = {
   rows: MeasurementRow[];
   shape?: {
     layers: number;
+    kv_layers?: number;
+    blocks?: number;
     attention_heads: number;
     kv_heads: number;
     head_dim: number;
@@ -115,8 +117,11 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
   const showGap = sorted.some(
     (row) => row.measured_runtime_bytes != null && row.measured_runtime_bytes > row.predicted_kv_bytes,
   );
+  const kvLayers = shape ? (shape.kv_layers ?? shape.layers) : 0;
   const shapeLine = shape
-    ? `${shape.layers} layers, ${shape.kv_heads} KV heads, head dim ${shape.head_dim}, ${shape.bytes_per_value} bytes`
+    ? `${
+        shape.blocks && shape.blocks !== kvLayers ? `${shape.blocks} blocks, ${kvLayers} KV layers` : `${kvLayers} layers`
+      }, ${shape.kv_heads} KV heads, head dim ${shape.head_dim}, ${shape.bytes_per_value} bytes`
     : "";
   const gqaLine =
     shape && shape.attention_heads !== shape.kv_heads
