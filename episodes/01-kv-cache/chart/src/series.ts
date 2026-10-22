@@ -1,4 +1,4 @@
-/** Which memory series the chart draws beside the predicted KV cache. */
+/** Growth series the chart draws from one shared baseline context. */
 
 export const GPU_ATTRIBUTIONS = ["ollama-pid", "new-pid", "only-runner", "memory.used"] as const;
 
