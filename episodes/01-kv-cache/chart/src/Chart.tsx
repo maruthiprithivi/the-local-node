@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { chartSeries, comparisonSubtitle, formatTotalGb, growthCaption } from "./series";
+import { chartSeries, comparisonSubtitle, formatBarValue, formatTotalGb } from "./series";
 import { CAPTION_BAND, FPS, HEIGHT, theme, WIDTH } from "./theme";
 
 export type MeasurementRow = {
@@ -32,7 +32,7 @@ export type ChartProps = {
   kv_cache_type?: string;
 };
 
-const GIB = 1024 ** 3;
+const GB = 1e9;
 const SAFE_HEIGHT = HEIGHT - CAPTION_BAND;
 const INTRO_FRAMES = 28;
 const HOLD_SECONDS = 2;
@@ -47,9 +47,9 @@ const formatTick = (gib: number): string => {
   return gib.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 };
 
-/** Nice GiB steps so the axis reads 0, 5, 10, 20 rather than fractions of the tallest bar. */
+/** Nice decimal-GB steps so the axis reads 0, 0.5, 1, 2 rather than fractions of the tallest bar. */
 export const roundAxis = (maxBytes: number): { topBytes: number; ticks: number[] } => {
-  const maxGib = Math.max(maxBytes, 1) / GIB;
+  const maxGb = Math.max(maxBytes, 1) / GB;
   const steps: number[] = [];
   for (const base of [1, 2, 2.5, 5]) {
     for (let exp = -2; exp <= 4; exp++) steps.push(base * 10 ** exp);
@@ -57,16 +57,16 @@ export const roundAxis = (maxBytes: number): { topBytes: number; ticks: number[]
   steps.sort((a, b) => a - b);
   let step = steps[steps.length - 1];
   for (const candidate of steps) {
-    const intervals = Math.ceil(maxGib / candidate - 1e-9);
+    const intervals = Math.ceil(maxGb / candidate - 1e-9);
     if (intervals >= 3 && intervals <= 6) {
       step = candidate;
       break;
     }
   }
-  const intervals = Math.max(1, Math.ceil(maxGib / step - 1e-9));
+  const intervals = Math.max(1, Math.ceil(maxGb / step - 1e-9));
   const top = intervals * step;
   const ticks = Array.from({ length: intervals + 1 }, (_, index) => index * step);
-  return { topBytes: top * GIB, ticks };
+  return { topBytes: top * GB, ticks };
 };
 
 /** Last bar and its label reach full size at least HOLD_SECONDS before the final frame. */
@@ -111,7 +111,7 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
     extrapolateRight: "clamp",
   });
 
-  const plot = { left: 156, right: 1840, top: 292, bottom: 620 };
+  const plot = { left: 156, right: 1840, top: 400, bottom: 700 };
   const plotWidth = plot.right - plot.left;
   const plotHeight = plot.bottom - plot.top;
   const groupWidth = plotWidth / sorted.length;
@@ -154,9 +154,9 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
           </div>
         ) : null}
         <div style={{ position: "absolute", left: 72, top: 152, opacity: titleOpacity }}>
-          <div style={{ fontSize: 22, color: theme.muted }}>{model}</div>
-          {shapeLine ? <div style={{ marginTop: 4, fontSize: 20, color: theme.muted }}>{shapeLine}</div> : null}
-          {gqaLine ? <div style={{ marginTop: 2, fontSize: 20, color: theme.muted }}>{gqaLine}</div> : null}
+          <div style={{ fontSize: LABEL_FONT, color: theme.muted }}>{model}</div>
+          {shapeLine ? <div style={{ marginTop: 6, fontSize: LABEL_FONT, color: theme.muted }}>{shapeLine}</div> : null}
+          {gqaLine ? <div style={{ marginTop: 4, fontSize: LABEL_FONT, color: theme.muted }}>{gqaLine}</div> : null}
         </div>
 
         <div
@@ -188,7 +188,7 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
           style={{
             position: "absolute",
             left: plot.left,
-            top: plot.top - 40,
+            top: plot.top - 78,
             fontSize: LABEL_FONT,
             lineHeight: 1,
             color: theme.muted,
@@ -201,7 +201,7 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
 
         <svg width={WIDTH} height={SAFE_HEIGHT} style={{ position: "absolute", inset: 0, opacity: axisOpacity }}>
           {axis.ticks.map((tick, index) => {
-            const fraction = tick / (axis.topBytes / GIB);
+            const fraction = tick / (axis.topBytes / GB);
             const y = plot.bottom - plotHeight * fraction;
             const label = formatTick(tick);
             return (
@@ -242,8 +242,8 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
           const predictedGrowth = series.predicted[index];
           const measuredGrowth = series.measured[index];
           const onBaseline = index === series.baselineIndex;
-          const predictedText = predictedGrowth == null ? null : growthCaption(predictedGrowth, "predicted", onBaseline);
-          const measuredText = measuredGrowth == null ? null : growthCaption(measuredGrowth, "measured", onBaseline);
+          const predictedText = predictedGrowth == null ? null : formatBarValue(predictedGrowth);
+          const measuredText = measuredGrowth == null ? null : formatBarValue(measuredGrowth);
           const predictedHeight =
             predictedGrowth == null ? 0 : (Math.max(0, predictedGrowth) / axis.topBytes) * plotHeight * grow;
           const measuredHeight =
@@ -288,23 +288,60 @@ export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
               >
                 {formatContext(row.num_ctx)}
               </div>
-              <div
-                style={{
-                  position: "absolute",
-                  left: cx - groupWidth / 2,
-                  top: plot.bottom + 46,
-                  width: groupWidth,
-                  textAlign: "center",
-                  fontSize: LABEL_FONT,
-                  lineHeight: 1.15,
-                  whiteSpace: "nowrap",
-                  opacity: labelOpacity,
-                  fontFamily: CAPTION_FONT,
-                }}
-              >
-                {predictedText != null ? <div style={{ color: theme.predicted }}>{predictedText}</div> : null}
-                {measuredText != null ? <div style={{ color: theme.measured }}>{measuredText}</div> : null}
-              </div>
+              {predictedText != null ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: predictedX - 24,
+                    top: Math.max(plot.top - 36, plot.bottom - predictedHeight - 36),
+                    width: barWidth + 48,
+                    textAlign: "center",
+                    fontSize: LABEL_FONT,
+                    lineHeight: 1,
+                    color: theme.predicted,
+                    fontFamily: CAPTION_FONT,
+                    opacity: labelOpacity,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {predictedText}
+                </div>
+              ) : null}
+              {measuredText != null ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: measuredX - 24,
+                    top: Math.max(plot.top - 36, plot.bottom - measuredHeight - 36),
+                    width: barWidth + 48,
+                    textAlign: "center",
+                    fontSize: LABEL_FONT,
+                    lineHeight: 1,
+                    color: theme.measured,
+                    fontFamily: CAPTION_FONT,
+                    opacity: labelOpacity,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {measuredText}
+                </div>
+              ) : null}
+              {onBaseline ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: cx - groupWidth / 2,
+                    top: plot.bottom + 52,
+                    width: groupWidth,
+                    textAlign: "center",
+                    fontSize: LABEL_FONT,
+                    color: theme.ink,
+                    fontFamily: CAPTION_FONT,
+                  }}
+                >
+                  baseline
+                </div>
+              ) : null}
             </React.Fragment>
           );
         })}

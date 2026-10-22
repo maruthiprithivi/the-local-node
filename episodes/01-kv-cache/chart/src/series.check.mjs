@@ -1,23 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chartSeries, comparisonSubtitle, formatTotalGb, formatViewerMemory, growthCaption } from "./series.ts";
+import { chartSeries, comparisonSubtitle, formatBarValue, formatTotalGb } from "./series.ts";
 
 const MIB = 1024 * 1024;
 
 test("predicted and GPU growth share the shortest context", () => {
-  const short = 31.5 * MIB;
-  const long = 2016 * MIB;
+  const predicted512 = 32 * MIB;
+  const predicted32k = 2048 * MIB;
   const series = chartSeries([
     {
       num_ctx: 32768,
-      predicted_kv_bytes: long,
+      predicted_kv_bytes: predicted32k,
       gpu_memory_bytes: 20176 * MIB,
       gpu_attribution: "new-pid",
       process_rss_bytes: 9 * MIB,
     },
     {
       num_ctx: 512,
-      predicted_kv_bytes: short,
+      predicted_kv_bytes: predicted512,
       gpu_memory_bytes: 17816 * MIB,
       gpu_attribution: "ollama-pid",
       process_rss_bytes: 1 * MIB,
@@ -27,19 +27,21 @@ test("predicted and GPU growth share the shortest context", () => {
   assert.equal(series.measuredLabel, "measured on this machine");
   assert.equal(series.measuredKind, "gpu");
   assert.equal(series.baselineTokens, 512);
+  assert.equal(series.baselineIndex, 1);
   assert.equal(series.predicted[1], 0);
   assert.equal(series.measured[1], 0);
-  assert.equal(series.predicted[0], long - short);
+  assert.equal(series.predicted[0], 2016 * MIB);
   assert.equal(series.measured[0], 2360 * MIB);
-  assert.equal(growthCaption(series.predicted[1], "predicted", true), "baseline");
-  assert.equal(growthCaption(series.measured[1], "measured", true), "baseline");
-  assert.equal(growthCaption(series.predicted[0], "predicted", false), "+1.9 GB predicted");
-  assert.equal(growthCaption(series.measured[0], "measured", false), "+2.3 GB measured");
+  assert.equal(formatBarValue(series.predicted[1]), "0");
+  assert.equal(formatBarValue(series.measured[1]), "0");
+  assert.equal(formatBarValue(series.predicted[0]), "2.1");
+  assert.equal(formatBarValue(series.measured[0]), "2.5");
+  assert.equal(formatTotalGb(series.longest.predicted_kv_bytes), "2.1 GB");
   assert.equal(
     comparisonSubtitle(series.baselineTokens),
     "Extra memory needed as the conversation gets longer, compared with a 512-token chat",
   );
-  assert.deepEqual(series.longest, { num_ctx: 32768, predicted_kv_bytes: long });
+  assert.deepEqual(series.longest, { num_ctx: 32768, predicted_kv_bytes: predicted32k });
 });
 
 test("macOS rows with gpu_attribution unavailable plot process RSS growth", () => {
@@ -94,14 +96,16 @@ test("a missing shortest rung uses the next context for both series", () => {
   assert.deepEqual(series.longest, { num_ctx: 2048, predicted_kv_bytes: 40 });
 });
 
-test("viewer labels round to one decimal GB and use MB under 0.1 GB", () => {
-  assert.equal(formatViewerMemory(2 * 1024 ** 3), "+2.0 GB");
-  assert.equal(formatViewerMemory(2.3046875 * 1024 ** 3), "+2.3 GB");
-  assert.equal(formatViewerMemory(32 * MIB), "+32 MB");
-  assert.equal(formatViewerMemory(0), "+0.0 GB");
-  assert.equal(growthCaption(0, "predicted", true), "baseline");
-  assert.equal(growthCaption(-32 * MIB, "measured", false), "-32 MB measured");
-  assert.equal(formatTotalGb(16 * 1024 ** 3), "16.0 GB");
+test("viewer labels use decimal GB and MB, and exact zero stays 0", () => {
+  assert.equal(formatBarValue(2.1 * 1e9), "2.1");
+  assert.equal(formatBarValue(2.47463936 * 1e9), "2.5");
+  assert.equal(formatBarValue(32 * 1e6), "32 MB");
+  assert.equal(formatBarValue(0), "0");
+  assert.equal(formatBarValue(-32 * 1e6), "-32 MB");
+  assert.equal(formatBarValue(2016 * MIB), "2.1");
+  assert.equal(formatBarValue(2360 * MIB), "2.5");
+  assert.equal(formatTotalGb(2048 * MIB), "2.1 GB");
+  assert.equal(formatBarValue(0).includes("+"), false);
   assert.equal(
     comparisonSubtitle(1024),
     "Extra memory needed as the conversation gets longer, compared with a 1,024-token chat",

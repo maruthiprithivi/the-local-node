@@ -15,24 +15,21 @@ export type SeriesRow = {
 export const PREDICTED_LABEL = "predicted (KV cache math)";
 export const MEASURED_LABEL = "measured on this machine";
 
-const GIB = 1024 ** 3;
-const MIB = 1024 ** 2;
+const GB = 1e9;
+const MB = 1e6;
 
-/** Bytes are GiB. The chart labels that unit GB. Under 0.1 GB, switch to whole MB. */
-export const formatViewerMemory = (bytes: number): string => {
-  const sign = bytes < 0 ? "-" : "+";
+/** Decimal GB (bytes / 1e9). Under 0.1 GB, whole MB (bytes / 1e6). Exact 0 stays "0". */
+export const formatBarValue = (bytes: number): string => {
+  if (bytes === 0) return "0";
+  const sign = bytes < 0 ? "-" : "";
   const abs = Math.abs(bytes);
-  if (abs === 0) return "+0.0 GB";
-  const gb = abs / GIB;
-  if (gb < 0.1) return `${sign}${Math.round(abs / MIB)} MB`;
-  return `${sign}${(Math.round(gb * 10) / 10).toFixed(1)} GB`;
-};
-
-/** The shortest rung says baseline. Every later rung names the series. */
-export const growthCaption = (bytes: number, role: "predicted" | "measured", isBaseline: boolean): string => {
-  if (isBaseline) return "baseline";
-  const noun = role === "predicted" ? "predicted" : "measured";
-  return `${formatViewerMemory(bytes)} ${noun}`;
+  const gb = abs / GB;
+  if (gb < 0.1) {
+    const mb = Math.round(abs / MB);
+    if (mb === 0) return "0";
+    return `${sign}${mb} MB`;
+  }
+  return `${sign}${(Math.round(gb * 10) / 10).toFixed(1)}`;
 };
 
 export const comparisonSubtitle = (baselineTokens: number): string => {
@@ -40,7 +37,7 @@ export const comparisonSubtitle = (baselineTokens: number): string => {
   return `Extra memory needed as the conversation gets longer, compared with a ${count}-token chat`;
 };
 
-export const formatTotalGb = (bytes: number): string => `${(Math.round(Math.abs(bytes) / GIB * 10) / 10).toFixed(1)} GB`;
+export const formatTotalGb = (bytes: number): string => `${(Math.round(Math.abs(bytes) / GB * 10) / 10).toFixed(1)} GB`;
 
 export type MeasuredChoice = {
   /** Honest legend text. Null when the file has neither an attributed GPU column nor process RSS. */
