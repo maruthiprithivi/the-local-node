@@ -349,6 +349,35 @@ class MeasureHelpersTest(unittest.TestCase):
         self.assertIn(str(4 * GIB), csv_text)
 
 
+class SweepHeaderTest(unittest.TestCase):
+    def test_header_keeps_the_model_name_off_the_layer_count(self):
+        shape = kv_cache.shape_from_counts(
+            layers=16,
+            attention_heads=32,
+            kv_heads=8,
+            head_dim=64,
+            name="llama3.2:1b",
+        )
+        self.assertEqual(
+            measure_kv.sweep_header(shape),
+            "llama3.2:1b | layers: 16 | attention heads: 32 | KV heads: 8 | head dim 64",
+        )
+
+    def test_header_prints_blocks_and_kv_layers_for_a_hybrid(self):
+        shape = kv_cache.shape_from_counts(
+            layers=16,
+            attention_heads=32,
+            kv_heads=2,
+            head_dim=128,
+            name="qwen",
+            block_count=65,
+        )
+        self.assertEqual(
+            measure_kv.sweep_header(shape),
+            "qwen | blocks: 65, KV layers: 16 | attention heads: 32 | KV heads: 2 | head dim 128",
+        )
+
+
 class SampleAssetsTest(unittest.TestCase):
     def test_sample_measurements_match_the_formula(self):
         path = EP / "chart" / "src" / "sample-measurements.json"

@@ -43,3 +43,9 @@ jobs:
       - name: Test the episode 1 KV cache calculator
         working-directory: episodes/01-kv-cache
         run: python -m unittest discover -s tests -t . -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test the chart series selection
+        working-directory: episodes/01-kv-cache/chart
+        run: node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/series.check.mjs

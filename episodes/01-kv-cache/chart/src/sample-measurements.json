@@ -11,7 +11,7 @@
     "bytes_per_value": 2
   },
   "notes": [
-    "Sample rows so the chart renders before a live run. measured_runtime_bytes is the predicted cache plus a fixed 5 GiB, standing in for weights and compute buffers. It is not a measurement."
+    "Sample rows so the chart renders before a live run. There is no GPU or process figure, so the chart draws the predicted cache only. measured_runtime_bytes is the predicted cache plus a fixed 5 GiB and is not drawn. It is not a measurement."
   ],
   "rows": [
     {

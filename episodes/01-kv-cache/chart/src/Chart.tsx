@@ -1,11 +1,15 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { chooseMeasured } from "./series";
 import { CAPTION_BAND, FPS, HEIGHT, theme, WIDTH } from "./theme";
 
 export type MeasurementRow = {
   num_ctx: number;
   predicted_kv_bytes: number;
-  measured_runtime_bytes: number | null;
+  measured_runtime_bytes?: number | null;
+  gpu_memory_bytes?: number | null;
+  process_rss_bytes?: number | null;
+  gpu_attribution?: string | null;
   ttft_ms?: number | null;
   notes?: string;
 };
@@ -87,16 +91,17 @@ export const chartDuration = (rowCount: number, fps: number = FPS): number => {
 
 const formatContext = (tokens: number): string => tokens.toLocaleString("en-US");
 
-export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
+export const Chart: React.FC<ChartProps> = ({ model, rows, shape }) => {
   const frame = useCurrentFrame();
   const { durationInFrames, fps } = useVideoConfig();
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error("The measurements file needs a non-empty rows array.");
   }
   const sorted = [...rows].sort((a, b) => a.num_ctx - b.num_ctx);
+  const measured = chooseMeasured(sorted);
   const maxBytes = Math.max(
     1,
-    ...sorted.flatMap((row) => [row.predicted_kv_bytes, row.measured_runtime_bytes ?? 0]),
+    ...sorted.flatMap((row, index) => [row.predicted_kv_bytes, Math.max(0, measured.growth[index] ?? 0)]),
   );
   const axis = roundAxis(maxBytes);
   const axisOpacity = interpolate(frame, [0, 18], [0, 1], {
@@ -114,9 +119,6 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
   const groupWidth = plotWidth / sorted.length;
   const barWidth = Math.min(52, groupWidth * 0.26);
   const span = barSpan(sorted.length, durationInFrames, fps);
-  const showGap = sorted.some(
-    (row) => row.measured_runtime_bytes != null && row.measured_runtime_bytes > row.predicted_kv_bytes,
-  );
   const kvLayers = shape ? (shape.kv_layers ?? shape.layers) : 0;
   const shapeLine = shape
     ? `${
@@ -133,34 +135,26 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
       <div style={{ height: SAFE_HEIGHT, overflow: "hidden", position: "relative" }}>
         <div style={{ position: "absolute", left: 72, top: 36, opacity: titleOpacity }}>
           <div style={{ fontFamily: theme.serif, fontStyle: "italic", fontSize: 64, lineHeight: 1 }}>
-            Predicted vs measured
+            {measured.label ? "Predicted vs measured" : "Predicted KV cache"}
           </div>
           <div style={{ marginTop: 14, fontSize: 22, color: theme.muted }}>{model}</div>
           {shapeLine ? <div style={{ marginTop: 6, fontSize: 20, color: theme.muted }}>{shapeLine}</div> : null}
           {gqaLine ? <div style={{ marginTop: 4, fontSize: 20, color: theme.muted }}>{gqaLine}</div> : null}
         </div>
 
-        <div style={{ position: "absolute", right: 72, top: 44, width: 620, textAlign: "right", opacity: titleOpacity }}>
-          {source === "sample" ? (
-            <div style={{ fontSize: 20, color: theme.muted }}>sample data, not a measurement</div>
-          ) : (
-            <div style={{ fontSize: 20, color: theme.muted }}>{source}</div>
-          )}
-          <div style={{ marginTop: 18, display: "flex", justifyContent: "flex-end", gap: 22, fontSize: 20 }}>
+        <div style={{ position: "absolute", right: 72, top: 48, textAlign: "right", opacity: titleOpacity }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 22, fontSize: 20 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 18, height: 18, background: theme.predicted, display: "inline-block" }} />
               predicted KV cache
             </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 18, height: 18, background: theme.measured, display: "inline-block" }} />
-              measured runtime
-            </span>
+            {measured.label ? (
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 18, height: 18, background: theme.measured, display: "inline-block" }} />
+                {measured.label}
+              </span>
+            ) : null}
           </div>
-          {showGap ? (
-            <div style={{ marginTop: 10, fontSize: 18, color: theme.muted }}>
-              measured total includes weights and compute buffers
-            </div>
-          ) : null}
         </div>
 
         <svg width={WIDTH} height={SAFE_HEIGHT} style={{ position: "absolute", inset: 0, opacity: axisOpacity }}>
@@ -209,10 +203,10 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
             extrapolateRight: "clamp",
           });
           const cx = plot.left + groupWidth * index + groupWidth / 2;
+          const growth = measured.growth[index];
           const predictedHeight = (row.predicted_kv_bytes / axis.topBytes) * plotHeight * grow;
-          const measuredHeight =
-            row.measured_runtime_bytes == null ? 0 : (row.measured_runtime_bytes / axis.topBytes) * plotHeight * grow;
-          const predictedX = cx - barWidth - 6;
+          const measuredHeight = growth == null ? 0 : (Math.max(0, growth) / axis.topBytes) * plotHeight * grow;
+          const predictedX = measured.label ? cx - barWidth - 6 : cx - barWidth / 2;
           const measuredX = cx + 6;
           return (
             <React.Fragment key={row.num_ctx}>
@@ -226,7 +220,7 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
                   background: theme.predicted,
                 }}
               />
-              {row.measured_runtime_bytes != null ? (
+              {growth != null ? (
                 <div
                   style={{
                     position: "absolute",
@@ -265,10 +259,10 @@ export const Chart: React.FC<ChartProps> = ({ model, source, rows, shape }) => {
                 }}
               >
                 <span style={{ color: theme.predicted }}>{formatGib(row.predicted_kv_bytes)}</span>
-                {row.measured_runtime_bytes != null ? (
+                {growth != null ? (
                   <>
                     <span style={{ color: theme.muted }}> / </span>
-                    <span style={{ color: theme.measured }}>{formatGib(row.measured_runtime_bytes)}</span>
+                    <span style={{ color: theme.measured }}>{formatGib(growth)}</span>
                   </>
                 ) : null}
               </div>

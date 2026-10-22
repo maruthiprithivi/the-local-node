@@ -7,7 +7,8 @@
     "studio": "remotion studio src/index.ts",
     "render": "remotion render src/index.ts KVCacheChart out/kv-cache.mp4",
     "still": "remotion still src/index.ts KVCacheChart out/kv-cache.png --frame=264",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/series.check.mjs"
   },
   "dependencies": {
     "@remotion/cli": "4.0.527",

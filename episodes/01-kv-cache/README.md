@@ -111,14 +111,14 @@ The script writes `runs/kv-sweep.json` and `runs/kv-sweep.csv`. Those files are 
 | `measured_runtime_bytes` | `size` from Ollama's process list. This is weights plus compute buffers plus the cache, not the cache alone |
 | `measured_vram_bytes` | `size_vram` when Ollama reports it, otherwise empty |
 | `gpu_memory_bytes` | `nvidia-smi` memory.used when that query returns a number. If it returns `[N/A]`, the row sums `nvidia-smi --query-compute-apps=pid,used_memory` for the runner serving this model: the PID Ollama reports, or the new runner PID after the load. Other resident runners are not added in |
-| `gpu_attribution` | which of those approaches produced the GPU figure (`ollama-pid`, `new-pid`, `only-runner`, `memory.used`, or `unattributed`) |
+| `gpu_attribution` | which approach produced the GPU figure (`ollama-pid`, `new-pid`, `only-runner`, `memory.used`, `unattributed`, or `unavailable`). macOS rows use `unavailable`, because there is no separate GPU counter |
 | `process_rss_bytes` | on macOS, the Ollama server plus runners Ollama spawned. A standalone `llama-server` is left out unless its parent chain reaches Ollama. Omitted on Linux, because CUDA memory is not in the resident set and the number stays flat |
 | `ttft_ms` | wall time to the first token on a second, already-loaded request. A thinking model's first thinking token counts. The request sends `think: false` when the server accepts it |
 | `load_ms` | time to the first token on the request that loaded the model |
 
 On a Mac the runtime size is the unified-memory figure. There is no separate GPU counter, and the JSON says so. On Linux, a missing `nvidia-smi` leaves `gpu_memory_bytes` empty and the sweep continues. A context the server refuses is one row with a note, not a failed run.
 
-The measured total includes the weights and the compute buffers, not just the KV cache, so `measured_runtime_bytes` sits above `predicted_kv_bytes`. Ollama's reported model size is an estimate, and it moves in steps rather than with every extra token. Use the GPU figure, or the process growth between rungs, for the cache. Doubling the context doubles the predicted cache. That growth should show up on top of a size that stays put. A hybrid model's prediction only counts full-attention layers, so it will be smaller than a count of every block. The report prints both, for example `blocks: 65, KV layers: 16`, and the JSON shape carries `blocks` and `kv_layers`. A short attention window can still make the live growth smaller than that prediction.
+The measured total includes the weights and the compute buffers, not just the KV cache, so `measured_runtime_bytes` sits above `predicted_kv_bytes`. Ollama's reported model size is an estimate, and it moves in steps rather than with every extra token. Use the GPU figure, or the process growth between rungs, for the cache. Doubling the context doubles the predicted cache. On the machine that shows up as growth in GPU memory or, on a Mac, in process RSS, measured from the shortest context. The chart draws that growth next to the prediction. A hybrid model's prediction only counts full-attention layers, so it will be smaller than a count of every block. The report prints both, for example `blocks: 65, KV layers: 16`, and the JSON shape carries `blocks` and `kv_layers`. A short attention window can still make the live growth smaller than that prediction.
 
 Other models that are already loaded are unloaded before the sweep, so an older runner does not sit inside every GPU row. Pass `--keep-others` to leave them loaded. Each row's note says which attribution was used. The file-level note counts how many rows actually got a GPU figure, instead of repeating a probe from before the model was loaded.
 
@@ -138,7 +138,7 @@ Compare the two runtime columns yourself. The calculator's `q8_0` column is the 
 
 ## 5. Render the chart
 
-The chart reads the measurement JSON: predicted cache against measured runtime memory, by context length. It is 1920x1080 at 24 fps. The bottom 150 px is left empty for captions. The y-axis uses round GiB ticks. The last bar and its label finish, then the frame holds for at least 2 seconds. A sample file is built in, so the chart renders before you have a live run. The sample's measured series is the prediction plus a fixed 5 GiB, standing in for weights and compute buffers. That stand-in is not a measurement.
+The chart reads the measurement JSON and draws the predicted KV cache against the memory that tracks the cache. When `gpu_attribution` is `ollama-pid`, `new-pid`, `only-runner`, or `memory.used`, the second series is the growth in `gpu_memory_bytes` from the shortest context, labeled measured GPU memory growth. On macOS, where `gpu_attribution` is `unavailable`, the second series is the growth in `process_rss_bytes`, labeled measured process RSS growth. Ollama's reported size stays in the JSON. The drawn series are the prediction and that growth. The frame is 1920x1080 at 24 fps. The bottom 150 px is left empty for captions. The y-axis uses round GiB ticks. The last bar and its label finish, then the frame holds for at least 2 seconds. A sample file is built in, so the chart renders before you have a live run. The built-in sample carries the predicted cache, so that render is the prediction alone. `measured_runtime_bytes` in the sample is still the prediction plus a fixed 5 GiB. That stand-in is not a measurement.
 
 ```bash
 cd chart
@@ -167,4 +167,4 @@ npm run render -- --props=../runs/kv-sweep.json
 python -m unittest discover -s tests -t . -v
 ```
 
-The tests check the 4 GiB example, the 8-KV-head case, the quantized widths, the Qwen shape, and the GGUF and `config.json` readers. They do not start Ollama and they do not download a model.
+From `chart/`, `npm test` checks that attributed GPU rows plot memory growth and that macOS `unavailable` rows plot process RSS growth. The tests check the 4 GiB example, the 8-KV-head case, the quantized widths, the Qwen shape, and the GGUF and `config.json` readers. They do not start Ollama and they do not download a model.

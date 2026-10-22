@@ -7,6 +7,9 @@ reads /api/ps after each load. predicted_kv_bytes is the formula from
 kv_cache.py. measured_runtime_bytes is the size Ollama reports. That
 total includes the weights and compute buffers, not just the KV cache.
 The growth from one context rung to the next is the part that tracks the cache.
+The chart plots that growth: attributed GPU memory when gpu_attribution is
+set, and process RSS when the row says unavailable. Ollama's reported size
+stays in the file.
 
     python measure_kv.py
     python measure_kv.py --pull
@@ -871,6 +874,15 @@ def chart_props_arg(json_path: Path, chart_dir: Path) -> str:
     return Path(os.path.relpath(json_path.resolve(), chart_dir.resolve())).as_posix()
 
 
+def sweep_header(shape) -> str:
+    """One line for the sweep. Pipes keep the model name off the layer count."""
+    return (
+        f"{shape.name} | {layer_count_line(shape)} | "
+        f"attention heads: {shape.attention_heads} | "
+        f"KV heads: {shape.kv_heads} | head dim {shape.head_dim}"
+    )
+
+
 def write_results(stem: Path, payload: dict) -> tuple[Path, Path]:
     stem.parent.mkdir(parents=True, exist_ok=True)
     json_path, csv_path = output_paths(stem)
@@ -964,10 +976,7 @@ def main(argv: list[str] | None = None) -> int:
                 header_notes.append("Could not list resident models, so other models were left loaded.")
             else:
                 header_notes.append(unload_note(unloaded, False))
-        print(
-            f"{shape.name}: {layer_count_line(shape)}, {shape.attention_heads} attention heads, "
-            f"{shape.kv_heads} KV heads, head dim {shape.head_dim}"
-        )
+        print(sweep_header(shape))
         if shape.layer_note:
             print(shape.layer_note)
         if shape.grouped:
