@@ -1,0 +1,12 @@
+{
+ "t1": {"hidden": "test_t1_slugify.py", "title": "slugify() leaves double dashes and trailing dashes",
+        "body": "`widgets.textutil.slugify(\"Hello,  World!\")` returns `hello--world-` but should return `hello-world`.\n\nExpected: runs of punctuation/whitespace become a single dash, and there are no leading or trailing dashes (so `\"!!!\"` gives an empty string). Accented letters should still be folded to ASCII (`Café` -> `cafe`)."},
+ "t2": {"hidden": "test_t2_money.py", "title": "format_cents shows $0.5 for five cents and garbles negatives",
+        "body": "`format_cents(5)` returns `$0.5` instead of `$0.05`, and `format_cents(-250)` returns `$-3.50`. The docstring says negatives should look like `-$2.50`. Cents must always be two digits."},
+ "t3": {"hidden": "test_t3_durations.py", "title": "parse_duration only accepts the XhYm form",
+        "body": "`parse_duration(\"2h\")` and `parse_duration(\"45m\")` raise ValueError, and seconds (`\"90s\"`, `\"1h2m3s\"`) are not supported, although the docstring promises them. Units must appear in h, m, s order, each at most once; anything else (including an empty string) should still raise ValueError. Surrounding whitespace is fine."},
+ "t4": {"hidden": "test_t4_inventory.py", "title": "Inventory.remove lets stock go negative",
+        "body": "Removing more units than are in stock silently makes the count negative:\n\n```python\ninv = Inventory(); inv.add(\"a\", 3); inv.remove(\"a\", 5)\ninv.count(\"a\")  # -2\n```\n\nIt should raise the existing `InsufficientStock` exception and leave the count unchanged (also for unknown SKUs)."},
+ "t5": {"hidden": "test_t5_csvio.py", "title": "read_rows breaks on quoted fields and BOM",
+        "body": "`widgets.csvio.read_rows` splits on every comma, so a quoted field like `\"Smith, John\"` is cut in two, escaped quotes (`\"\"`) are not handled, and a UTF-8 BOM at the start ends up in the first header name. Please parse proper CSV (standard library is fine); blank lines should still be skipped."}
+}

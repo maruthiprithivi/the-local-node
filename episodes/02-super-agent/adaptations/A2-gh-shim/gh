@@ -1,0 +1,443 @@
+#!/usr/bin/env python3
+"""gh-compat (adaptation A2): a minimal GitHub-CLI-compatible shim that talks to a local Gitea forge (REST v1).
+
+The dsh-superagent prototype only speaks to github.com through `gh`. This shim implements the subset of `gh`
+the prototype's host and its workers use, translates GitHub REST paths/shapes to Gitea and back, and rewrites
+forge URLs to github.com form (the prototype's URL parser only accepts https://github.com / https://api.github.com).
+
+Configuration (environment variables win over the optional JSON config file; nothing is hardcoded):
+  FORGE_URL         base URL of the forge as seen from where this runs, e.g. http://127.0.0.1:3000
+  FORGE_TOKEN       the agent account's forge token, OR
+  FORGE_TOKEN_FILE  path to a 0600 file holding that token (use this for mode a: dsh strips environment
+                    variables whose names contain TOKEN/KEY/SECRET/PASSWORD from worker processes)
+  FORGE_LOGIN       the agent account's login name (e.g. agentbot)
+  FORGE_SCOPES      optional, only echoed by `gh auth status`
+  GHCOMPAT_LOG      optional, append-only JSON-lines log of every invocation (argv + HTTP status, never the token)
+  GHCOMPAT_CONFIG   optional JSON file {"base": ..., "token_file": ..., "login": ..., "scopes": ..., "log": ...};
+                    default ~/.config/gh-agent/config.json if it exists.
+
+Known gap kept on purpose so the reach check can reproduce it: `gh auth token` prints the token to stdout,
+like the real gh does. Set GHCOMPAT_DENY_AUTH_TOKEN=1 to refuse that subcommand instead.
+"""
+import json, os, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
+_CFG_PATH = os.environ.get("GHCOMPAT_CONFIG") or os.path.expanduser("~/.config/gh-agent/config.json")
+CFG = json.load(open(_CFG_PATH)) if os.path.exists(_CFG_PATH) else {}
+def _setting(env, key, default=None):
+    return os.environ.get(env) or CFG.get(key) or default
+BASE = (_setting("FORGE_URL", "base") or "").rstrip("/")
+if not BASE:
+    sys.stderr.write("gh: FORGE_URL is not set (and no config file)\n"); sys.exit(4)
+API = BASE + "/api/v1"
+def _token():
+    if os.environ.get("FORGE_TOKEN"): return os.environ["FORGE_TOKEN"].strip()
+    tf = _setting("FORGE_TOKEN_FILE", "token_file")
+    if tf:
+        try: return open(os.path.expanduser(tf)).read().strip()
+        except OSError: pass
+    sys.stderr.write("gh: no forge token (set FORGE_TOKEN or FORGE_TOKEN_FILE)\n"); sys.exit(4)
+TOKEN = _token()
+LOGIN = _setting("FORGE_LOGIN", "login", "agentbot")
+SCOPES = _setting("FORGE_SCOPES", "scopes", "")
+LOGF = os.path.expanduser(_setting("GHCOMPAT_LOG", "log", "~/.config/gh-agent/ghcompat.log"))
+VERSION = "gh version 2.63.0 (gh-compat shim for a local Gitea forge)"
+def log(**k):
+    try:
+        with open(LOGF, "a") as f: f.write(json.dumps({"t": time.strftime("%F %T"), "pid": os.getpid(), "cwd": os.getcwd(), **k}) + "\n")
+    except Exception: pass
+def die(msg, code=1):
+    sys.stderr.write(msg.rstrip() + "\n"); log(exit=code, err=msg[:500]); sys.exit(code)
+# ---------- URL / shape translation ----------
+def to_gh(s):
+    s = s.replace(API + "/", "https://api.github.com/").replace(BASE + "/", "https://github.com/")
+    return re.sub(r"(https://github\.com/[^/\s]+/[^/\s]+)/pulls/(\d+)", r"\1/pull/\2", s)
+REV_STATE = {"REQUEST_CHANGES": "CHANGES_REQUESTED", "COMMENT": "COMMENTED", "REQUEST_REVIEW": "PENDING"}
+def fix(o, ctx=None):
+    if isinstance(o, list): return [fix(x, ctx) for x in o]
+    if isinstance(o, str): return to_gh(o)
+    if not isinstance(o, dict): return o
+    o = {k: fix(v, ctx) for k, v in o.items()}
+    if "login" in o and "id" in o and "type" not in o:
+        o["type"] = "Bot" if o["login"].endswith("[bot]") else "User"
+    if isinstance(o.get("pull_request"), dict) and "url" not in o["pull_request"] and "number" in o:
+        m = re.match(r"https://github\.com/([^/]+/[^/]+)/", o.get("html_url", ""))
+        if m: o["pull_request"]["url"] = f"https://api.github.com/repos/{m.group(1)}/pulls/{o['number']}"
+    if "subject" in o and isinstance(o["subject"], dict):  # notification
+        if o["subject"].get("type") == "Pull": o["subject"]["type"] = "PullRequest"
+        o.setdefault("reason", "subscribed")
+    if ctx == "review" and isinstance(o.get("state"), str): o["state"] = REV_STATE.get(o["state"], o["state"])
+    return o
+def from_gh(s):
+    return s.replace("https://api.github.com/", API + "/").replace("https://github.com/", BASE + "/")
+# ---------- HTTP ----------
+def http(method, url, body=None, headers=None):
+    r = urllib.request.Request(url, data=body, method=method)
+    r.add_header("Authorization", f"token {TOKEN}")
+    r.add_header("Accept", "application/json")
+    if body is not None: r.add_header("Content-Type", "application/json")
+    for k, v in (headers or {}).items():
+        if k.lower() in ("accept", "if-none-match"): continue
+        r.add_header(k, v)
+    try:
+        with urllib.request.urlopen(r, timeout=60) as resp: return resp.status, dict(resp.headers), resp.read()
+    except urllib.error.HTTPError as e: return e.code, dict(e.headers), e.read()
+    except urllib.error.URLError as e: die(f"gh: could not reach forge: {e.reason}")
+def translate(path, method, raw):
+    """GitHub REST path -> (gitea url | synthetic response)."""
+    path = from_gh(path)
+    if path.startswith(API): path = path[len(API):]
+    path = path.lstrip("/")
+    p, _, q = path.partition("?")
+    qs = urllib.parse.parse_qsl(q, keep_blank_values=True)
+    qs = [("limit" if k == "per_page" else k, v) for k, v in qs]
+    m = re.match(r"repos/([^/]+/[^/]+)/(.*)$", p)
+    rest = m.group(2) if m else None
+    if p == "graphql": return ("synthetic", 400, {"message": "GraphQL is not available on this forge (gh-compat supports REST only)"})
+    if m:
+        repo = m.group(1)
+        if re.fullmatch(r"commits/[^/]+/check-runs", rest): return ("synthetic", 200, {"total_count": 0, "check_runs": []})
+        if re.fullmatch(r"commits/[^/]+/check-suites", rest): return ("synthetic", 200, {"total_count": 0, "check_suites": []})
+        mm = re.fullmatch(r"commits/([^/]+)", rest)
+        if mm and method == "GET": return ("commit", repo, mm.group(1))
+        mm = re.fullmatch(r"pulls/(\d+)/comments", rest)
+        if mm and method == "GET": return ("reviewcomments", repo, int(mm.group(1)))
+        mm = re.fullmatch(r"git/refs/heads/(.+)", rest)
+        if mm and method == "DELETE": p = f"repos/{repo}/branches/{mm.group(1)}"
+        mm = re.fullmatch(r"contents/(.+)", rest)
+        if mm and raw and method == "GET": p = f"repos/{repo}/raw/{mm.group(1)}"
+    url = f"{API}/{p}" + ("?" + urllib.parse.urlencode(qs) if qs else "")
+    return ("url", url)
+def call(method, path, body=None, headers=None, raw=False, paginate=False):
+    t = translate(path, method, raw)
+    if t[0] == "synthetic": return t[1], {}, json.dumps(t[2]).encode(), None
+    if t[0] == "commit":
+        _, repo, ref = t
+        c, h, b = http("GET", f"{API}/repos/{repo}/git/commits/{urllib.parse.quote(ref)}")
+        if c == 200: return c, h, b, None
+        c, h, b = http("GET", f"{API}/repos/{repo}/branches/{urllib.parse.quote(ref, safe='')}")
+        if c != 200: return c, h, b, None
+        br = json.loads(b); return 200, h, json.dumps({"sha": br["commit"]["id"], "commit": br["commit"]}).encode(), None
+    if t[0] == "reviewcomments":
+        _, repo, n = t
+        c, h, b = http("GET", f"{API}/repos/{repo}/pulls/{n}/reviews")
+        if c != 200: return c, h, b, None
+        out = []
+        for rv in json.loads(b):
+            c2, _, b2 = http("GET", f"{API}/repos/{repo}/pulls/{n}/reviews/{rv['id']}/comments")
+            if c2 == 200:
+                for cm in json.loads(b2):
+                    cm.setdefault("line", cm.get("position") or None); cm.setdefault("original_line", cm.get("original_position") or None)
+                    cm.setdefault("diff_hunk", cm.get("diff_hunk", "")); out.append(cm)
+        return 200, h, json.dumps(out).encode(), None
+    url = t[1]; pages = []
+    c, h, b = http(method, url, body, headers)
+    if not paginate or c != 200: return c, h, b, None
+    pages.append(json.loads(b or b"null"))
+    for _ in range(100):
+        nxt = re.search(r'<([^>]+)>;\s*rel="next"', h.get("Link", "") or "")
+        if not nxt: break
+        c, h, b = http("GET", nxt.group(1), None, headers)
+        if c != 200: break
+        pages.append(json.loads(b or b"null"))
+    return 200, h, None, pages
+# ---------- gh api ----------
+def typed(v):
+    if v in ("true", "false"): return v == "true"
+    if v == "null": return None
+    if re.fullmatch(r"-?\d+", v): return int(v)
+    if v.startswith("@"): return open(v[1:]).read() if v != "@-" else sys.stdin.read()
+    return v
+def setfield(d, k, v):
+    if k.endswith("[]"): d.setdefault(k[:-2], []).append(v)
+    else: d[k] = v
+def jq(expr, data):
+    r = subprocess.run(["jq", "-r", expr], input=json.dumps(data), capture_output=True, text=True)
+    if r.returncode: die(f"gh: jq error: {r.stderr.strip()}")
+    return r.stdout
+def cmd_api(a):
+    path = None; method = None; fields = {}; headers = {}; include = paginate = slurp = False; jqx = None; inp = None
+    i = 0
+    while i < len(a):
+        x = a[i]
+        if x in ("-X", "--method"): method = a[i + 1].upper(); i += 2; continue
+        if x in ("-f", "--raw-field"): k, _, v = a[i + 1].partition("="); setfield(fields, k, v); i += 2; continue
+        if x in ("-F", "--field"): k, _, v = a[i + 1].partition("="); setfield(fields, k, typed(v)); i += 2; continue
+        if x in ("-H", "--header"): k, _, v = a[i + 1].partition(":"); headers[k.strip()] = v.strip(); i += 2; continue
+        if x in ("-i", "--include"): include = True; i += 1; continue
+        if x == "--paginate": paginate = True; i += 1; continue
+        if x == "--slurp": slurp = True; i += 1; continue
+        if x in ("-q", "--jq"): jqx = a[i + 1]; i += 2; continue
+        if x == "--input": inp = a[i + 1]; i += 2; continue
+        if x in ("--hostname", "-p", "--preview", "--cache", "-t", "--template"): i += 2; continue
+        if x == "--silent": i += 1; continue
+        if path is None: path = x; i += 1; continue
+        die(f"gh: unsupported api argument {x}")
+    if not path: die("gh api: endpoint required")
+    if "{owner}" in path or "{repo}" in path:
+        o_, r_ = current_repo().split("/", 1); path = path.replace("{owner}", o_).replace("{repo}", r_)
+    method = method or ("POST" if fields or inp else "GET")
+    raw = any("raw" in v for k, v in headers.items() if k.lower() == "accept")
+    body = None
+    if method == "GET" and fields:
+        path += ("&" if "?" in path else "?") + urllib.parse.urlencode({k: str(v) for k, v in fields.items()})
+    elif inp: body = (sys.stdin.read() if inp == "-" else open(inp).read()).encode()
+    elif fields or method in ("POST", "PATCH", "PUT"): body = json.dumps(fields).encode() if fields else None
+    if any(k.lower() == "if-none-match" for k in headers): pass
+    c, h, b, pages = call(method, path, body, headers, raw, paginate)
+    log(cmd="api", method=method, path=path, status=c)
+    ctx = "review" if re.search(r"/reviews", path) else None
+    if c >= 400 or c == 304:
+        msg = ""
+        try: msg = json.loads(b).get("message", "")
+        except Exception: msg = (b or b"").decode(errors="replace")[:300]
+        if b: sys.stdout.write(to_gh((b or b"").decode(errors="replace")) + "\n")
+        die(f"gh: {msg or 'error'} (HTTP {c})" if c != 304 else "gh: HTTP 304")
+    if raw and pages is None:
+        if include: sys.stdout.write(f"HTTP/1.1 {c} OK\r\n\r\n")
+        sys.stdout.buffer.write(b or b""); return
+    if pages is not None:
+        pages = [fix(p, ctx) for p in pages]
+        data = pages if slurp else ([x for p in pages for x in p] if all(isinstance(p, list) for p in pages) else pages[-1])
+    else:
+        data = fix(json.loads(b), ctx) if b and b.strip() else None
+    if include:
+        hdr = [f"HTTP/1.1 {c} OK"] + [f"{k}: {to_gh(v)}" for k, v in h.items() if k.lower() not in ("set-cookie",)] + ["X-Poll-Interval: 60"]
+        sys.stdout.write("\r\n".join(hdr) + "\r\n\r\n")
+    if data is None: return
+    sys.stdout.write(jq(jqx, data) if jqx else json.dumps(data) + "\n")
+# ---------- helpers for porcelain ----------
+def current_repo(explicit=None):
+    if explicit:
+        return re.sub(r"^https?://github\.com/", "", explicit).removesuffix(".git").strip("/")
+    env = os.environ.get("DSH_SUPERAGENT_GITHUB_REPOSITORY") or os.environ.get("GH_REPO")
+    try:
+        u = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
+        m = re.search(r"[:/]([^/:]+/[^/]+?)(?:\.git)?$", u)
+        if m and (BASE in u or "github.com" in u): return m.group(1)
+    except Exception: pass
+    if env: return env
+    die("gh: could not determine the repository; use --repo owner/name")
+def get(path):
+    c, h, b, _ = call("GET", path)
+    if c >= 400: die(f"gh: {json.loads(b).get('message', 'error') if b else 'error'} (HTTP {c})")
+    return fix(json.loads(b))
+def send(method, path, data):
+    c, h, b, _ = call(method, path, json.dumps(data).encode())
+    log(cmd="porcelain", method=method, path=path, status=c)
+    if c >= 400:
+        try: msg = json.loads(b).get("message", "")
+        except Exception: msg = b.decode(errors="replace")[:300]
+        die(f"gh: {msg} (HTTP {c})")
+    return fix(json.loads(b)) if b and b.strip() else None
+def opts(a, flags, bools=()):
+    o = {"_": []}; i = 0
+    while i < len(a):
+        x = a[i]
+        if "=" in x and x.split("=")[0] in flags: k, v = x.split("=", 1); o[flags[k]] = v; i += 1; continue
+        if x in flags: o[flags[x]] = a[i + 1] if i + 1 < len(a) else ""; i += 2; continue
+        if x in bools: o[bools[x]] = True; i += 1; continue
+        o["_"].append(x); i += 1
+    return o
+def body_of(o):
+    if o.get("body_file"): return sys.stdin.read() if o["body_file"] == "-" else open(o["body_file"]).read()
+    return o.get("body", "")
+def num_of(x):
+    if x is None: return None
+    m = re.search(r"(\d+)$", x.rstrip("/"))
+    return int(m.group(1)) if m else None
+def out_json(data, fields, jqx):
+    sel = {f: data.get(f) for f in fields.split(",")} if fields else data
+    sys.stdout.write(jq(jqx, sel) if jqx else json.dumps(sel, indent=2) + "\n")
+def gh_user(u): return {"login": (u or {}).get("login", "ghost")}
+def pr_obj(repo, pr, with_comments=False):
+    n = pr["number"]
+    state = "MERGED" if pr.get("merged") else pr["state"].upper()
+    d = {"number": n, "title": pr.get("title"), "body": pr.get("body") or "", "state": state, "url": pr.get("html_url"),
+         "headRefName": pr["head"]["ref"], "baseRefName": pr["base"]["ref"], "headRefOid": pr["head"]["sha"],
+         "author": gh_user(pr.get("user")), "isDraft": bool(pr.get("draft")), "additions": pr.get("additions"),
+         "deletions": pr.get("deletions"), "changedFiles": pr.get("changed_files"), "mergeable": "MERGEABLE" if pr.get("mergeable") else "UNKNOWN",
+         "createdAt": pr.get("created_at"), "updatedAt": pr.get("updated_at"), "closed": pr["state"] == "closed",
+         "labels": [{"name": l["name"]} for l in pr.get("labels") or []], "statusCheckRollup": [], "reviewDecision": ""}
+    if with_comments:
+        d["comments"] = [{"author": gh_user(c.get("user")), "body": c.get("body"), "createdAt": c.get("created_at"), "url": c.get("html_url")}
+                         for c in get(f"repos/{repo}/issues/{n}/comments")]
+        d["reviews"] = [{"author": gh_user(r.get("user")), "body": r.get("body"), "state": r.get("state"), "submittedAt": r.get("submitted_at")}
+                        for r in fix(get(f"repos/{repo}/pulls/{n}/reviews"), "review")]
+    return d
+def issue_obj(repo, it, with_comments=False):
+    d = {"number": it["number"], "title": it["title"], "body": it.get("body") or "", "state": it["state"].upper(), "url": it["html_url"],
+         "author": gh_user(it.get("user")), "labels": [{"name": l["name"]} for l in it.get("labels") or []],
+         "createdAt": it.get("created_at"), "updatedAt": it.get("updated_at"), "closed": it["state"] == "closed", "assignees": []}
+    if with_comments:
+        d["comments"] = [{"author": gh_user(c.get("user")), "body": c.get("body"), "createdAt": c.get("created_at"), "url": c.get("html_url")}
+                         for c in get(f"repos/{repo}/issues/{it['number']}/comments")]
+    return d
+def print_thread(kind, d):
+    print(f"{d['title']} {d['url']}\n{d['state']} • {d['author']['login']} opened\n")
+    print(d["body"] or "No description provided"); print()
+    for c in d.get("comments", []):
+        print(f"--\n{c['author']['login']} • {c['createdAt']}\n{c['body']}\n")
+def find_pr(repo, sel):
+    n = num_of(sel) if sel and re.search(r"\d+$", sel) and not re.search(r"[A-Za-z_-]", sel.split("/")[-1]) else None
+    if n: return get(f"repos/{repo}/pulls/{n}")
+    branch = sel or subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
+    for pr in get(f"repos/{repo}/pulls?state=all&limit=50"):
+        if pr["head"]["ref"] == branch: return pr
+    die(f'no pull requests found for branch "{branch}"')
+# ---------- porcelain ----------
+F = {"--repo": "repo", "-R": "repo", "--title": "title", "-t": "title", "--body": "body", "-b": "body", "--body-file": "body_file",
+     "-F": "body_file", "--base": "base", "-B": "base", "--head": "head", "-H": "head", "--json": "json", "--jq": "jq", "-q": "jq",
+     "--state": "state", "-s": "state", "--limit": "limit", "-L": "limit", "--comment": "comment", "-c": "comment",
+     "--add-label": "label", "--label": "label", "-l": "label", "--add-reviewer": "rev", "--reviewer": "rev", "-r": "rev",
+     "--assignee": "asg", "-a": "asg", "--milestone": "ms", "--search": "search", "--author": "author", "-A": "author",
+     "--template": "tmpl", "--match-head-commit": "mhc", "--subject": "subject", "--remove-label": "rmlabel"}
+B = {"--draft": "draft", "-d": "draft", "--comments": "comments", "-c": "comments", "--fill": "fill", "-f": "fill", "--web": "web",
+     "--auto": "auto", "--merge": "merge", "--squash": "squash", "--rebase": "rebase", "--delete-branch": "delbranch",
+     "--disable-auto": "disauto", "--yes": "yes", "--admin": "admin", "--no-maintainer-edit": "nme"}
+def cmd_pr(a):
+    sub, a = a[0], a[1:]
+    fl = dict(F); bl = dict(B)
+    if sub == "view": bl["-c"] = "comments"; fl.pop("-c", None)
+    o = opts(a, fl, bl); repo = current_repo(o.get("repo"))
+    if o.get("web"): die("gh: --web is not available")
+    if sub == "create":
+        head = o.get("head") or subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
+        base = o.get("base") or get(f"repos/{repo}")["default_branch"]
+        title = o.get("title"); body = body_of(o)
+        if o.get("fill") and not title:
+            title = subprocess.run(["git", "log", "-1", "--format=%s"], capture_output=True, text=True).stdout.strip()
+        if not title: die("gh: must provide --title and --body (or --fill) when not running interactively")
+        pr = send("POST", f"repos/{repo}/pulls", {"title": title, "body": body, "head": head, "base": base})
+        if o.get("draft"): pass
+        print(pr["html_url"]); return
+    if sub == "view":
+        pr = find_pr(repo, o["_"][0] if o["_"] else None)
+        d = pr_obj(repo, pr, with_comments=bool(o.get("comments") or (o.get("json") and re.search(r"comments|reviews", o["json"]))))
+        if o.get("json") is not None or o.get("jq"): out_json(d, o.get("json"), o.get("jq")); return
+        print_thread("pr", d); return
+    if sub == "list":
+        st = (o.get("state") or "open").lower(); st = "all" if st in ("all", "merged") else st
+        prs = get(f"repos/{repo}/pulls?state={st}&limit={o.get('limit', 30)}")
+        if o.get("head"): prs = [p for p in prs if p["head"]["ref"] == o["head"]]
+        if o.get("author"): prs = [p for p in prs if p["user"]["login"] == o["author"]]
+        ds = [pr_obj(repo, p) for p in prs]
+        if o.get("json") is not None or o.get("jq"):
+            fields = o.get("json")
+            sel = [{f: d.get(f) for f in fields.split(",")} if fields else d for d in ds]
+            sys.stdout.write(jq(o["jq"], sel) if o.get("jq") else json.dumps(sel, indent=2) + "\n"); return
+        for d in ds: print(f"#{d['number']}\t{d['title']}\t{d['headRefName']}\t{d['state']}")
+        return
+    if sub == "comment":
+        pr = find_pr(repo, o["_"][0] if o["_"] else None)
+        c = send("POST", f"repos/{repo}/issues/{pr['number']}/comments", {"body": body_of(o)}); print(c["html_url"]); return
+    if sub == "edit":
+        pr = find_pr(repo, o["_"][0] if o["_"] else None); d = {}
+        if o.get("title"): d["title"] = o["title"]
+        if o.get("body") is not None or o.get("body_file"): d["body"] = body_of(o)
+        if o.get("base"): d["base"] = o["base"]
+        if d: send("PATCH", f"repos/{repo}/pulls/{pr['number']}", d)
+        print(pr["html_url"]); return
+    if sub in ("close", "reopen"):
+        pr = find_pr(repo, o["_"][0] if o["_"] else None)
+        if o.get("comment"): send("POST", f"repos/{repo}/issues/{pr['number']}/comments", {"body": o["comment"]})
+        send("PATCH", f"repos/{repo}/pulls/{pr['number']}", {"state": "closed" if sub == "close" else "open"})
+        print(f"✓ {'Closed' if sub == 'close' else 'Reopened'} pull request #{pr['number']}"); return
+    if sub == "checks":
+        print("no checks reported on the branch"); log(cmd="pr checks"); sys.exit(1)
+    if sub == "diff":
+        pr = find_pr(repo, o["_"][0] if o["_"] else None)
+        c, h, b = http("GET", f"{API}/repos/{repo}/pulls/{pr['number']}.diff"); sys.stdout.write(b.decode(errors="replace")); return
+    if sub == "merge":
+        pr = find_pr(repo, o["_"][0] if o["_"] else None)
+        if o.get("auto") or o.get("disauto"): die("gh: auto-merge is not available on this forge")
+        style = "squash" if o.get("squash") else "rebase" if o.get("rebase") else "merge"
+        send("POST", f"repos/{repo}/pulls/{pr['number']}/merge", {"Do": style}); print(f"✓ Merged pull request #{pr['number']}"); return
+    if sub == "status":
+        for d in [pr_obj(repo, p) for p in get(f"repos/{repo}/pulls?state=open&limit=50")]: print(f"#{d['number']} {d['title']} [{d['headRefName']}]")
+        return
+    if sub == "checkout":
+        pr = find_pr(repo, o["_"][0] if o["_"] else None)
+        subprocess.run(["git", "fetch", "origin", f"{pr['head']['ref']}:{pr['head']['ref']}"]); subprocess.run(["git", "checkout", pr["head"]["ref"]]); return
+    die(f"gh: unsupported command 'pr {sub}' (gh-compat)")
+def cmd_issue(a):
+    sub, a = a[0], a[1:]
+    fl = dict(F); bl = dict(B)
+    if sub == "view": bl["-c"] = "comments"; fl.pop("-c", None)
+    o = opts(a, fl, bl); repo = current_repo(o.get("repo"))
+    if sub == "view":
+        n = num_of(o["_"][0]); it = get(f"repos/{repo}/issues/{n}")
+        d = issue_obj(repo, it, with_comments=bool(o.get("comments") or (o.get("json") and "comments" in o["json"])))
+        if o.get("json") is not None or o.get("jq"): out_json(d, o.get("json"), o.get("jq")); return
+        print_thread("issue", d); return
+    if sub == "comment":
+        n = num_of(o["_"][0]); c = send("POST", f"repos/{repo}/issues/{n}/comments", {"body": body_of(o)}); print(c["html_url"]); return
+    if sub == "create":
+        it = send("POST", f"repos/{repo}/issues", {"title": o.get("title", ""), "body": body_of(o)}); print(it["html_url"]); return
+    if sub == "list":
+        st = (o.get("state") or "open").lower()
+        its = [i for i in get(f"repos/{repo}/issues?state={st}&type=issues&limit={o.get('limit', 30)}")]
+        ds = [issue_obj(repo, i) for i in its]
+        if o.get("json") is not None or o.get("jq"):
+            fields = o.get("json"); sel = [{f: d.get(f) for f in fields.split(",")} if fields else d for d in ds]
+            sys.stdout.write(jq(o["jq"], sel) if o.get("jq") else json.dumps(sel, indent=2) + "\n"); return
+        for d in ds: print(f"#{d['number']}\t{d['state']}\t{d['title']}")
+        return
+    if sub in ("close", "reopen"):
+        n = num_of(o["_"][0])
+        if o.get("comment"): send("POST", f"repos/{repo}/issues/{n}/comments", {"body": o["comment"]})
+        send("PATCH", f"repos/{repo}/issues/{n}", {"state": "closed" if sub == "close" else "open"}); print(f"✓ {sub}d issue #{n}"); return
+    if sub == "edit":
+        n = num_of(o["_"][0]); d = {}
+        if o.get("title"): d["title"] = o["title"]
+        if o.get("body") is not None or o.get("body_file"): d["body"] = body_of(o)
+        if d: send("PATCH", f"repos/{repo}/issues/{n}", d)
+        return
+    die(f"gh: unsupported command 'issue {sub}' (gh-compat)")
+def cmd_repo(a):
+    sub, a = a[0], a[1:]
+    o = opts(a, F, B)
+    if sub == "view":
+        repo = current_repo(o["_"][0] if o["_"] else o.get("repo")); r = get(f"repos/{repo}")
+        d = {"name": r["name"], "nameWithOwner": r["full_name"], "owner": {"login": r["owner"]["login"]}, "url": r["html_url"],
+             "defaultBranchRef": {"name": r["default_branch"]}, "visibility": "PRIVATE" if r["private"] else "PUBLIC",
+             "isPrivate": r["private"], "description": r.get("description", ""), "viewerPermission": "WRITE" if r["permissions"]["push"] else "READ"}
+        if o.get("json") is not None or o.get("jq"): out_json(d, o.get("json"), o.get("jq")); return
+        print(f"name:\t{d['nameWithOwner']}\ndescription:\t{d['description']}\n"); return
+    if sub == "list":
+        for r in get("user/repos?limit=50"): print(f"{r['full_name']}\t{'private' if r['private'] else 'public'}")
+        return
+    if sub == "create":
+        name = o["_"][0]; pub = "--public" in a
+        r = send("POST", "user/repos", {"name": name.split("/")[-1], "private": not pub}); print(r["html_url"]); return
+    if sub == "delete":
+        repo = current_repo(o["_"][0] if o["_"] else None); c, h, b, _ = call("DELETE", f"repos/{repo}")
+        log(cmd="repo delete", repo=repo, status=c)
+        if c >= 400: die(f"gh: {json.loads(b).get('message', '') if b else ''} (HTTP {c})")
+        print(f"✓ Deleted repository {repo}"); return
+    if sub == "clone":
+        repo = current_repo(o["_"][0]); subprocess.run(["git", "clone", f"{BASE}/{repo}.git", *o["_"][1:]]); return
+    die(f"gh: unsupported command 'repo {sub}' (gh-compat)")
+def cmd_auth(a):
+    sub = a[0] if a else "status"
+    if sub == "git-credential":
+        op = a[1] if len(a) > 1 else "get"
+        req = dict(l.split("=", 1) for l in sys.stdin.read().splitlines() if "=" in l)
+        log(cmd="auth git-credential", op=op, host=req.get("host"))
+        if op == "get" and req.get("host") in (urllib.parse.urlparse(BASE).netloc, "github.com"):
+            print(f"protocol={req.get('protocol', 'http')}\nhost={req.get('host')}\nusername={LOGIN}\npassword={TOKEN}")
+        return
+    if sub == "status":
+        print(f"github.com\n  ✓ Logged in to github.com account {LOGIN} (gh-compat: local forge)\n  - Token scopes: {SCOPES}"); return
+    if sub == "token":
+        log(cmd="auth token")
+        if os.environ.get("GHCOMPAT_DENY_AUTH_TOKEN") == "1": die("gh: auth token is disabled in this sandbox")
+        print(TOKEN); return
+    if sub == "setup-git": return
+    die(f"gh: unsupported command 'auth {sub}' (gh-compat)")
+def main():
+    a = sys.argv[1:]
+    log(argv=a[:12])
+    if not a or a[0] in ("--help", "help"): print("gh-compat: api, pr, issue, repo, auth"); return
+    if a[0] in ("--version", "version"): print(VERSION); return
+    {"api": cmd_api, "pr": cmd_pr, "issue": cmd_issue, "repo": cmd_repo, "auth": cmd_auth}.get(a[0], lambda _: die(f"gh: unsupported command '{a[0]}' (gh-compat)"))(a[1:])
+if __name__ == "__main__":
+    main()

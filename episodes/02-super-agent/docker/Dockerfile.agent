@@ -1,0 +1,16 @@
+# Base agent image (generic rebuild of what the Nov 4 2026 test used): Node 24, DeepSeek Harness `dsh` 0.2.1-rc.2,
+# git, jq, curl, tmux, python3, an isolated pytest env, and a dedicated interpreter copy for the forwarder so the
+# sandbox network policy can allow egress for that one binary only. Unprivileged user `agent` (uid 1000).
+# Build:  docker build -f docker/Dockerfile.agent -t dshsa-agent:local .
+FROM node:24-bookworm-slim
+ARG DSH_VERSION=0.2.1-rc.2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-venv git jq curl ca-certificates procps tmux zstd \
+ && rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /opt/taskenv && /opt/taskenv/bin/pip install --no-cache-dir "pytest>=8,<9"
+RUN npm install -g --ignore-scripts "@deepseek-ai/dsh@${DSH_VERSION}" && dsh --version
+RUN mkdir -p /opt/kit-bin && cp "$(readlink -f /usr/bin/python3)" /opt/kit-bin/kit-fwd && chmod 755 /opt/kit-bin/kit-fwd
+# the node image ships user `node` (uid 1000); rename it to `agent` with home /home/agent
+RUN usermod -l agent -d /home/agent -m node && groupmod -n agent node && mkdir -p /work && chown agent:agent /work
+USER agent
+WORKDIR /work

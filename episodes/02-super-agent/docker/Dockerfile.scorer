@@ -1,0 +1,5 @@
+# Scoring image: runs the hidden tests against the agent's PR branch with --network none.
+# Build:  docker build -f docker/Dockerfile.scorer -t dshsa-scorer:local docker/
+FROM python:3.12-slim
+RUN pip install --no-cache-dir "pytest>=8,<9"
+WORKDIR /work/repo

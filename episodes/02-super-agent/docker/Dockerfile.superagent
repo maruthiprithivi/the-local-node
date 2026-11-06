@@ -1,0 +1,29 @@
+# Mode-a image: base agent image + the dsh-superagent prototype at the pinned commit, built with adaptation A1,
+# the gh-compat shim (A2) and the dsh-scope peer fix (A6). Mode b also runs on this image (it ignores the prototype).
+# Build from the kit root:  docker build -f docker/Dockerfile.superagent -t dshsa-superagent:local .
+ARG BASE=dshsa-agent:local
+FROM ${BASE} AS build
+USER root
+ARG PROTO_REPO=deepseek-ai/dsh-superagent-prototype
+ARG PROTO_SHA=8c32a9dc5d72c033816c6a8110b37f40cf94fba4
+WORKDIR /build
+ADD https://github.com/${PROTO_REPO}/archive/${PROTO_SHA}.tar.gz /build/src.tgz
+COPY adaptations/A1-forge-credential-helper.sed /build/A1.sed
+RUN mkdir dsh-superagent && tar -xzf src.tgz -C dsh-superagent --strip-components=1 \
+ && cd dsh-superagent && cp src/infra/environment.ts /build/environment.ts.orig \
+ && sed -i -f /build/A1.sed src/infra/environment.ts \
+ && grep -c 'http://127.0.0.1:3000' src/infra/environment.ts
+RUN npm install -g --ignore-scripts pnpm@11.7.0 \
+ && cd dsh-superagent && pnpm install --frozen-lockfile --ignore-scripts && pnpm build
+
+FROM ${BASE}
+USER root
+RUN npm install -g --ignore-scripts pnpm@11.7.0
+COPY --from=build /build/dsh-superagent /opt/dsh-superagent
+COPY adaptations/A2-gh-shim/gh /opt/ghcompat/gh
+COPY adaptations/A6-dsh-scope-peer.sh /tmp/A6.sh
+RUN chmod 755 /opt/ghcompat/gh && chown -R root:root /opt/dsh-superagent /opt/ghcompat \
+ && sh /tmp/A6.sh /opt/dsh-superagent && rm /tmp/A6.sh
+LABEL dshsa.prototype_commit=8c32a9dc5d72c033816c6a8110b37f40cf94fba4 dshsa.adaptations=A1,A2,A6
+USER agent
+WORKDIR /work
