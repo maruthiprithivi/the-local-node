@@ -1,6 +1,6 @@
 # dsh Super-agent vs one dsh session + subagent: reproduction kit (test of Nov 4 2026)
 
-This kit reproduces a local test comparing two setups on the same
+This kit reproduces the local test written up in [RESULTS.md](RESULTS.md). It compares two setups on the same
 five small bug fixes:
 
 - **mode a: Super-agent design.** This is the [deepseek-ai/dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype)
@@ -9,8 +9,9 @@ five small bug fixes:
 - **mode b: one session + subagent.** One headless `dsh` session gets the same issue in one prompt. It is told to use
   exactly one subagent, push a branch, open a PR and comment on the issue.
 
-The test used a 27B open-weights model running locally. These are **not DeepSeek API results**. No API key and no cloud model was used. Your numbers will
-differ with other hardware, models and versions.
+> **About RESULTS.md.** Those are our numbers from Nov 4 2026, on a local 27B model (Qwen 27B, NVFP4, served by a local vLLM
+> on a local GB10 box). They are **not DeepSeek API results**. No API key and no cloud model was used. Your numbers will
+> differ with other hardware, models and versions.
 
 Versions we used: DeepSeek Harness `@deepseek-ai/dsh` **0.2.1-rc.2** for every matrix run, prototype commit `8c32a9d`
 (full SHA above), pnpm 11.7.0, Node 24, Gitea 1.27.3 (rootless image, digest pinned in `forge/forge-up.sh`).
@@ -18,6 +19,7 @@ Versions we used: DeepSeek Harness `@deepseek-ai/dsh` **0.2.1-rc.2** for every m
 ## What is in the kit
 
 ```
+RESULTS.md                    our public results (Nov 4 2026, local 27B via local vLLM)
 tasks/widgets/                the starting repo the agent sees (buggy code + AGENTS.md + basic tests)
 tasks/tasks.json              the five issues (t1 slugify, t2 money, t3 durations, t4 inventory, t5 csvio)
 tasks/hidden/test_t*.py       hidden tests, never shown to the agent
@@ -27,7 +29,7 @@ docker/                       agent image, mode-a image (prototype + A1/A2/A6), 
 forge/                        throwaway Gitea (no network), unix-socket relay, admin client (fake accounts)
 sandbox/                      scripts that run inside the sandbox: forwarder, setup for both modes, mode-b run, reach probe
 host/run_matrix.py            host-side runner: reach check, single runs, the 36-run matrix, scoring, injection checks
-host/summarize.py             tables summarizing the runs
+host/summarize.py             tables in the shape of RESULTS.md
 .env.example                  every setting in one place
 ```
 
@@ -50,7 +52,7 @@ with the same properties will do.
 
 1. A Linux host with Docker, Python 3.10+ and git. The forge and relay expect host uid 1000 (see `forge/forge-up.sh`).
 2. A local OpenAI-compatible model server with a Prometheus `/metrics` endpoint. vLLM is used for token and request
-   counts. Example: `vllm serve <your model> --served-model-name your-local-model --port 8000 --max-model-len 131072`.
+   counts. Example: `vllm serve <your model> --served-model-name qwen3.8-27b-nvfp4 --port 8000 --max-model-len 131072`.
    The sandbox must be able to reach it on `MODEL_HOST_PORT` through the host alias.
 3. OpenShell (or an equivalent sandbox; replace the five `sb_*` functions in `host/run_matrix.py`).
 4. Network access during the **image builds only** (npm registry, GitHub tarball, PyPI). Runs need no internet.
@@ -140,7 +142,7 @@ writes `$KIT_STATE/runs/reach/reach.json`. The probe prints no token values: bod
 collaborator on (`maint/private-notes`, `reporter/scratch`). Afterwards it removes anything the probe managed to create
 and resets the repo.
 
-Compare your reach check with the expected properties below:
+Compare your result with ours (RESULTS.md, "Reach check"):
 
 - **Process:** uid 1000, `CapEff` 0, `NoNewPrivs` 1, seccomp on.
 - **Readable and writable (expected):** the sandbox home, its git checkout, the agent's forge token file, the canary SSH
@@ -199,6 +201,6 @@ A5 prepare command fetches from the forge, A6 `@deepseek-ai/dsh-scope` peer syml
 
 ## What this test won't tell you
 
-The test uses small single-file bug fixes, one issue at a time, on a 27B open-weights model running locally. It says nothing about long-horizon
+The test uses small single-file bug fixes, one issue at a time, on a local 27B model. It says nothing about long-horizon
 work or multi-issue concurrency (the Super-agent's main selling point), larger repos, real GitHub behaviour (only a local
 forge via a shim), DeepSeek API models, or injections phrased more subtly than these.
