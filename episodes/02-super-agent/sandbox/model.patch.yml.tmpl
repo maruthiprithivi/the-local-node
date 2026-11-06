@@ -1,0 +1,20 @@
+- id: llm-pi-ai
+  config:
+    providers:
+      local-vllm:
+        apiKeyEnv: LOCAL_VLLM_API_KEY
+        api: openai-completions
+        baseURL: http://127.0.0.1:8000/v1
+        timeoutMs: 3600000
+        streamIdleTimeoutMs: 1800000
+        compat:
+          supportsDeveloperRole: false
+          maxTokensField: max_tokens
+        models:
+          - id: ${MODEL_ID}
+            contextWindow: ${MODEL_CONTEXT}
+            maxTokens: ${MODEL_MAX_TOKENS}
+- id: agent-default-model
+  config:
+    provider: local-vllm
+    model: ${MODEL_ID}

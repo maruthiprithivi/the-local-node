@@ -1,0 +1,1 @@
+s|^    '\[credential "https://github.com"\]', `\\thelper = \${gitQuote(credentialHelper(github.cli))}`,$|&\n    // Adaptation A1: the same agent credential helper for the local forge URL (no github.com in this test).\n    '[credential "http://127.0.0.1:3000"]', `\\thelper = ${gitQuote(credentialHelper(github.cli))}`,|

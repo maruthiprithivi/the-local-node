@@ -1,0 +1,28 @@
+# Example OpenShell sandbox policy for the agent sandbox (adapt to your OpenShell version's schema).
+# host.openshell.internal is OpenShell's generic alias for "the machine running the sandbox"; it is not a personal hostname.
+# Only the forwarder binary may open connections, and only to the model port and the forge relay port on that host.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /bin, /sbin, /etc, /opt]
+  read_write: [/home/agent, /tmp, /work, /dev/null]
+landlock:
+  compatibility: hard_requirement
+process:
+  run_as_user: "1000"
+  run_as_group: "1000"
+network_policies:
+  model:
+    endpoints:
+      - host: host.openshell.internal
+        port: 8000          # MODEL_HOST_PORT
+        tls: skip
+    binaries:
+      - path: /opt/kit-bin/kit-fwd
+  forge:
+    endpoints:
+      - host: host.openshell.internal
+        port: 13300         # FORGE_HOST_PORT (forge/relay.py)
+        tls: skip
+    binaries:
+      - path: /opt/kit-bin/kit-fwd
