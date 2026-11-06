@@ -23,6 +23,7 @@ See [contributing](CONTRIBUTING.md) for lesson updates, alignment checks and the
 - [`tracks/`](tracks/) contains the learning materials, with one directory per topic.
 - [`PLAYBOOK.md`](PLAYBOOK.md) is how to reproduce an episode demo on the reference machines.
 - [`episodes/01-kv-cache/`](episodes/01-kv-cache/) is the follow-along kit for episode one. It sizes a model's KV cache, measures that cache on Ollama, and renders the chart.
+- [`episodes/02-super-agent/`](episodes/02-super-agent/) is the starting repo, hidden tests and issue write-ups for comparing DeepSeek's Super-agent prototype with a single agent session.
 - [`website/`](website/) contains the code that publishes the guided courses.
 - [`assets/brand/`](assets/brand/) contains shared artwork for The Local Node.
 
