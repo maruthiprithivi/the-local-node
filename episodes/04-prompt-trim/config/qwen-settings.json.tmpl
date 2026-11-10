@@ -1,0 +1,22 @@
+{
+  "security": { "auth": { "selectedType": "openai" } },
+  "model": { "name": "__MODEL_ID__" },
+  "modelProviders": {
+    "openai": [
+      {
+        "id": "__MODEL_ID__",
+        "name": "__MODEL_ID__ (local vLLM)",
+        "envKey": "LOCAL_VLLM_API_KEY",
+        "baseUrl": "http://127.0.0.1:8000/v1",
+        "generationConfig": {
+          "timeout": 0,
+          "streamIdleTimeoutMs": 0,
+          "contextWindowSize": 131072,
+          "samplingParams": { "temperature": 0.6, "top_p": 0.95, "top_k": 20 }
+        }
+      }
+    ]
+  },
+  "telemetry": { "enabled": false },
+  "privacy": { "usageStatisticsEnabled": false }
+}

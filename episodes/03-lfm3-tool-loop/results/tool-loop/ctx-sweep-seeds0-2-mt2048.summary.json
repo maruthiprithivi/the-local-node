@@ -1,0 +1,200 @@
+[
+ {
+  "ctx": 32768,
+  "seed": 0,
+  "calls": 6,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 20443,
+  "wall_s": 25.65,
+  "turns": 7,
+  "post_break": [],
+  "break_turn_reasoning_len": 6872,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 32768,
+  "seed": 1,
+  "calls": 11,
+  "break": "server_error_or_ctx_overflow",
+  "detail": "{\"error\": {\"code\": 400, \"message\": \"request (33336 tokens) exceeds the available context size (32768 tokens), try increasing it\", \"type\": \"exceed_context_size_e",
+  "expected": null,
+  "tokens_at_break": 33336,
+  "wall_s": 8.14,
+  "turns": 12,
+  "post_break": [],
+  "break_turn_reasoning_len": null,
+  "break_turn_finish": null,
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 32768,
+  "seed": 2,
+  "calls": 11,
+  "break": "server_error_or_ctx_overflow",
+  "detail": "{\"error\": {\"code\": 400, \"message\": \"request (33309 tokens) exceeds the available context size (32768 tokens), try increasing it\", \"type\": \"exceed_context_size_e",
+  "expected": null,
+  "tokens_at_break": 33309,
+  "wall_s": 10.13,
+  "turns": 12,
+  "post_break": [],
+  "break_turn_reasoning_len": null,
+  "break_turn_finish": null,
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 65536,
+  "seed": 0,
+  "calls": 6,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 20443,
+  "wall_s": 25.7,
+  "turns": 7,
+  "post_break": [],
+  "break_turn_reasoning_len": 6872,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 65536,
+  "seed": 1,
+  "calls": 12,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 38374,
+  "wall_s": 31.91,
+  "turns": 13,
+  "post_break": [],
+  "break_turn_reasoning_len": 6264,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 65536,
+  "seed": 2,
+  "calls": 22,
+  "break": "server_error_or_ctx_overflow",
+  "detail": "{\"error\": {\"code\": 400, \"message\": \"request (66321 tokens) exceeds the available context size (65536 tokens), try increasing it\", \"type\": \"exceed_context_size_e",
+  "expected": null,
+  "tokens_at_break": 66321,
+  "wall_s": 21.55,
+  "turns": 23,
+  "post_break": [],
+  "break_turn_reasoning_len": null,
+  "break_turn_finish": null,
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 131072,
+  "seed": 0,
+  "calls": 6,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 20443,
+  "wall_s": 25.84,
+  "turns": 7,
+  "post_break": [],
+  "break_turn_reasoning_len": 6872,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 131072,
+  "seed": 1,
+  "calls": 12,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 38374,
+  "wall_s": 31.86,
+  "turns": 13,
+  "post_break": [],
+  "break_turn_reasoning_len": 6264,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 131072,
+  "seed": 2,
+  "calls": 25,
+  "break": "wrong_tool",
+  "detail": "called get_record (expected search)",
+  "expected": [
+   "search",
+   "invoice vector 7229"
+  ],
+  "tokens_at_break": 76866,
+  "wall_s": 71.49,
+  "turns": 27,
+  "post_break": [
+   [
+    [],
+    "",
+    "length"
+   ]
+  ],
+  "break_turn_reasoning_len": 5254,
+  "break_turn_finish": "tool_calls",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 262144,
+  "seed": 0,
+  "calls": 6,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 20443,
+  "wall_s": 25.79,
+  "turns": 7,
+  "post_break": [],
+  "break_turn_reasoning_len": 6872,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 262144,
+  "seed": 1,
+  "calls": 12,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 38374,
+  "wall_s": 31.75,
+  "turns": 13,
+  "post_break": [],
+  "break_turn_reasoning_len": 6264,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 262144,
+  "seed": 2,
+  "calls": 25,
+  "break": "wrong_tool",
+  "detail": "called get_record (expected search)",
+  "expected": [
+   "search",
+   "invoice vector 7229"
+  ],
+  "tokens_at_break": 76866,
+  "wall_s": 72.15,
+  "turns": 27,
+  "post_break": [
+   [
+    [],
+    "",
+    "length"
+   ]
+  ],
+  "break_turn_reasoning_len": 5254,
+  "break_turn_finish": "tool_calls",
+  "parallel_notes": 0
+ }
+]
