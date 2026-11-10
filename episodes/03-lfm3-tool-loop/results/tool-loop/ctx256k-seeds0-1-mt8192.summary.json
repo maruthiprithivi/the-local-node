@@ -1,0 +1,56 @@
+[
+ {
+  "ctx": 262144,
+  "seed": 0,
+  "calls": 6,
+  "break": "wrong_tool",
+  "detail": "called read_file (expected next_step)",
+  "expected": [
+   "next_step",
+   "0MB8-3N8L"
+  ],
+  "tokens_at_break": 25696,
+  "wall_s": 85.59,
+  "turns": 9,
+  "post_break": [
+   [
+    [
+     {
+      "name": "read_file",
+      "arguments": "{\"path\":\"/data/commit-74/notes-4444.txt\"}"
+     }
+    ],
+    "",
+    "tool_calls"
+   ],
+   [
+    [
+     {
+      "name": "search",
+      "arguments": "{\"query\":\"notes-4444\"}"
+     }
+    ],
+    "",
+    "tool_calls"
+   ]
+  ],
+  "break_turn_reasoning_len": 25819,
+  "break_turn_finish": "tool_calls",
+  "parallel_notes": 0
+ },
+ {
+  "ctx": 262144,
+  "seed": 1,
+  "calls": 12,
+  "break": "max_tokens_no_call",
+  "detail": "",
+  "expected": null,
+  "tokens_at_break": 44518,
+  "wall_s": 101.07,
+  "turns": 13,
+  "post_break": [],
+  "break_turn_reasoning_len": 27830,
+  "break_turn_finish": "length",
+  "parallel_notes": 0
+ }
+]

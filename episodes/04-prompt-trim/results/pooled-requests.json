@@ -1,0 +1,38 @@
+{
+ "qwen-p100": {
+  "requests": 85,
+  "requests_ok": 85,
+  "prompt_tokens_per_req_median": 17151,
+  "ttft_median_s": 1.641,
+  "ttft_p95_s": 6.96,
+  "uncached_tokens_per_req_median": 1888,
+  "cached_share_pct": 85.3
+ },
+ "qwen-p60": {
+  "requests": 80,
+  "requests_ok": 80,
+  "prompt_tokens_per_req_median": 14767.5,
+  "ttft_median_s": 1.549,
+  "ttft_p95_s": 6.61,
+  "uncached_tokens_per_req_median": 1712.5,
+  "cached_share_pct": 84.9
+ },
+ "qwen-p30": {
+  "requests": 92,
+  "requests_ok": 92,
+  "prompt_tokens_per_req_median": 13699.0,
+  "ttft_median_s": 1.6,
+  "ttft_p95_s": 8.57,
+  "uncached_tokens_per_req_median": 2161.5,
+  "cached_share_pct": 84.6
+ },
+ "qwen-pmin": {
+  "requests": 65,
+  "requests_ok": 65,
+  "prompt_tokens_per_req_median": 12513,
+  "ttft_median_s": 1.485,
+  "ttft_p95_s": 3.92,
+  "uncached_tokens_per_req_median": 1728,
+  "cached_share_pct": 82.6
+ }
+}

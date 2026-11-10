@@ -1,0 +1,22 @@
+# Run matrix used for the prompt-trim test (internal host paths and service names replaced; settings unchanged).
+# REDUCED: 5 fastest Qwen Code tasks, 2 seeds, 4 prompt levels, concurrency 8, harness variants interleaved.
+name: prompt-trim-qwen-r5
+isolation: {backend: openshell}
+run:
+  concurrency: 8
+  interleave_harnesses: true
+  seeds: [0, 1]
+models:
+  - id: qwen3.8-27b-nvfp4
+    kind: vllm
+    arm: dspark7-prob-nvfp4
+    serve_args_note: "SPEC_K=7 SPEC_METHOD=dspark MXFP8_LM_HEAD=0 GPU_UTIL=0.50 MAX_BATCHED=4096 MAX_SEQS=8 MAX_LEN=131072 (draft_sample_method probabilistic, --enable-prompt-tokens-details)"
+    manage: external
+    expect: {spec_decoding_on: true}
+harnesses:
+  - {name: qwen-p100, type: qwen, version: 0.26.1, items: [01-bugfix-pagination, 03-refactor-reports, 05-stacktrace-ingest, 08-pr-review, 09-multifile-api]}
+  - {name: qwen-p60, type: qwen-trim, version: 0.26.1, items: [01-bugfix-pagination, 03-refactor-reports, 05-stacktrace-ingest, 08-pr-review, 09-multifile-api], options: {system_prompt_file: prompts/t4-p60.md}}
+  - {name: qwen-p30, type: qwen-trim, version: 0.26.1, items: [01-bugfix-pagination, 03-refactor-reports, 05-stacktrace-ingest, 08-pr-review, 09-multifile-api], options: {system_prompt_file: prompts/t4-p30.md}}
+  - {name: qwen-pmin, type: qwen-trim, version: 0.26.1, items: [01-bugfix-pagination, 03-refactor-reports, 05-stacktrace-ingest, 08-pr-review, 09-multifile-api], options: {system_prompt_file: prompts/t4-pmin.md}}
+suites:
+  - {name: everyday, type: everyday}
