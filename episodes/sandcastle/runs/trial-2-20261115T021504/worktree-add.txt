@@ -1,0 +1,4 @@
+code=0
+HEAD is now at ccab16b baseline: failing slugify stub
+
+Preparing worktree (detached HEAD ccab16b)

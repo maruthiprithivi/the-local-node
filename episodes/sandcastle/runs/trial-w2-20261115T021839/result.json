@@ -1,0 +1,17 @@
+{
+  "runId": "trial-w2-20261115T021839",
+  "runIndex": "2",
+  "model": "llama/qwen2.5-coder-7b-instruct",
+  "imageName": "sandcastle-opencode:0.14.0-local",
+  "startedAt": "2026-11-14T18:18:40.639Z",
+  "wallMs": 80669,
+  "error": null,
+  "baselineTestExit": 1,
+  "testAfterExit": 1,
+  "passed": false,
+  "commitCount": 0,
+  "commits": [],
+  "iterationCount": 3,
+  "branch": "agent/slugify-trial-w2-20261115T021839",
+  "resultLogPath": "/home/user/sandcastle-episode/runs/trial-w2-20261115T021839/sandcastle-logs/agent.log"
+}

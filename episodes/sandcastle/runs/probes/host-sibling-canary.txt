@@ -1,0 +1,4 @@
+host proof: sibling-canary.txt sits next to the worktree
+-rw-rw-r-- 1 user user 26 Nov 15 02:47 /tmp/sandcastle-episode/sibling-canary.txt
+---
+CANARY_TOKEN_NOT_A_SECRET

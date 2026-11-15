@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "llama/qwen2.5-coder-7b-instruct",
+  "provider": {
+    "llama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "local-llama-server",
+      "options": {
+        "baseURL": "OPENCODE_BASE_URL_PLACEHOLDER",
+        "apiKey": "sk-local"
+      },
+      "models": {
+        "qwen2.5-coder-7b-instruct": {
+          "name": "Qwen2.5-Coder-7B-Instruct Q4_K_M (local llama-server)",
+          "limit": { "context": 16384, "output": 2048 }
+        }
+      }
+    }
+  }
+}

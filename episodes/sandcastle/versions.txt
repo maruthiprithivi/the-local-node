@@ -1,0 +1,59 @@
+# Pinned versions for the Sandcastle 0.14.0 local-model run
+# Dates are Asia/Singapore (UTC+8).
+
+@ai-hero/sandcastle  0.14.0
+  npm latest as of 2026-11-15
+  gitHead 7fe4a919b07d31a63db195bbc7890566de609579 (tag v0.14.0)
+  integrity sha512-s9B/23nPWL6y2sZkVxksqTge0MqGWr2HtjneGDf/V1npReiqDRlUJUvQ4+7K0oWORLqgHU5wLK0pfukg+UqTqQ==
+  published 2026-11-03 06:15:33 SGT
+  not used: npm dist-tag v1-next (prerelease)
+
+opencode-ai          1.19.5
+  npm latest as of 2026-11-15 (published 2026-10-28 14:17 SGT)
+  installed in the sandbox image (the 0.14.0 init Dockerfile uses opencode-ai@latest; this run pins 1.19.5)
+  CLI still has: opencode run --format json --model --session --fork
+  CLI still has: opencode export / opencode import
+  --help lists --auto for permissions; --dangerously-skip-permissions (passed by Sandcastle 0.14.0) is accepted and does not abort the CLI
+
+Node.js              v22.23.5 (linux-arm64)
+  tarball sha256 2babb9eb5264860d540849f4b064a6fbdebcdc323657d9d382ce23d313fd5e09
+  npm 10.9.9
+
+tsx                  4.20.6
+
+Docker Engine        29.6.2 (arm64)
+
+Sandbox image        sandcastle-opencode:0.14.0-local
+  id sha256:c76781a807df26243d0283b87ddf9b8f247a33d9a23cba434fc541578f879a68
+  FROM node:22-bookworm@sha256:e13726ca604184d7a91fcacab1fc09eefd642dc28e79ac34e85540dd93b78cfb
+
+Local model          Qwen/Qwen2.5-Coder-7B-Instruct-GGUF
+  file qwen2.5-coder-7b-instruct-q4_k_m.gguf
+  size 4683073536
+  sha256 509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c
+  served as qwen2.5-coder-7b-instruct
+  context 16384, n_params 7615616512
+
+llama-server         0.8.0-dev (build 1, commit 8642541)
+  image thinklite-llamacpp:8642541
+  id sha256:404144a0af3a85522483bca4d397610666773a0d8e4acd9cb81d65f629bdadba
+  listened only on the default-bridge gateway, port 18765 (address detected at runtime; not baked in)
+  container torn down after the runs
+
+Nothing paid was used. No hosted model, no DEEPSEEK_API_KEY, no OpenCode API key.
+The local provider used a dummy apiKey value "sk-local" in the OpenCode config (not a real secret).
+
+# Series C model (used for the three passing task runs)
+# Already-running local vLLM, not started or stopped by this kit.
+
+model                qwen3.8-27b-nvfp4
+runtime              vLLM (tool-call parser qwen3_xml, reasoning parser qwen3)
+context              131072
+auth                 no API key required (OpenCode config still has dummy apiKey sk-local)
+reachability         from the host and from a default-bridge sandbox: the process
+                     listens on a host address the sandbox can reach, port 8000
+                     (written here as <LLM_HOST>; not baked into the repro).
+                     Container localhost and the default-bridge gateway on port 8000
+                     did not accept connections, because the process is not bound there.
+
+The 7B llama-server (above) was used only for Series B and was torn down afterwards.

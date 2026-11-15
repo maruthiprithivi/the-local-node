@@ -1,0 +1,5 @@
+
+
+Implemented `slugify` in src/slugify.js, all 5 tests pass, and the change is committed.
+
+<promise>COMPLETE</promise>

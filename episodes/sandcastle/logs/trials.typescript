@@ -1,0 +1,51 @@
+Script started on 2026-11-15 02:14:52+08:00 [COMMAND="bash /home/user/sandcastle-episode/scripts/run-trials.sh" <not executed on terminal>]
+===== START trial-1-20261115T021452 mem=23.3% =====
+[trial-1-20261115T021452] Started on branch agent/slugify-trial-1-20261115T021452
+  tail -f /home/user/sandcastle-episode/runs/trial-1-20261115T021452/sandcastle-logs/agent.log
+
+Worktree removed (no uncommitted changes)
+{
+  "runId": "trial-1-20261115T021452",
+  "passed": false,
+  "wallMs": 11372,
+  "error": "(FiberFailure) AgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\nAgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\n    at <anonymous> (/home/user/sandcastle-episode/harness/node_modules/@ai-hero/sandcastle/src/Orchestrator.ts:232:23)",
+  "testAfterExit": 1,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-1-20261115T021452"
+}
+===== END trial-1-20261115T021452 exit=2 =====
+===== START trial-2-20261115T021504 mem=33.5% =====
+[trial-2-20261115T021504] Started on branch agent/slugify-trial-2-20261115T021504
+  tail -f /home/user/sandcastle-episode/runs/trial-2-20261115T021504/sandcastle-logs/agent.log
+
+Worktree removed (no uncommitted changes)
+{
+  "runId": "trial-2-20261115T021504",
+  "passed": false,
+  "wallMs": 11287,
+  "error": "(FiberFailure) AgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\nAgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\n    at <anonymous> (/home/user/sandcastle-episode/harness/node_modules/@ai-hero/sandcastle/src/Orchestrator.ts:232:23)",
+  "testAfterExit": 1,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-2-20261115T021504"
+}
+===== END trial-2-20261115T021504 exit=2 =====
+===== START trial-3-20261115T021516 mem=35.1% =====
+[trial-3-20261115T021516] Started on branch agent/slugify-trial-3-20261115T021516
+  tail -f /home/user/sandcastle-episode/runs/trial-3-20261115T021516/sandcastle-logs/agent.log
+
+Worktree removed (no uncommitted changes)
+{
+  "runId": "trial-3-20261115T021516",
+  "passed": false,
+  "wallMs": 11184,
+  "error": "(FiberFailure) AgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\nAgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\n    at <anonymous> (/home/user/sandcastle-episode/harness/node_modules/@ai-hero/sandcastle/src/Orchestrator.ts:232:23)",
+  "testAfterExit": 1,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-3-20261115T021516"
+}
+===== END trial-3-20261115T021516 exit=2 =====
+| run | pass/fail | wall s | test after | commits | error |
+| --- | --- | --- | --- | --- | --- |
+| trial-1-20261115T021452 | FAIL | 11.4 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-2-20261115T021504 | FAIL | 11.3 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-3-20261115T021516 | FAIL | 11.2 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+mem=36.6%
+
+Script done on 2026-11-15 02:15:29+08:00 [COMMAND_EXIT_CODE="0"]

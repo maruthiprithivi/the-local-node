@@ -1,0 +1,5 @@
+
+
+Done - `slugify` implemented in src/slugify.js:1, all 5 tests pass, committed as `74e6813`.
+
+<promise>COMPLETE</promise>

@@ -1,0 +1,8 @@
+{
+  "name": "slugify-kata",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/slugify.test.js"
+  }
+}

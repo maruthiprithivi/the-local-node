@@ -1,0 +1,4 @@
+code=0
+HEAD is now at 845bb2a Implement slugify
+
+Preparing worktree (detached HEAD 845bb2a)

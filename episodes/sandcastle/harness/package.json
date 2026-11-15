@@ -1,0 +1,14 @@
+{
+  "name": "sandcastle-0.14.0-local-harness",
+  "private": true,
+  "type": "module",
+  "description": "Local-only harness for @ai-hero/sandcastle 0.14.0 with a local OpenCode model",
+  "scripts": {
+    "probes": "tsx run-probes.ts",
+    "trial": "tsx run-trial.ts"
+  },
+  "dependencies": {
+    "@ai-hero/sandcastle": "0.14.0",
+    "tsx": "4.20.6"
+  }
+}

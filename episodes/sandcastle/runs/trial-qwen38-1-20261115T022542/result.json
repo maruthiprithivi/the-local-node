@@ -1,0 +1,21 @@
+{
+  "runId": "trial-qwen38-1-20261115T022542",
+  "runIndex": "1",
+  "model": "qwen/qwen3.8-27b-nvfp4",
+  "imageName": "sandcastle-opencode:0.14.0-local",
+  "startedAt": "2026-11-14T18:25:42.758Z",
+  "wallMs": 101502,
+  "error": null,
+  "baselineTestExit": 1,
+  "testAfterExit": 0,
+  "passed": true,
+  "commitCount": 1,
+  "commits": [
+    {
+      "sha": "e0a93a0f4547d033fd5d6713ab1f11ba0a859e2b"
+    }
+  ],
+  "iterationCount": 1,
+  "branch": "agent/slugify-trial-qwen38-1-20261115T022542",
+  "resultLogPath": "/home/user/sandcastle-episode/runs/trial-qwen38-1-20261115T022542/sandcastle-logs/agent.log"
+}

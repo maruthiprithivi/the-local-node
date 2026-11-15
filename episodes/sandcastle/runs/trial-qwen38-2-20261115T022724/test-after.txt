@@ -1,0 +1,49 @@
+code=0
+stdout:
+
+> test
+> node --test test/slugify.test.js
+
+TAP version 13
+# Subtest: lowercases and hyphenates spaces
+ok 1 - lowercases and hyphenates spaces
+  ---
+  duration_ms: 0.428132
+  type: 'test'
+  ...
+# Subtest: trims and collapses whitespace
+ok 2 - trims and collapses whitespace
+  ---
+  duration_ms: 0.079588
+  type: 'test'
+  ...
+# Subtest: strips punctuation and collapses hyphens
+ok 3 - strips punctuation and collapses hyphens
+  ---
+  duration_ms: 0.046642
+  type: 'test'
+  ...
+# Subtest: strips leading and trailing hyphens
+ok 4 - strips leading and trailing hyphens
+  ---
+  duration_ms: 0.042898
+  type: 'test'
+  ...
+# Subtest: empty or punctuation-only input becomes n-a
+ok 5 - empty or punctuation-only input becomes n-a
+  ---
+  duration_ms: 0.644781
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 32.900559
+
+stderr:
+

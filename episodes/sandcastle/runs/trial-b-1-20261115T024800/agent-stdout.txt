@@ -1,0 +1,25 @@
+```bash
+npm run test
+``````bash
+read -r filePath="src/slugify.js"
+read -r -d '' fileContent << 'EOF'
+function slugify(input) {
+  return input
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/, 'n-a');
+}
+
+module.exports = slugify;
+EOF
+
+write -f "$filePath" -c "$fileContent"
+bash -c "npm test"
+bash -c "git add $filePath"
+bash -c 'git commit -m "Implement slugify function"'
+echo "<promise>COMPLETE</promise>"
+```
