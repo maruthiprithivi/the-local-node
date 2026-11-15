@@ -1,0 +1,112 @@
+code=1
+stdout:
+
+> test
+> node --test test/slugify.test.js
+
+TAP version 13
+# Subtest: lowercases and hyphenates spaces
+not ok 1 - lowercases and hyphenates spaces
+  ---
+  duration_ms: 0.808017
+  type: 'test'
+  location: '/tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:5:1'
+  failureType: 'testCodeFailure'
+  error: 'not implemented'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    slugify (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/src/slugify.js:3:9)
+    TestContext.<anonymous> (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:6:16)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.start (node:internal/test_runner/test:944:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: trims and collapses whitespace
+not ok 2 - trims and collapses whitespace
+  ---
+  duration_ms: 0.115424
+  type: 'test'
+  location: '/tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:9:1'
+  failureType: 'testCodeFailure'
+  error: 'not implemented'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    slugify (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/src/slugify.js:3:9)
+    TestContext.<anonymous> (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:10:16)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: strips punctuation and collapses hyphens
+not ok 3 - strips punctuation and collapses hyphens
+  ---
+  duration_ms: 0.09992
+  type: 'test'
+  location: '/tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:13:1'
+  failureType: 'testCodeFailure'
+  error: 'not implemented'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    slugify (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/src/slugify.js:3:9)
+    TestContext.<anonymous> (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:14:16)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: strips leading and trailing hyphens
+not ok 4 - strips leading and trailing hyphens
+  ---
+  duration_ms: 0.112096
+  type: 'test'
+  location: '/tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:18:1'
+  failureType: 'testCodeFailure'
+  error: 'not implemented'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    slugify (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/src/slugify.js:3:9)
+    TestContext.<anonymous> (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:19:16)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: empty or punctuation-only input becomes n-a
+not ok 5 - empty or punctuation-only input becomes n-a
+  ---
+  duration_ms: 0.101232
+  type: 'test'
+  location: '/tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:22:1'
+  failureType: 'testCodeFailure'
+  error: 'not implemented'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    slugify (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/src/slugify.js:3:9)
+    TestContext.<anonymous> (file:///tmp/sandcastle-episode/runs/trial-b-1-20261115T024854/check-wt/test/slugify.test.js:23:16)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 0
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 53.619656
+
+stderr:
+

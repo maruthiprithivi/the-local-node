@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <rect width="1920" height="1080" fill="#F6F1E7"/>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#E6DFD1" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#grid)"/>
+
+  <text x="96" y="110" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="44" font-weight="700" fill="#1F2933">Sandcastle 0.14.0</text>
+  <text x="96" y="158" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="26" fill="#52606D">Same task, same sandbox, three series. Local model only.</text>
+
+  <!-- shared start -->
+  <rect x="96" y="210" width="1728" height="120" rx="18" fill="#FFFFFF" stroke="#3E4C59" stroke-width="2"/>
+  <text x="960" y="262" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#1F2933">Implement slugify, run the tests, commit</text>
+  <text x="960" y="302" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="20" fill="#52606D">OpenCode 1.19.5 in the docker() sandbox, talking to a local /v1 endpoint</text>
+
+  <!-- connector down -->
+  <line x1="960" y1="330" x2="960" y2="390" stroke="#3E4C59" stroke-width="4"/>
+  <polygon points="960,402 948,382 972,382" fill="#3E4C59"/>
+
+  <!-- three series cards -->
+  <!-- A -->
+  <rect x="96" y="430" width="520" height="500" rx="22" fill="#FFFFFF" stroke="#C94C4C" stroke-width="3"/>
+  <rect x="96" y="430" width="520" height="86" rx="22" fill="#C94C4C"/>
+  <rect x="96" y="474" width="520" height="42" fill="#C94C4C"/>
+  <text x="356" y="488" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="32" font-weight="700" fill="#FFFFFF">Series A</text>
+  <text x="356" y="580" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1F2933">Read-only config</text>
+  <text x="356" y="640" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#3E4C59">OpenCode cannot write</text>
+  <text x="356" y="676" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#3E4C59">.gitignore at startup</text>
+  <text x="356" y="760" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#C94C4C">Stops here</text>
+  <text x="356" y="804" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#52606D">The agent never starts</text>
+  <text x="356" y="880" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#C94C4C">FAIL</text>
+
+  <!-- B -->
+  <rect x="700" y="430" width="520" height="500" rx="22" fill="#FFFFFF" stroke="#C47B16" stroke-width="3"/>
+  <rect x="700" y="430" width="520" height="86" rx="22" fill="#C47B16"/>
+  <rect x="700" y="474" width="520" height="42" fill="#C47B16"/>
+  <text x="960" y="488" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="32" font-weight="700" fill="#FFFFFF">Series B</text>
+  <text x="960" y="580" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1F2933">Writable config, 7B model</text>
+  <text x="960" y="640" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#3E4C59">The model talks, then prints</text>
+  <text x="960" y="676" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#3E4C59">tool JSON as text</text>
+  <text x="960" y="760" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#C47B16">No commit</text>
+  <text x="960" y="804" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#52606D">Tests stay on the stub</text>
+  <text x="960" y="880" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#C47B16">FAIL</text>
+
+  <!-- C -->
+  <rect x="1304" y="430" width="520" height="500" rx="22" fill="#FFFFFF" stroke="#2F7D4A" stroke-width="4"/>
+  <rect x="1304" y="430" width="520" height="86" rx="22" fill="#2F7D4A"/>
+  <rect x="1304" y="474" width="520" height="42" fill="#2F7D4A"/>
+  <text x="1564" y="488" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="32" font-weight="700" fill="#FFFFFF">Series C</text>
+  <text x="1564" y="580" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1F2933">Writable config, 27B model</text>
+  <text x="1564" y="640" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#3E4C59">Real tools: read, write or edit,</text>
+  <text x="1564" y="676" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#3E4C59">npm test, git commit</text>
+  <text x="1564" y="760" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="#2F7D4A">5/5 tests, commit</text>
+  <text x="1564" y="804" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#52606D">Same sandbox as Series B</text>
+  <text x="1564" y="880" text-anchor="middle" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#2F7D4A">PASS</text>
+
+  <text x="96" y="1008" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="18" fill="#7B8794">The sandbox boundary did not decide B versus C. The model did.</text>
+</svg>

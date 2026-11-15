@@ -1,0 +1,18 @@
+node_modules/
+opt/
+models/
+*.gguf
+*.part
+.env
+auth.json
+logs/*.log
+runs/*/worktree/
+recording/raw/
+.sandcastle/worktrees/
+.sandcastle/logs/
+
+# Raw per-run Sandcastle agent logs are evidence; keep them even if the repo ignores *.log.
+!runs/*/sandcastle-logs/
+!runs/*/sandcastle-logs/agent.log
+
+sibling-canary.txt

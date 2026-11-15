@@ -7,3 +7,4 @@ Follow-along kits live in `episodes/`. Open a folder and run it from a clean che
 - [`episodes/03-lfm3-tool-loop/`](episodes/03-lfm3-tool-loop/) is the reproduction kit for testing how many chained tool calls LiquidAI LFM3-1.7B gets right with ~3K-token tool results, plus its decode-speed numbers.
 - [`episodes/04-prompt-trim/`](episodes/04-prompt-trim/) is the reproduction kit for trimming Qwen Code's system prompt on a local Qwen3.8-27B: the prompt levels, settings, analysis scripts and results.
 - [`episodes/05-prefix-reuse/`](episodes/05-prefix-reuse/) is the reproduction kit for a raw-text prefix-reuse timing and cache microbenchmark on vLLM, SGLang and Ollama.
+- [`episodes/sandcastle/`](episodes/sandcastle/) is the evidence kit for a local run of Sandcastle 0.14.0: the same slugify coding-agent task across series A, B and C, with the task repo, harness, logs and recordings.

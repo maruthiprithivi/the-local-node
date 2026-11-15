@@ -1,0 +1,54 @@
+Script started on 2026-11-15 02:25:42+08:00 [COMMAND="bash /tmp/run-series-c.sh" <not executed on terminal>]
+mem_used_pct=49.9
+===== START trial-qwen38-1-20261115T022542 mem=49.9% model=qwen/qwen3.8-27b-nvfp4 =====
+[trial-qwen38-1-20261115T022542] Started on branch agent/slugify-trial-qwen38-1-20261115T022542
+  tail -f /home/user/sandcastle-episode/runs/trial-qwen38-1-20261115T022542/sandcastle-logs/agent.log
+{
+  "runId": "trial-qwen38-1-20261115T022542",
+  "passed": true,
+  "wallMs": 101502,
+  "error": null,
+  "testAfterExit": 0,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-qwen38-1-20261115T022542"
+}
+===== END trial-qwen38-1-20261115T022542 mem=50.2% =====
+mem_used_pct=50.2
+===== START trial-qwen38-2-20261115T022724 mem=50.2% model=qwen/qwen3.8-27b-nvfp4 =====
+[trial-qwen38-2-20261115T022724] Started on branch agent/slugify-trial-qwen38-2-20261115T022724
+  tail -f /home/user/sandcastle-episode/runs/trial-qwen38-2-20261115T022724/sandcastle-logs/agent.log
+{
+  "runId": "trial-qwen38-2-20261115T022724",
+  "passed": true,
+  "wallMs": 111632,
+  "error": null,
+  "testAfterExit": 0,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-qwen38-2-20261115T022724"
+}
+===== END trial-qwen38-2-20261115T022724 mem=50.2% =====
+mem_used_pct=50.2
+===== START trial-qwen38-3-20261115T022916 mem=50.2% model=qwen/qwen3.8-27b-nvfp4 =====
+[trial-qwen38-3-20261115T022916] Started on branch agent/slugify-trial-qwen38-3-20261115T022916
+  tail -f /home/user/sandcastle-episode/runs/trial-qwen38-3-20261115T022916/sandcastle-logs/agent.log
+{
+  "runId": "trial-qwen38-3-20261115T022916",
+  "passed": true,
+  "wallMs": 83082,
+  "error": null,
+  "testAfterExit": 0,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-qwen38-3-20261115T022916"
+}
+===== END trial-qwen38-3-20261115T022916 mem=50.3% =====
+| run | pass/fail | wall s | test after | commits | error |
+| --- | --- | --- | --- | --- | --- |
+| trial-1-20261115T021452 | FAIL | 11.4 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-2-20261115T021504 | FAIL | 11.3 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-3-20261115T021516 | FAIL | 11.2 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-qwen38-1-20261115T022542 | PASS | 101.5 | 0 | 1 | - |
+| trial-qwen38-2-20261115T022724 | PASS | 111.6 | 0 | 1 | - |
+| trial-qwen38-3-20261115T022916 | PASS | 83.1 | 0 | 1 | - |
+| trial-w1-20261115T021634 | FAIL | 77.8 | 1 | 0 | - |
+| trial-w2-20261115T021839 | FAIL | 80.7 | 1 | 0 | - |
+| trial-w3-20261115T022001 | FAIL | 61.6 | 1 | 0 | - |
+SERIES_C_DONE
+
+Script done on 2026-11-15 02:30:40+08:00 [COMMAND_EXIT_CODE="0"]

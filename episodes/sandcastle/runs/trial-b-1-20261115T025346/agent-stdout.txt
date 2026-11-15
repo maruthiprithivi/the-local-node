@@ -1,0 +1,48 @@
+```bash
+echo "const slugify = (input) => {
+  if (typeof input !== 'string') {
+    input = String(input);
+  }
+  input = input.toLowerCase().trim().replace(/\\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  input = input.replace(/-+/g, '-').replace(/^-+|-+$/, '');
+  return input || 'n-a';
+};
+
+module.exports = slugify;" > src/slugify.js
+```
+
+npm test```bash
+npm test
+``````bash
+# Navigate to the working directory
+cd /home/agent/workspace
+
+# Read the slugify.js file
+read filePath="/home/agent/workspace/src/slugify.js"
+
+# Define the new slugify function
+newFunction='
+function slugify(input) {
+  return input
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, 'n-a');
+}
+'
+
+# Edit the slugify.js file with the new function
+edit filePath="/home/agent/workspace/src/slugify.js" newString="$newFunction"
+
+# Run the tests
+bash command="npm test" timeout=60000
+
+# Commit the change
+bash command="git add src/slugify.js && git commit -m 'Add slugify function'" timeout=60000
+
+# Complete
+<promise>COMPLETE</promise>
+```

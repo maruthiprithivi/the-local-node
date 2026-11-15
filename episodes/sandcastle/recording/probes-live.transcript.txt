@@ -1,0 +1,24 @@
+===== host: worktree (task-repo) =====
+drwxr-xr-x 6 user user 4096 Nov 15 02:46 task-repo
+===== run enforcement probes =====
+host proof: sibling-canary.txt sits next to the worktree
+-rw-rw-r-- 1 user user 26 Nov 15 02:47 /tmp/sandcastle-episode/sibling-canary.txt
+---
+CANARY_TOKEN_NOT_A_SECRET
+
+{
+  "ok": true,
+  "outPath": "/tmp/sandcastle-episode/runs/probes/probes.json",
+  "wallMs": 11590,
+  "error": null
+}
+⠙===== host: sibling-canary.txt after the probe run =====
+-rw-rw-r-- 1 user user 26 Nov 15 02:47 sibling-canary.txt
+----- contents -----
+CANARY_TOKEN_NOT_A_SECRET
+===== sandbox result (exact lines from probes.stdout.txt) =====
+---PROBES---
+{"name": "read_sibling_rel", "exitCode": 0, "stdout": "trying=../sibling-canary.txt\nexit=1\n", "stderr": "cat: ../sibling-canary.txt: No such file or directory\n"}
+{"name": "read_sibling_abs", "exitCode": 0, "stdout": "trying_host_sibling_path\nexit=1\n", "stderr": "cat: /tmp/sandcastle-episode/sibling-canary.txt: No such file or directory\n"}
+---END---
+===== probe runner exit 0 =====

@@ -1,0 +1,17 @@
+{
+  "runId": "trial-2-20261115T021504",
+  "runIndex": "2",
+  "model": "llama/qwen2.5-coder-7b-instruct",
+  "imageName": "sandcastle-opencode:0.14.0-local",
+  "startedAt": "2026-11-14T18:15:05.441Z",
+  "wallMs": 11287,
+  "error": "(FiberFailure) AgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\nAgentError: opencode exited with code 1:\n\u001b[91m\u001b[1mError: \u001b[0mUnexpected error\n\nUnknown: FileSystem.writeFile (/home/agent/.config/opencode/.gitignore)\n\n    at <anonymous> (/home/user/sandcastle-episode/harness/node_modules/@ai-hero/sandcastle/src/Orchestrator.ts:232:23)",
+  "baselineTestExit": 1,
+  "testAfterExit": 1,
+  "passed": false,
+  "commitCount": null,
+  "commits": null,
+  "iterationCount": 0,
+  "branch": "agent/slugify-trial-2-20261115T021504",
+  "resultLogPath": "/home/user/sandcastle-episode/runs/trial-2-20261115T021504/sandcastle-logs/agent.log"
+}

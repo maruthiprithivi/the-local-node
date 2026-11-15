@@ -1,0 +1,38 @@
+Script started on 2026-11-15 02:18:39+08:00 [COMMAND="bash /tmp/run-w23.sh" <not executed on terminal>]
+mem_used_pct=55.5
+===== START trial-w2-20261115T021839 mem=55.5% =====
+[trial-w2-20261115T021839] Started on branch agent/slugify-trial-w2-20261115T021839
+  tail -f /home/user/sandcastle-episode/runs/trial-w2-20261115T021839/sandcastle-logs/agent.log
+{
+  "runId": "trial-w2-20261115T021839",
+  "passed": false,
+  "wallMs": 80669,
+  "error": null,
+  "testAfterExit": 1,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-w2-20261115T021839"
+}
+===== END trial-w2-20261115T021839 mem=55.9% =====
+mem_used_pct=55.9
+===== START trial-w3-20261115T022001 mem=55.9% =====
+[trial-w3-20261115T022001] Started on branch agent/slugify-trial-w3-20261115T022001
+  tail -f /home/user/sandcastle-episode/runs/trial-w3-20261115T022001/sandcastle-logs/agent.log
+{
+  "runId": "trial-w3-20261115T022001",
+  "passed": false,
+  "wallMs": 61592,
+  "error": null,
+  "testAfterExit": 1,
+  "outDir": "/home/user/sandcastle-episode/runs/trial-w3-20261115T022001"
+}
+===== END trial-w3-20261115T022001 mem=55.2% =====
+| run | pass/fail | wall s | test after | commits | error |
+| --- | --- | --- | --- | --- | --- |
+| trial-1-20261115T021452 | FAIL | 11.4 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-2-20261115T021504 | FAIL | 11.3 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-3-20261115T021516 | FAIL | 11.2 | 1 | None | (FiberFailure) AgentError: opencode exited with code 1: |
+| trial-w1-20261115T021634 | FAIL | 77.8 | 1 | 0 | - |
+| trial-w2-20261115T021839 | FAIL | 80.7 | 1 | 0 | - |
+| trial-w3-20261115T022001 | FAIL | 61.6 | 1 | 0 | - |
+WRAPPER_DONE
+
+Script done on 2026-11-15 02:21:04+08:00 [COMMAND_EXIT_CODE="0"]
