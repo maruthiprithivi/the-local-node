@@ -8,3 +8,4 @@ Follow-along kits live in `episodes/`. Open a folder and run it from a clean che
 - [`episodes/04-prompt-trim/`](episodes/04-prompt-trim/) is the reproduction kit for trimming Qwen Code's system prompt on a local Qwen3.8-27B: the prompt levels, settings, analysis scripts and results.
 - [`episodes/05-prefix-reuse/`](episodes/05-prefix-reuse/) is the reproduction kit for a raw-text prefix-reuse timing and cache microbenchmark on vLLM, SGLang and Ollama.
 - [`episodes/sandcastle/`](episodes/sandcastle/) is the evidence kit for a local run of Sandcastle 0.14.0: the same slugify coding-agent task across series A, B and C, with the task repo, harness, logs and recordings.
+- [`episodes/session-logs-replay/`](episodes/session-logs-replay/) is the reproduction kit for replaying coding-agent session logs and counting how often a final "done" message hid an error, a retry, or a test that never ran.
