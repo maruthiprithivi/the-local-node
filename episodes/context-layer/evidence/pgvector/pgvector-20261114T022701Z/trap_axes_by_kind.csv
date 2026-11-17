@@ -1,0 +1,17 @@
+axis,subject_kind,probes_passed,probes_total,runs
+freshness,human,10,10,5
+freshness,agent,15,15,5
+freshness,mcp_server,15,15,5
+freshness,skill,15,15,5
+identity_permission,human,5,15,5
+identity_permission,agent,10,10,5
+identity_permission,mcp_server,0,5,5
+identity_permission,skill,0,5,5
+entity,human,5,5,5
+entity,agent,5,5,5
+entity,mcp_server,5,5,5
+entity,skill,5,5,5
+meaning_flip,human,0,5,5
+meaning_flip,agent,0,5,5
+meaning_flip,mcp_server,0,5,5
+meaning_flip,skill,0,5,5

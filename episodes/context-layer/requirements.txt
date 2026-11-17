@@ -1,0 +1,4 @@
+# Pinned. Python 3.12.
+PyYAML==6.0.2
+psycopg[binary]==3.2.3
+neo4j==6.4.1

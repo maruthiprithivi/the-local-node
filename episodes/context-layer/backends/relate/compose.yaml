@@ -1,0 +1,10 @@
+# Pinned, local only, bound to loopback. The password comes from the environment, never committed.
+# Same DBMS that Neo4j Desktop (Relate) runs: Neo4j Community, Bolt on 7687, file mode (data on disk).
+services:
+  neo4j:
+    image: neo4j:2026.10.2-community@sha256:4a2fd4f41ce384aa7d6a74b399f22c202e154f3966119c28a18ed9a500904f5e
+    environment:
+      NEO4J_AUTH: neo4j/${CTXLAYER_NEO4J_PASSWORD:?set it in your shell}
+      NEO4J_server_memory_heap_max__size: 1g
+      NEO4J_server_memory_pagecache_size: 256m
+    ports: ["127.0.0.1:57687:7687"]

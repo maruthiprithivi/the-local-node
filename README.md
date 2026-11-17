@@ -29,6 +29,7 @@ See [contributing](CONTRIBUTING.md) for lesson updates, alignment checks and the
 - [`episodes/05-prefix-reuse/`](episodes/05-prefix-reuse/) is the reproduction kit for a raw-text prefix-reuse timing and cache microbenchmark on vLLM, SGLang and Ollama.
 - [`episodes/sandcastle/`](episodes/sandcastle/) is the evidence kit for a local run of Sandcastle 0.14.0: the same slugify coding-agent task across series A, B and C, with the task repo, harness, logs and recordings.
 - [`episodes/session-logs-replay/`](episodes/session-logs-replay/) is the reproduction kit for replaying coding-agent session logs and counting how often a final "done" message hid an error, a retry, or a test that never ran.
+- [`episodes/context-layer/`](episodes/context-layer/) is the test harness and pgvector reproduction kit for the race for the context layer: one synthetic join, move, leave workload (people, agents, MCP servers and skills), a read back after every change, four trap axes, raw runs, CSVs and charts.
 - [`website/`](website/) contains the code that publishes the guided courses.
 - [`assets/brand/`](assets/brand/) contains shared artwork for The Local Node.
 

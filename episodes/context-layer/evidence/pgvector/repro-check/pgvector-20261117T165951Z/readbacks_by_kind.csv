@@ -1,0 +1,5 @@
+subject_kind,readbacks_passed,readbacks_total,leaked_facts,runs
+human,40,40,0,5
+agent,35,35,0,5
+mcp_server,20,20,0,5
+skill,20,20,0,5

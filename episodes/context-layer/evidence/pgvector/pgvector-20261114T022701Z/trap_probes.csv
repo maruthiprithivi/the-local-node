@@ -1,0 +1,131 @@
+run_id,axis,asker,about,after,ask,pass,missing,leaked,answer,tokens_added,ask_ms
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,241.049
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,237.234
+pgvector-20261114T022701Z-seed7-48f2851-r1,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,244.556
+pgvector-20261114T022701Z-seed7-48f2851-r1,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,242.982
+pgvector-20261114T022701Z-seed7-48f2851-r1,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,580.316
+pgvector-20261114T022701Z-seed7-48f2851-r1,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,473.789
+pgvector-20261114T022701Z-seed7-48f2851-r1,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,248.325
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,243.979
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,889.425
+pgvector-20261114T022701Z-seed7-48f2851-r1,meaning_flip,E1003,A2001,A2001 change,Who no longer owns the support triage agent?,0,owner:E1001,owner:E1011,owner:E1011;ticket_queue_read,9,320.986
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1003,A2001,A2001 remove,What can the support triage agent read?,1,,,,0,239.468
+pgvector-20261114T022701Z-seed7-48f2851-r1,entity,E1003,A2002,A2002 change,What can the release notes agent read?,1,,,build_logs_read;deploy_console_read;owner:E1002,15,236.238
+pgvector-20261114T022701Z-seed7-48f2851-r1,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,253.433
+pgvector-20261114T022701Z-seed7-48f2851-r1,identity_permission,E1002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,242.021
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1003,M3001,M3001 add,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup,9,421.462
+pgvector-20261114T022701Z-seed7-48f2851-r1,identity_permission,E1011,M3001,M3001 add,Which tools can the ledger MCP server call?,0,,owner:E1003;tool:ledger_lookup,owner:E1003;tool:ledger_lookup,9,457.548
+pgvector-20261114T022701Z-seed7-48f2851-r1,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,238.925
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,237.196
+pgvector-20261114T022701Z-seed7-48f2851-r1,entity,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,247.736
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1003,M3001,M3001 remove,What can the ledger MCP server call?,1,,,,0,816.943
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1001,S4001,S4001 add,Who owns the expense summary skill?,1,,,expense_review;owner:E1003,7,418.611
+pgvector-20261114T022701Z-seed7-48f2851-r1,identity_permission,A2001,S4001,S4001 add,What does the expense summary skill grant?,0,,expense_review;owner:E1003,expense_review;owner:E1003,7,244.507
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1001,S4001,S4001 change,Who owns the expense summary skill?,1,,,expense_review;owner:E1001,7,239.577
+pgvector-20261114T022701Z-seed7-48f2851-r1,entity,E1003,S4001,S4001 change,What does the expense summary skill grant?,1,,,expense_review;owner:E1001,7,235.204
+pgvector-20261114T022701Z-seed7-48f2851-r1,meaning_flip,E1003,S4001,S4001 change,Who no longer owns the expense summary skill?,0,owner:E1003,owner:E1001,expense_review;owner:E1001,7,244.964
+pgvector-20261114T022701Z-seed7-48f2851-r1,freshness,E1003,S4001,S4001 remove,What does the expense summary skill grant?,1,,,,0,244.624
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,483.732
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,528.352
+pgvector-20261114T022701Z-seed7-48f2851-r2,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,235.402
+pgvector-20261114T022701Z-seed7-48f2851-r2,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,341.166
+pgvector-20261114T022701Z-seed7-48f2851-r2,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,235.56
+pgvector-20261114T022701Z-seed7-48f2851-r2,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,473.648
+pgvector-20261114T022701Z-seed7-48f2851-r2,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,237.266
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,250.358
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,240.475
+pgvector-20261114T022701Z-seed7-48f2851-r2,meaning_flip,E1003,A2001,A2001 change,Who no longer owns the support triage agent?,0,owner:E1001,owner:E1011,owner:E1011;ticket_queue_read,9,240.795
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1003,A2001,A2001 remove,What can the support triage agent read?,1,,,,0,240.182
+pgvector-20261114T022701Z-seed7-48f2851-r2,entity,E1003,A2002,A2002 change,What can the release notes agent read?,1,,,build_logs_read;deploy_console_read;owner:E1002,15,237.991
+pgvector-20261114T022701Z-seed7-48f2851-r2,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,241.932
+pgvector-20261114T022701Z-seed7-48f2851-r2,identity_permission,E1002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,237.169
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1003,M3001,M3001 add,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup,9,582.286
+pgvector-20261114T022701Z-seed7-48f2851-r2,identity_permission,E1011,M3001,M3001 add,Which tools can the ledger MCP server call?,0,,owner:E1003;tool:ledger_lookup,owner:E1003;tool:ledger_lookup,9,237.506
+pgvector-20261114T022701Z-seed7-48f2851-r2,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,239.583
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,238.602
+pgvector-20261114T022701Z-seed7-48f2851-r2,entity,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,246.289
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1003,M3001,M3001 remove,What can the ledger MCP server call?,1,,,,0,241.349
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1001,S4001,S4001 add,Who owns the expense summary skill?,1,,,expense_review;owner:E1003,7,238.717
+pgvector-20261114T022701Z-seed7-48f2851-r2,identity_permission,A2001,S4001,S4001 add,What does the expense summary skill grant?,0,,expense_review;owner:E1003,expense_review;owner:E1003,7,240.342
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1001,S4001,S4001 change,Who owns the expense summary skill?,1,,,expense_review;owner:E1001,7,242.235
+pgvector-20261114T022701Z-seed7-48f2851-r2,entity,E1003,S4001,S4001 change,What does the expense summary skill grant?,1,,,expense_review;owner:E1001,7,510.125
+pgvector-20261114T022701Z-seed7-48f2851-r2,meaning_flip,E1003,S4001,S4001 change,Who no longer owns the expense summary skill?,0,owner:E1003,owner:E1001,expense_review;owner:E1001,7,812.545
+pgvector-20261114T022701Z-seed7-48f2851-r2,freshness,E1003,S4001,S4001 remove,What does the expense summary skill grant?,1,,,,0,237.139
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,462.471
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,240.851
+pgvector-20261114T022701Z-seed7-48f2851-r3,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,239.783
+pgvector-20261114T022701Z-seed7-48f2851-r3,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,239.324
+pgvector-20261114T022701Z-seed7-48f2851-r3,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,441.872
+pgvector-20261114T022701Z-seed7-48f2851-r3,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,480.317
+pgvector-20261114T022701Z-seed7-48f2851-r3,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,248.186
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,238.807
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,784.714
+pgvector-20261114T022701Z-seed7-48f2851-r3,meaning_flip,E1003,A2001,A2001 change,Who no longer owns the support triage agent?,0,owner:E1001,owner:E1011,owner:E1011;ticket_queue_read,9,249.401
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1003,A2001,A2001 remove,What can the support triage agent read?,1,,,,0,239.209
+pgvector-20261114T022701Z-seed7-48f2851-r3,entity,E1003,A2002,A2002 change,What can the release notes agent read?,1,,,build_logs_read;deploy_console_read;owner:E1002,15,251.759
+pgvector-20261114T022701Z-seed7-48f2851-r3,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,247.58
+pgvector-20261114T022701Z-seed7-48f2851-r3,identity_permission,E1002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,239.217
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1003,M3001,M3001 add,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup,9,238.373
+pgvector-20261114T022701Z-seed7-48f2851-r3,identity_permission,E1011,M3001,M3001 add,Which tools can the ledger MCP server call?,0,,owner:E1003;tool:ledger_lookup,owner:E1003;tool:ledger_lookup,9,235.818
+pgvector-20261114T022701Z-seed7-48f2851-r3,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,237.406
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,239.594
+pgvector-20261114T022701Z-seed7-48f2851-r3,entity,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,241.398
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1003,M3001,M3001 remove,What can the ledger MCP server call?,1,,,,0,237.624
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1001,S4001,S4001 add,Who owns the expense summary skill?,1,,,expense_review;owner:E1003,7,851.435
+pgvector-20261114T022701Z-seed7-48f2851-r3,identity_permission,A2001,S4001,S4001 add,What does the expense summary skill grant?,0,,expense_review;owner:E1003,expense_review;owner:E1003,7,552.318
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1001,S4001,S4001 change,Who owns the expense summary skill?,1,,,expense_review;owner:E1001,7,795.594
+pgvector-20261114T022701Z-seed7-48f2851-r3,entity,E1003,S4001,S4001 change,What does the expense summary skill grant?,1,,,expense_review;owner:E1001,7,240.453
+pgvector-20261114T022701Z-seed7-48f2851-r3,meaning_flip,E1003,S4001,S4001 change,Who no longer owns the expense summary skill?,0,owner:E1003,owner:E1001,expense_review;owner:E1001,7,243.681
+pgvector-20261114T022701Z-seed7-48f2851-r3,freshness,E1003,S4001,S4001 remove,What does the expense summary skill grant?,1,,,,0,241.152
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,239.728
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,269.38
+pgvector-20261114T022701Z-seed7-48f2851-r4,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,517.013
+pgvector-20261114T022701Z-seed7-48f2851-r4,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,681.715
+pgvector-20261114T022701Z-seed7-48f2851-r4,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,233.054
+pgvector-20261114T022701Z-seed7-48f2851-r4,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,473.1
+pgvector-20261114T022701Z-seed7-48f2851-r4,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,235.904
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,243.532
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,239.662
+pgvector-20261114T022701Z-seed7-48f2851-r4,meaning_flip,E1003,A2001,A2001 change,Who no longer owns the support triage agent?,0,owner:E1001,owner:E1011,owner:E1011;ticket_queue_read,9,242.648
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1003,A2001,A2001 remove,What can the support triage agent read?,1,,,,0,237.661
+pgvector-20261114T022701Z-seed7-48f2851-r4,entity,E1003,A2002,A2002 change,What can the release notes agent read?,1,,,build_logs_read;deploy_console_read;owner:E1002,15,498.842
+pgvector-20261114T022701Z-seed7-48f2851-r4,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,235.988
+pgvector-20261114T022701Z-seed7-48f2851-r4,identity_permission,E1002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,240.127
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1003,M3001,M3001 add,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup,9,783.815
+pgvector-20261114T022701Z-seed7-48f2851-r4,identity_permission,E1011,M3001,M3001 add,Which tools can the ledger MCP server call?,0,,owner:E1003;tool:ledger_lookup,owner:E1003;tool:ledger_lookup,9,271.46
+pgvector-20261114T022701Z-seed7-48f2851-r4,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,497.453
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,241.438
+pgvector-20261114T022701Z-seed7-48f2851-r4,entity,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,240.345
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1003,M3001,M3001 remove,What can the ledger MCP server call?,1,,,,0,452.369
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1001,S4001,S4001 add,Who owns the expense summary skill?,1,,,expense_review;owner:E1003,7,507.185
+pgvector-20261114T022701Z-seed7-48f2851-r4,identity_permission,A2001,S4001,S4001 add,What does the expense summary skill grant?,0,,expense_review;owner:E1003,expense_review;owner:E1003,7,796.351
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1001,S4001,S4001 change,Who owns the expense summary skill?,1,,,expense_review;owner:E1001,7,338.386
+pgvector-20261114T022701Z-seed7-48f2851-r4,entity,E1003,S4001,S4001 change,What does the expense summary skill grant?,1,,,expense_review;owner:E1001,7,351.129
+pgvector-20261114T022701Z-seed7-48f2851-r4,meaning_flip,E1003,S4001,S4001 change,Who no longer owns the expense summary skill?,0,owner:E1003,owner:E1001,expense_review;owner:E1001,7,849.937
+pgvector-20261114T022701Z-seed7-48f2851-r4,freshness,E1003,S4001,S4001 remove,What does the expense summary skill grant?,1,,,,0,879.499
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,244.291
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,277.062
+pgvector-20261114T022701Z-seed7-48f2851-r5,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,235.504
+pgvector-20261114T022701Z-seed7-48f2851-r5,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,253.867
+pgvector-20261114T022701Z-seed7-48f2851-r5,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,523.495
+pgvector-20261114T022701Z-seed7-48f2851-r5,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,491.215
+pgvector-20261114T022701Z-seed7-48f2851-r5,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,239.117
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,236.873
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,572.402
+pgvector-20261114T022701Z-seed7-48f2851-r5,meaning_flip,E1003,A2001,A2001 change,Who no longer owns the support triage agent?,0,owner:E1001,owner:E1011,owner:E1011;ticket_queue_read,9,235.162
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1003,A2001,A2001 remove,What can the support triage agent read?,1,,,,0,241.497
+pgvector-20261114T022701Z-seed7-48f2851-r5,entity,E1003,A2002,A2002 change,What can the release notes agent read?,1,,,build_logs_read;deploy_console_read;owner:E1002,15,238.452
+pgvector-20261114T022701Z-seed7-48f2851-r5,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,794.609
+pgvector-20261114T022701Z-seed7-48f2851-r5,identity_permission,E1002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,1005.861
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1003,M3001,M3001 add,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup,9,234.867
+pgvector-20261114T022701Z-seed7-48f2851-r5,identity_permission,E1011,M3001,M3001 add,Which tools can the ledger MCP server call?,0,,owner:E1003;tool:ledger_lookup,owner:E1003;tool:ledger_lookup,9,244.189
+pgvector-20261114T022701Z-seed7-48f2851-r5,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,238.548
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,242.447
+pgvector-20261114T022701Z-seed7-48f2851-r5,entity,E1003,M3001,M3001 change,Which tools can the ledger MCP server call?,1,,,owner:E1003;tool:ledger_lookup_redacted,11,241.044
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1003,M3001,M3001 remove,What can the ledger MCP server call?,1,,,,0,236.661
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1001,S4001,S4001 add,Who owns the expense summary skill?,1,,,expense_review;owner:E1003,7,238.094
+pgvector-20261114T022701Z-seed7-48f2851-r5,identity_permission,A2001,S4001,S4001 add,What does the expense summary skill grant?,0,,expense_review;owner:E1003,expense_review;owner:E1003,7,802.496
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1001,S4001,S4001 change,Who owns the expense summary skill?,1,,,expense_review;owner:E1001,7,236.542
+pgvector-20261114T022701Z-seed7-48f2851-r5,entity,E1003,S4001,S4001 change,What does the expense summary skill grant?,1,,,expense_review;owner:E1001,7,449.832
+pgvector-20261114T022701Z-seed7-48f2851-r5,meaning_flip,E1003,S4001,S4001 change,Who no longer owns the expense summary skill?,0,owner:E1003,owner:E1001,expense_review;owner:E1001,7,385.871
+pgvector-20261114T022701Z-seed7-48f2851-r5,freshness,E1003,S4001,S4001 remove,What does the expense summary skill grant?,1,,,,0,238.356

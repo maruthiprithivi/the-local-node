@@ -1,0 +1,116 @@
+run_id,step,entity,step_text,pass,missing,leaked,got
+pgvector-20261114T022701Z-seed7-48f2851-r1,4,E1011,"read back E1011, expect ticket_queue, support_kb, escalations",1,,,escalations;support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r1,6,E1001,"read back E1001, expect ticket_queue, support_kb",1,,,support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r1,9,E1001,"read back E1001, expect support access gone",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r1,11,E1001,"read back E1001, expect ledger_read, expense_review",1,,,expense_review;ledger_read
+pgvector-20261114T022701Z-seed7-48f2851-r1,16,E1001,"read back E1001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r1,18,E1002,"read back E1002, expect deploy_console, build_logs",1,,,build_logs;deploy_console
+pgvector-20261114T022701Z-seed7-48f2851-r1,20,E1002,"read back E1002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r1,24,E1003,"read back E1003, expect ledger_read, ledger_write, expense_review",1,,,expense_review;ledger_read;ledger_write
+pgvector-20261114T022701Z-seed7-48f2851-r1,27,A2001,"read back A2001, expect owner:E1001, ticket_queue_read",1,,,owner:E1001;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r1,30,A2001,"read back A2001, expect owner:E1001 gone",1,,,ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r1,32,A2001,"read back A2001, expect owner:E1011, ticket_queue_read",1,,,owner:E1011;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r1,36,A2001,"read back A2001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r1,39,A2002,"read back A2002, expect owner:E1002, build_logs_read",1,,,build_logs_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r1,41,A2002,"read back A2002, expect build_logs_read, deploy_console_read",1,,,build_logs_read;deploy_console_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r1,44,A2002,"read back A2002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r1,48,M3001,"read back M3001, expect owner:E1003, tool:ledger_lookup",1,,,owner:E1003;tool:ledger_lookup
+pgvector-20261114T022701Z-seed7-48f2851-r1,52,M3001,"read back M3001, expect tool:ledger_lookup gone",1,,,owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r1,54,M3001,"read back M3001, expect tool:ledger_lookup_redacted",1,,,owner:E1003;tool:ledger_lookup_redacted
+pgvector-20261114T022701Z-seed7-48f2851-r1,59,M3001,"read back M3001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r1,62,S4001,"read back S4001, expect owner:E1003, expense_review",1,,,expense_review;owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r1,66,S4001,"read back S4001, expect owner:E1003 gone",1,,,expense_review
+pgvector-20261114T022701Z-seed7-48f2851-r1,68,S4001,"read back S4001, expect owner:E1001, expense_review",1,,,expense_review;owner:E1001
+pgvector-20261114T022701Z-seed7-48f2851-r1,73,S4001,"read back S4001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r2,4,E1011,"read back E1011, expect ticket_queue, support_kb, escalations",1,,,escalations;support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r2,6,E1001,"read back E1001, expect ticket_queue, support_kb",1,,,support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r2,9,E1001,"read back E1001, expect support access gone",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r2,11,E1001,"read back E1001, expect ledger_read, expense_review",1,,,expense_review;ledger_read
+pgvector-20261114T022701Z-seed7-48f2851-r2,16,E1001,"read back E1001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r2,18,E1002,"read back E1002, expect deploy_console, build_logs",1,,,build_logs;deploy_console
+pgvector-20261114T022701Z-seed7-48f2851-r2,20,E1002,"read back E1002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r2,24,E1003,"read back E1003, expect ledger_read, ledger_write, expense_review",1,,,expense_review;ledger_read;ledger_write
+pgvector-20261114T022701Z-seed7-48f2851-r2,27,A2001,"read back A2001, expect owner:E1001, ticket_queue_read",1,,,owner:E1001;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r2,30,A2001,"read back A2001, expect owner:E1001 gone",1,,,ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r2,32,A2001,"read back A2001, expect owner:E1011, ticket_queue_read",1,,,owner:E1011;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r2,36,A2001,"read back A2001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r2,39,A2002,"read back A2002, expect owner:E1002, build_logs_read",1,,,build_logs_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r2,41,A2002,"read back A2002, expect build_logs_read, deploy_console_read",1,,,build_logs_read;deploy_console_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r2,44,A2002,"read back A2002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r2,48,M3001,"read back M3001, expect owner:E1003, tool:ledger_lookup",1,,,owner:E1003;tool:ledger_lookup
+pgvector-20261114T022701Z-seed7-48f2851-r2,52,M3001,"read back M3001, expect tool:ledger_lookup gone",1,,,owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r2,54,M3001,"read back M3001, expect tool:ledger_lookup_redacted",1,,,owner:E1003;tool:ledger_lookup_redacted
+pgvector-20261114T022701Z-seed7-48f2851-r2,59,M3001,"read back M3001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r2,62,S4001,"read back S4001, expect owner:E1003, expense_review",1,,,expense_review;owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r2,66,S4001,"read back S4001, expect owner:E1003 gone",1,,,expense_review
+pgvector-20261114T022701Z-seed7-48f2851-r2,68,S4001,"read back S4001, expect owner:E1001, expense_review",1,,,expense_review;owner:E1001
+pgvector-20261114T022701Z-seed7-48f2851-r2,73,S4001,"read back S4001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r3,4,E1011,"read back E1011, expect ticket_queue, support_kb, escalations",1,,,escalations;support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r3,6,E1001,"read back E1001, expect ticket_queue, support_kb",1,,,support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r3,9,E1001,"read back E1001, expect support access gone",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r3,11,E1001,"read back E1001, expect ledger_read, expense_review",1,,,expense_review;ledger_read
+pgvector-20261114T022701Z-seed7-48f2851-r3,16,E1001,"read back E1001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r3,18,E1002,"read back E1002, expect deploy_console, build_logs",1,,,build_logs;deploy_console
+pgvector-20261114T022701Z-seed7-48f2851-r3,20,E1002,"read back E1002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r3,24,E1003,"read back E1003, expect ledger_read, ledger_write, expense_review",1,,,expense_review;ledger_read;ledger_write
+pgvector-20261114T022701Z-seed7-48f2851-r3,27,A2001,"read back A2001, expect owner:E1001, ticket_queue_read",1,,,owner:E1001;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r3,30,A2001,"read back A2001, expect owner:E1001 gone",1,,,ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r3,32,A2001,"read back A2001, expect owner:E1011, ticket_queue_read",1,,,owner:E1011;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r3,36,A2001,"read back A2001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r3,39,A2002,"read back A2002, expect owner:E1002, build_logs_read",1,,,build_logs_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r3,41,A2002,"read back A2002, expect build_logs_read, deploy_console_read",1,,,build_logs_read;deploy_console_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r3,44,A2002,"read back A2002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r3,48,M3001,"read back M3001, expect owner:E1003, tool:ledger_lookup",1,,,owner:E1003;tool:ledger_lookup
+pgvector-20261114T022701Z-seed7-48f2851-r3,52,M3001,"read back M3001, expect tool:ledger_lookup gone",1,,,owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r3,54,M3001,"read back M3001, expect tool:ledger_lookup_redacted",1,,,owner:E1003;tool:ledger_lookup_redacted
+pgvector-20261114T022701Z-seed7-48f2851-r3,59,M3001,"read back M3001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r3,62,S4001,"read back S4001, expect owner:E1003, expense_review",1,,,expense_review;owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r3,66,S4001,"read back S4001, expect owner:E1003 gone",1,,,expense_review
+pgvector-20261114T022701Z-seed7-48f2851-r3,68,S4001,"read back S4001, expect owner:E1001, expense_review",1,,,expense_review;owner:E1001
+pgvector-20261114T022701Z-seed7-48f2851-r3,73,S4001,"read back S4001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r4,4,E1011,"read back E1011, expect ticket_queue, support_kb, escalations",1,,,escalations;support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r4,6,E1001,"read back E1001, expect ticket_queue, support_kb",1,,,support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r4,9,E1001,"read back E1001, expect support access gone",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r4,11,E1001,"read back E1001, expect ledger_read, expense_review",1,,,expense_review;ledger_read
+pgvector-20261114T022701Z-seed7-48f2851-r4,16,E1001,"read back E1001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r4,18,E1002,"read back E1002, expect deploy_console, build_logs",1,,,build_logs;deploy_console
+pgvector-20261114T022701Z-seed7-48f2851-r4,20,E1002,"read back E1002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r4,24,E1003,"read back E1003, expect ledger_read, ledger_write, expense_review",1,,,expense_review;ledger_read;ledger_write
+pgvector-20261114T022701Z-seed7-48f2851-r4,27,A2001,"read back A2001, expect owner:E1001, ticket_queue_read",1,,,owner:E1001;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r4,30,A2001,"read back A2001, expect owner:E1001 gone",1,,,ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r4,32,A2001,"read back A2001, expect owner:E1011, ticket_queue_read",1,,,owner:E1011;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r4,36,A2001,"read back A2001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r4,39,A2002,"read back A2002, expect owner:E1002, build_logs_read",1,,,build_logs_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r4,41,A2002,"read back A2002, expect build_logs_read, deploy_console_read",1,,,build_logs_read;deploy_console_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r4,44,A2002,"read back A2002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r4,48,M3001,"read back M3001, expect owner:E1003, tool:ledger_lookup",1,,,owner:E1003;tool:ledger_lookup
+pgvector-20261114T022701Z-seed7-48f2851-r4,52,M3001,"read back M3001, expect tool:ledger_lookup gone",1,,,owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r4,54,M3001,"read back M3001, expect tool:ledger_lookup_redacted",1,,,owner:E1003;tool:ledger_lookup_redacted
+pgvector-20261114T022701Z-seed7-48f2851-r4,59,M3001,"read back M3001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r4,62,S4001,"read back S4001, expect owner:E1003, expense_review",1,,,expense_review;owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r4,66,S4001,"read back S4001, expect owner:E1003 gone",1,,,expense_review
+pgvector-20261114T022701Z-seed7-48f2851-r4,68,S4001,"read back S4001, expect owner:E1001, expense_review",1,,,expense_review;owner:E1001
+pgvector-20261114T022701Z-seed7-48f2851-r4,73,S4001,"read back S4001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r5,4,E1011,"read back E1011, expect ticket_queue, support_kb, escalations",1,,,escalations;support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r5,6,E1001,"read back E1001, expect ticket_queue, support_kb",1,,,support_kb;ticket_queue
+pgvector-20261114T022701Z-seed7-48f2851-r5,9,E1001,"read back E1001, expect support access gone",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r5,11,E1001,"read back E1001, expect ledger_read, expense_review",1,,,expense_review;ledger_read
+pgvector-20261114T022701Z-seed7-48f2851-r5,16,E1001,"read back E1001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r5,18,E1002,"read back E1002, expect deploy_console, build_logs",1,,,build_logs;deploy_console
+pgvector-20261114T022701Z-seed7-48f2851-r5,20,E1002,"read back E1002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r5,24,E1003,"read back E1003, expect ledger_read, ledger_write, expense_review",1,,,expense_review;ledger_read;ledger_write
+pgvector-20261114T022701Z-seed7-48f2851-r5,27,A2001,"read back A2001, expect owner:E1001, ticket_queue_read",1,,,owner:E1001;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r5,30,A2001,"read back A2001, expect owner:E1001 gone",1,,,ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r5,32,A2001,"read back A2001, expect owner:E1011, ticket_queue_read",1,,,owner:E1011;ticket_queue_read
+pgvector-20261114T022701Z-seed7-48f2851-r5,36,A2001,"read back A2001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r5,39,A2002,"read back A2002, expect owner:E1002, build_logs_read",1,,,build_logs_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r5,41,A2002,"read back A2002, expect build_logs_read, deploy_console_read",1,,,build_logs_read;deploy_console_read;owner:E1002
+pgvector-20261114T022701Z-seed7-48f2851-r5,44,A2002,"read back A2002, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r5,48,M3001,"read back M3001, expect owner:E1003, tool:ledger_lookup",1,,,owner:E1003;tool:ledger_lookup
+pgvector-20261114T022701Z-seed7-48f2851-r5,52,M3001,"read back M3001, expect tool:ledger_lookup gone",1,,,owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r5,54,M3001,"read back M3001, expect tool:ledger_lookup_redacted",1,,,owner:E1003;tool:ledger_lookup_redacted
+pgvector-20261114T022701Z-seed7-48f2851-r5,59,M3001,"read back M3001, expect no access",1,,,
+pgvector-20261114T022701Z-seed7-48f2851-r5,62,S4001,"read back S4001, expect owner:E1003, expense_review",1,,,expense_review;owner:E1003
+pgvector-20261114T022701Z-seed7-48f2851-r5,66,S4001,"read back S4001, expect owner:E1003 gone",1,,,expense_review
+pgvector-20261114T022701Z-seed7-48f2851-r5,68,S4001,"read back S4001, expect owner:E1001, expense_review",1,,,expense_review;owner:E1001
+pgvector-20261114T022701Z-seed7-48f2851-r5,73,S4001,"read back S4001, expect no access",1,,,

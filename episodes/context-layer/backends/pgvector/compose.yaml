@@ -1,0 +1,8 @@
+# Pinned, local only, bound to loopback. Password comes from the environment, never committed.
+services:
+  pg:
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      POSTGRES_PASSWORD: ${CTXLAYER_PG_PASSWORD:?set it in your shell}
+      POSTGRES_DB: ctxlayer
+    ports: ["127.0.0.1:55432:5432"]

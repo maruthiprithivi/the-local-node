@@ -1,0 +1,7 @@
+image: pgvector/pgvector:0.8.0-pg17
+digest: pgvector/pgvector@sha256:40b404964359299eefdd5f8518facf1886c562848cf4de13b6eaf91cb70c2b87
+arch: amd64
+postgres: 17.6 (Debian 17.6-1.pgdg12+1)
+memory_cap: 2g  cpus: 2  bind: 127.0.0.1 only
+batch: pgvector-20261117T165951Z  runs: 5
+pgvector extension: 0.8.0

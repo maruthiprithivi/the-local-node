@@ -1,0 +1,56 @@
+run_id,axis,asker,about,after,ask,pass,missing,leaked,answer,tokens_added,ask_ms
+pgvector-20261114T002325Z-seed7-45a3db3-r1,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,245.15
+pgvector-20261114T002325Z-seed7-45a3db3-r1,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,248.968
+pgvector-20261114T002325Z-seed7-45a3db3-r1,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,245.797
+pgvector-20261114T002325Z-seed7-45a3db3-r1,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,262.494
+pgvector-20261114T002325Z-seed7-45a3db3-r1,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,246.067
+pgvector-20261114T002325Z-seed7-45a3db3-r1,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,509.753
+pgvector-20261114T002325Z-seed7-45a3db3-r1,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,809.57
+pgvector-20261114T002325Z-seed7-45a3db3-r1,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,250.634
+pgvector-20261114T002325Z-seed7-45a3db3-r1,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,244.618
+pgvector-20261114T002325Z-seed7-45a3db3-r1,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,249.558
+pgvector-20261114T002325Z-seed7-45a3db3-r1,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,258.144
+pgvector-20261114T002325Z-seed7-45a3db3-r2,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,247.452
+pgvector-20261114T002325Z-seed7-45a3db3-r2,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,535.561
+pgvector-20261114T002325Z-seed7-45a3db3-r2,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,259.796
+pgvector-20261114T002325Z-seed7-45a3db3-r2,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,480.083
+pgvector-20261114T002325Z-seed7-45a3db3-r2,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,244.16
+pgvector-20261114T002325Z-seed7-45a3db3-r2,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,490.913
+pgvector-20261114T002325Z-seed7-45a3db3-r2,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,246.593
+pgvector-20261114T002325Z-seed7-45a3db3-r2,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,247.516
+pgvector-20261114T002325Z-seed7-45a3db3-r2,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,244.884
+pgvector-20261114T002325Z-seed7-45a3db3-r2,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,246.174
+pgvector-20261114T002325Z-seed7-45a3db3-r2,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,247.695
+pgvector-20261114T002325Z-seed7-45a3db3-r3,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,255.626
+pgvector-20261114T002325Z-seed7-45a3db3-r3,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,246.037
+pgvector-20261114T002325Z-seed7-45a3db3-r3,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,246.047
+pgvector-20261114T002325Z-seed7-45a3db3-r3,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,245.182
+pgvector-20261114T002325Z-seed7-45a3db3-r3,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,255.572
+pgvector-20261114T002325Z-seed7-45a3db3-r3,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,502.867
+pgvector-20261114T002325Z-seed7-45a3db3-r3,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,246.799
+pgvector-20261114T002325Z-seed7-45a3db3-r3,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,314.347
+pgvector-20261114T002325Z-seed7-45a3db3-r3,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,463.346
+pgvector-20261114T002325Z-seed7-45a3db3-r3,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,245.672
+pgvector-20261114T002325Z-seed7-45a3db3-r3,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,246.946
+pgvector-20261114T002325Z-seed7-45a3db3-r4,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,251.135
+pgvector-20261114T002325Z-seed7-45a3db3-r4,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,466.369
+pgvector-20261114T002325Z-seed7-45a3db3-r4,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,451.103
+pgvector-20261114T002325Z-seed7-45a3db3-r4,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,249.732
+pgvector-20261114T002325Z-seed7-45a3db3-r4,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,790.717
+pgvector-20261114T002325Z-seed7-45a3db3-r4,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,621.383
+pgvector-20261114T002325Z-seed7-45a3db3-r4,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,633.657
+pgvector-20261114T002325Z-seed7-45a3db3-r4,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,772.967
+pgvector-20261114T002325Z-seed7-45a3db3-r4,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,430.521
+pgvector-20261114T002325Z-seed7-45a3db3-r4,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,246.666
+pgvector-20261114T002325Z-seed7-45a3db3-r4,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,248.421
+pgvector-20261114T002325Z-seed7-45a3db3-r5,freshness,E1003,E1001,E1001 join,What can Mira Okafor access?,1,,,support_kb;ticket_queue,7,245.863
+pgvector-20261114T002325Z-seed7-45a3db3-r5,freshness,E1003,E1001,E1001 move,What can Mira Okafor access?,1,,,expense_review;ledger_read,7,246.746
+pgvector-20261114T002325Z-seed7-45a3db3-r5,entity,E1003,E1011,E1001 move,What can Mira Okoro access?,1,,,escalations;support_kb;ticket_queue,9,249.03
+pgvector-20261114T002325Z-seed7-45a3db3-r5,meaning_flip,E1003,E1001,E1001 move,What can Mira Okafor no longer access?,0,support_kb;ticket_queue,expense_review;ledger_read,expense_review;ledger_read,7,259.88
+pgvector-20261114T002325Z-seed7-45a3db3-r5,identity_permission,E1002,E1001,E1002 leave,What can Mira Okafor access?,1,,,,0,260.855
+pgvector-20261114T002325Z-seed7-45a3db3-r5,identity_permission,E1002,E1011,E1002 leave,What can Mira Okoro access?,0,,escalations;support_kb;ticket_queue,escalations;support_kb;ticket_queue,9,1140.47
+pgvector-20261114T002325Z-seed7-45a3db3-r5,identity_permission,E1002,E1003,E1003 join,What can Ada Mensah access?,0,,expense_review;ledger_read;ledger_write,expense_review;ledger_read;ledger_write,11,244.21
+pgvector-20261114T002325Z-seed7-45a3db3-r5,freshness,E1011,A2001,A2001 add,Who owns the support triage agent?,1,,,owner:E1001;ticket_queue_read,9,244.934
+pgvector-20261114T002325Z-seed7-45a3db3-r5,freshness,E1011,A2001,A2001 change,Who owns the support triage agent?,1,,,owner:E1011;ticket_queue_read,9,245.987
+pgvector-20261114T002325Z-seed7-45a3db3-r5,identity_permission,A2002,A2002,A2002 owner_leaves,What can the release notes agent read?,1,,,,0,256.588
+pgvector-20261114T002325Z-seed7-45a3db3-r5,meaning_flip,E1003,M3001,M3001 change,Which tools can the ledger MCP server no longer call?,0,tool:ledger_lookup,tool:ledger_lookup_redacted,owner:E1003;tool:ledger_lookup_redacted,11,467.051

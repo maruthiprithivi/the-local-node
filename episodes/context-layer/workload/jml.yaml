@@ -1,0 +1,354 @@
+# Synthetic join, move, leave workload for The race for the context layer.
+# Every company, person, agent, server, skill and access name in this file is made up.
+# kind is one of: human, agent, mcp_server, skill
+# humans join, move and leave; agents, MCP servers and skills are added, changed and removed.
+workload: jml-synthetic
+company: Example Co
+seed: 7
+
+entities:
+  - id: E1011
+    kind: human
+    name: Mira Okoro
+    events:
+      - kind: join
+        department: support
+        role: support lead
+        grant: [ticket_queue, support_kb, escalations]
+        expect_after:
+          has: [ticket_queue, support_kb, escalations]
+          lacks: []
+
+  - id: E1001
+    kind: human
+    name: Mira Okafor
+    events:
+      - kind: join
+        department: support
+        role: support agent
+        grant: [ticket_queue, support_kb]
+        expect_after:
+          has: [ticket_queue, support_kb]
+          lacks: []
+
+      - kind: move
+        from: support
+        to: finance
+        role: finance analyst
+        revoke: [ticket_queue, support_kb]
+        grant: [ledger_read, expense_review]
+        expect_after:
+          has: [ledger_read, expense_review]
+          lacks: [ticket_queue, support_kb]
+
+      - kind: leave
+        revoke: all
+        expect_after:
+          has: []
+          lacks: [ticket_queue, support_kb, ledger_read, expense_review]
+          answer: no access
+
+  - id: E1002
+    kind: human
+    name: Tomas Lind
+    events:
+      - kind: join
+        department: engineering
+        role: platform engineer
+        grant: [deploy_console, build_logs]
+        expect_after:
+          has: [deploy_console, build_logs]
+          lacks: []
+
+      - kind: leave
+        revoke: all
+        expect_after:
+          has: []
+          lacks: [deploy_console, build_logs]
+          answer: no access
+
+  - id: E1003
+    kind: human
+    name: Ada Mensah
+    events:
+      - kind: join
+        department: finance
+        role: finance manager
+        manages: [E1001]
+        grant: [ledger_read, ledger_write, expense_review]
+        expect_after:
+          has: [ledger_read, ledger_write, expense_review]
+          lacks: []
+
+  # Non human lifecycle. Owners are humans above; an owner is stored as the fact owner:<id>.
+  - id: A2001
+    kind: agent
+    name: support triage agent
+    events:
+      - kind: add
+        owner: E1001
+        grant: [ticket_queue_read]
+        expect_after: {has: [owner:E1001, ticket_queue_read], lacks: []}
+      - kind: change
+        owner: {from: E1001, to: E1011}
+        expect_after: {has: [owner:E1011, ticket_queue_read], lacks: [owner:E1001]}
+      - kind: remove
+        expect_after: {has: [], lacks: [owner:E1011, ticket_queue_read], answer: no access}
+
+  - id: A2002
+    kind: agent
+    name: release notes agent
+    events:
+      - kind: add
+        owner: E1002
+        grant: [build_logs_read]
+        expect_after: {has: [owner:E1002, build_logs_read], lacks: []}
+      - kind: change
+        grant: [deploy_console_read]
+        expect_after: {has: [build_logs_read, deploy_console_read], lacks: []}
+      - kind: owner_leaves
+        owner: E1002
+        expect_after: {has: [], lacks: [owner:E1002, build_logs_read, deploy_console_read], answer: no access}
+
+  - id: M3001
+    kind: mcp_server
+    name: ledger MCP server
+    events:
+      - kind: add
+        owner: E1003
+        grant: [tool:ledger_lookup]
+        expect_after: {has: [owner:E1003, tool:ledger_lookup], lacks: []}
+      - kind: change
+        revoke: [tool:ledger_lookup]
+        grant: [tool:ledger_lookup_redacted]
+        expect_after: {has: [tool:ledger_lookup_redacted], lacks: [tool:ledger_lookup]}
+      - kind: remove
+        expect_after: {has: [], lacks: [owner:E1003, tool:ledger_lookup_redacted], answer: no access}
+
+  - id: S4001
+    kind: skill
+    name: expense summary skill
+    events:
+      - kind: add
+        owner: E1003
+        grant: [expense_review]
+        expect_after: {has: [owner:E1003, expense_review], lacks: []}
+      - kind: change
+        owner: {from: E1003, to: E1001}
+        expect_after: {has: [owner:E1001, expense_review], lacks: [owner:E1003]}
+      - kind: remove
+        expect_after: {has: [], lacks: [owner:E1001, expense_review], answer: no access}
+
+# Trap asks. Each one is scored pass or fail on its own, by axis, never averaged.
+# axis must be one of: freshness, identity_permission, entity, meaning_flip
+# probes: each probe asks at a point in the timeline, right after `entity` finishes event `event`
+# (its read back has already run). A probe passes when every fact in `has` is in the answer and no
+# fact in `lacks` is. `empty: true` means the right answer is nothing at all. A trap passes when all
+# of its probes pass. Ground truth is written here, not derived from the backend under test.
+traps:
+  - axis: freshness
+    asker: E1003
+    ask: What can Mira Okafor access?
+    about: E1001
+    asked_after: [join, move]
+    expect: the answer changes after her move
+    probes:
+      - {entity: E1001, event: join, has: [ticket_queue, support_kb], lacks: [ledger_read, expense_review]}
+      - {entity: E1001, event: move, has: [ledger_read, expense_review], lacks: [ticket_queue, support_kb]}
+
+  - axis: identity_permission
+    asker: E1002
+    ask: What can Mira Okafor access?
+    about: E1001
+    asked_after: [leave]
+    expect: a leaver gets nothing, even asking about someone else
+    probes:
+      - {entity: E1002, event: leave, empty: true}
+
+  - axis: identity_permission
+    asker: E1002
+    ask: What can Mira Okoro access?
+    about: E1011
+    asked_after: [leave]
+    expect: a leaver who left asks about a person who is still active, and gets nothing
+    probes:
+      - {entity: E1002, event: leave, empty: true}
+
+  - axis: identity_permission
+    asker: E1002
+    ask: What can Ada Mensah access?
+    about: E1003
+    asked_after: [join]
+    expect: an active engineer is not allowed to read a finance manager's access, so gets nothing
+    probes:
+      - {entity: E1003, event: join, empty: true}
+
+  - axis: entity
+    asker: E1003
+    ask: What can Mira Okoro access?
+    about: E1011
+    confuse_with: E1001
+    asked_after: [move]
+    expect: support access for E1011, not finance access for E1001
+    probes:
+      - {entity: E1001, event: move, has: [ticket_queue, support_kb, escalations], lacks: [ledger_read, expense_review]}
+
+  - axis: meaning_flip
+    asker: E1003
+    ask: What can Mira Okafor no longer access?
+    about: E1001
+    asked_after: [move]
+    expect: the revoked support access, not the current finance access
+    probes:
+      - {entity: E1001, event: move, has: [ticket_queue, support_kb], lacks: [ledger_read, expense_review]}
+
+  - axis: freshness
+    asker: E1011
+    ask: Who owns the support triage agent?
+    about: A2001
+    asked_after: [add, change]
+    expect: the owner changes from E1001 to E1011
+    probes:
+      - {entity: A2001, event: add, has: ["owner:E1001"], lacks: ["owner:E1011"]}
+      - {entity: A2001, event: change, has: ["owner:E1011"], lacks: ["owner:E1001"]}
+
+  - axis: identity_permission
+    asker: A2002
+    ask: What can the release notes agent read?
+    about: A2002
+    asked_after: [owner_leaves]
+    expect: an agent whose owner left gets nothing
+    probes:
+      - {entity: A2002, event: owner_leaves, empty: true}
+
+  - axis: meaning_flip
+    asker: E1003
+    ask: Which tools can the ledger MCP server no longer call?
+    about: M3001
+    asked_after: [change]
+    expect: the removed ledger_lookup tool, not the current redacted one
+    probes:
+      - {entity: M3001, event: change, has: ["tool:ledger_lookup"], lacks: ["tool:ledger_lookup_redacted"]}
+
+  # Non human traps. Same four axes, same scoring, ground truth written here.
+  - axis: freshness
+    asker: E1003
+    ask: Which tools can the ledger MCP server call?
+    about: M3001
+    asked_after: [add, change]
+    expect: the tool changes from ledger_lookup to the redacted one
+    probes:
+      - {entity: M3001, event: add, has: ["tool:ledger_lookup"], lacks: ["tool:ledger_lookup_redacted"]}
+      - {entity: M3001, event: change, has: ["tool:ledger_lookup_redacted"], lacks: ["tool:ledger_lookup"]}
+
+  - axis: freshness
+    asker: E1001
+    ask: Who owns the expense summary skill?
+    about: S4001
+    asked_after: [add, change]
+    expect: the owner changes from E1003 to E1001
+    probes:
+      - {entity: S4001, event: add, has: ["owner:E1003"], lacks: ["owner:E1001"]}
+      - {entity: S4001, event: change, has: ["owner:E1001"], lacks: ["owner:E1003"]}
+
+  - axis: freshness
+    asker: E1003
+    ask: What can the support triage agent read?
+    about: A2001
+    asked_after: [remove]
+    expect: a removed agent has nothing left to report
+    probes:
+      - {entity: A2001, event: remove, empty: true}
+
+  - axis: freshness
+    asker: E1003
+    ask: What can the ledger MCP server call?
+    about: M3001
+    asked_after: [remove]
+    expect: a removed MCP server has nothing left to report
+    probes:
+      - {entity: M3001, event: remove, empty: true}
+
+  - axis: freshness
+    asker: E1003
+    ask: What does the expense summary skill grant?
+    about: S4001
+    asked_after: [remove]
+    expect: a removed skill has nothing left to report
+    probes:
+      - {entity: S4001, event: remove, empty: true}
+
+  - axis: identity_permission
+    asker: E1011
+    ask: Which tools can the ledger MCP server call?
+    about: M3001
+    asked_after: [add]
+    expect: a support lead is not allowed to read a finance MCP server's tools, so gets nothing
+    probes:
+      - {entity: M3001, event: add, empty: true}
+
+  - axis: identity_permission
+    asker: A2001
+    ask: What does the expense summary skill grant?
+    about: S4001
+    asked_after: [add]
+    expect: a removed agent asks about a skill, and gets nothing
+    probes:
+      - {entity: S4001, event: add, empty: true}
+
+  - axis: identity_permission
+    asker: E1002
+    ask: What can the release notes agent read?
+    about: A2002
+    asked_after: [owner_leaves]
+    expect: the owner who left asks about the agent they used to own, and gets nothing
+    probes:
+      - {entity: A2002, event: owner_leaves, empty: true}
+
+  - axis: entity
+    asker: E1003
+    ask: What can the release notes agent read?
+    about: A2002
+    confuse_with: A2001
+    asked_after: [change]
+    expect: build and deploy reads for A2002, not the ticket queue read or owner of A2001
+    probes:
+      - {entity: A2002, event: change, has: [build_logs_read, deploy_console_read], lacks: [ticket_queue_read, "owner:E1011", "owner:E1001"]}
+
+  - axis: entity
+    asker: E1003
+    ask: What does the expense summary skill grant?
+    about: S4001
+    confuse_with: M3001
+    asked_after: [change]
+    expect: expense review for the skill, not the ledger tool of the MCP server
+    probes:
+      - {entity: S4001, event: change, has: [expense_review, "owner:E1001"], lacks: ["tool:ledger_lookup_redacted", "owner:E1003"]}
+
+  - axis: meaning_flip
+    asker: E1003
+    ask: Who no longer owns the expense summary skill?
+    about: S4001
+    asked_after: [change]
+    expect: the previous owner E1003, not the current owner
+    probes:
+      - {entity: S4001, event: change, has: ["owner:E1003"], lacks: ["owner:E1001"]}
+
+  - axis: meaning_flip
+    asker: E1003
+    ask: Who no longer owns the support triage agent?
+    about: A2001
+    asked_after: [change]
+    expect: the previous owner E1001, not the current owner
+    probes:
+      - {entity: A2001, event: change, has: ["owner:E1001"], lacks: ["owner:E1011"]}
+
+  - axis: entity
+    asker: E1003
+    ask: Which tools can the ledger MCP server call?
+    about: M3001
+    confuse_with: S4001
+    asked_after: [change]
+    expect: the redacted ledger tool for the MCP server, not the expense review grant of the skill
+    probes:
+      - {entity: M3001, event: change, has: ["tool:ledger_lookup_redacted", "owner:E1003"], lacks: [expense_review, "tool:ledger_lookup"]}

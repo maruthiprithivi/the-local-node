@@ -1,0 +1,5 @@
+axis,traps_passed,traps_total,runs,passed_all_runs,total_all_runs
+freshness,2,2,5,10,10
+identity_permission,2,4,5,10,20
+entity,1,1,5,5,5
+meaning_flip,0,2,5,0,10

@@ -1,0 +1,16 @@
+[project]
+name = "ctxlayer"
+version = "0.1.0"
+description = "Provider agnostic harness for The race for the context layer"
+requires-python = ">=3.11"
+dependencies = ["PyYAML==6.0.2", "psycopg[binary]==3.2.3", "neo4j==6.4.1"]
+
+[project.scripts]
+ctxlayer = "ctxlayer.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["ctxlayer"]
