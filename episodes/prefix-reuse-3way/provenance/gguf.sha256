@@ -1,0 +1,2 @@
+4ba990ad6736f2b07691fa5cf9836c4b0eb26498ecdd646c1e76ba597c99ec9f  qwen3.5-4b-bf16.gguf
+# size_bytes=8665619904  n_tensors=441  convert_hf_to_gguf.py --outtype bf16  llama.cpp 8642541  (file not included)

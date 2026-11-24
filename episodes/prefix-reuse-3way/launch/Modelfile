@@ -1,0 +1,2 @@
+FROM /gguf/qwen3.5-4b-bf16.gguf
+PARAMETER num_ctx 8192
